@@ -72,14 +72,48 @@ SDIO 卡在 0.98 秒起来：`mmc1: new UHS-I speed SDR104 SDIO card at address 
 
 写入时 `10.0.0.117` 没有路由，eMMC 没有重新核对。
 
+## 第十七次启动
+
+触摸方向对了。Wi-Fi 仍然没有。SDIO 卡还是 0.98 秒起来，日志里没有 ath10k，也没有 `cfg80211` 的监管库提示。`dlkm_loader` 报 module load count 是 0。`init.kukui.rc` 的 `early-init`、`init`、`fs`、`post-fs-data` 都执行了，`post-fs` 没有。上一份里的 `insmod` 写在 `post-fs`，所以没有加载。
+
+这次改由已经在跑的 `dlkm_loader` 加载。`vendor_dlkm` 的 `/lib/modules/` 加上 `modules.load` 和 `modules.dep`，顺序是 rfkill、cfg80211、libarc4、mac80211、ath、ath10k_core、ath10k_sdio。固件路径在 `on init` 再写一次，写在 loader 启动之前。内核映像没重链。
+
+桌面没有导航键，也没有手势。AOSP 的 `config_showNavigationBar` 默认是 false，这台机器没有硬件导航键，键盘盖又不是常驻的。vendor 覆盖把它改成 true。三键和手势两套 overlay 本来就在镜像里，设置里可以切换。默认先出三键。
+
+日志 274270 字节，2474 行，sha256 `057b48778adec9b7e7587bf4eaef1f364f35492d1b88a104049f667b766ad2d0`，写到 191.47 秒。
+
+内核分区没重写。新的 super 仍是 8,589,934,592 字节，读回 `sdb3` 的 sha256：
+
+```text
+228d2e06fa17f4514ad3aa75089e7a96f561a0ce7664fe4ea57369ef5b5f4850
+```
+
+写入时没有再核对 eMMC。
+
+## 第十八次启动
+
+导航栏在。Wi-Fi 开关打开后立刻弹回去。驱动这次是好的：`dlkm_loader` 加载了模块，25.06 秒 `ath10k_sdio` 认出 `qca6174 hw3.2`，固件 `WLAN.RMH.4.4.1-00174`。`wificond` 建出 `wlan0`，接口是 up。随后 `WifiNative` 报 `Failed to setup iface in supplicant`，接口被拆掉。开关再拨几次都是同一句。
+
+`wpa_supplicant` 加 STA 接口之前要有 `/vendor/etc/wifi/wpa_supplicant.conf`，再抄到 `/data/vendor/wifi/wpa/wpa_supplicant.conf`。这份 super 里没有那个模板，所以加接口直接失败。镜像里补上这份配置，并关掉 P2P。logcat 过滤加上 `wpa_supplicant` 和 `SupplicantStaIfaceHalAidlImpl` 的警告。内核映像没重链。
+
+日志 254984 字节，2360 行，sha256 `106fd90cfa4c07ce89fbffe095ed5868b60269d6213cc90908e029fe90feae22`，写到 134.02 秒。
+
+内核分区没重写。新的 super 仍是 8,589,934,592 字节，读回 `sdb3` 的 sha256：
+
+```text
+012a698619d23a36de96b46517a654c87f4066bc375d313fa54dc8014a9806b5
+```
+
+写入时没有再核对 eMMC。
+
 ## 人工测试
 
 U 盘从工作站卸载之后再做。
 
 1. 卸下 U 盘，插到 Krane 上。外接鼠标仍接在 hub 上，键盘盖装上。
 2. 重启，开发者屏幕按 Ctrl+U。
-3. 桌面应仍停住。手指在玻璃上从上往下划，内容应跟着往下走。若变成镜像，或方向仍不对，告诉我。
-4. 打开 Wi-Fi，看能否扫到网络。能连上再试一次。这次还不能算已经可用。
+3. 屏幕底部的三个键应还在。
+4. 打开 Wi-Fi，看开关是否停在打开，以及能否扫到网络。能连上再试一次。这次还不能算已经可用。
 5. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
 6. 把 U 盘插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。
 
@@ -89,8 +123,8 @@ U 盘从工作站卸载之后再做。
 
 1. `evdev.ko` 已加载。外接鼠标和键盘盖触控板能用。
 2. Panfrost。第十五次启动仍是 Mali-G72 GLES 3.1。
-3. Wi-Fi，然后是无线 adb。SDIO 卡已枚举。ath10k 模块和 QCA6174 固件已写入 super，等这次 Ctrl+U。有线 adb 仍然不可用。
-4. 触摸、旋转、USI 笔。触摸已能点，方向按第十六次的手势写成 `ORIENTATION_270`。笔还没改。
+3. Wi-Fi，然后是无线 adb。第十八次驱动和 `wlan0` 已起来，supplicant 缺配置。配置已写入 super，等这次 Ctrl+U。有线 adb 仍然不可用。
+4. 触摸、旋转、USI 笔。方向已经对。笔还没改。屏幕导航键已打开。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
 7. 蓝牙。上面的 SIGABRT 留到这一项。

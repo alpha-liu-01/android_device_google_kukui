@@ -28,6 +28,9 @@ set -- \
     AllocatorService:E BufferQueueProducer:E \
     BootAnimation:I libc:F DEBUG:I AndroidRuntime:E tombstoned:E \
     EventHub:I InputReader:W \
+    WifiNative:I WifiService:W wificond:I \
+    SupplicantStaIfaceHalAidlImpl:W WifiClientModeImpl:W \
+    wpa_supplicant:W \
     netd:E Netd:E '*:S'
 
 logcat -b crash -b system -b main -v threadtime \

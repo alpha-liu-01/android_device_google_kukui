@@ -5,6 +5,9 @@
 
 LOCAL_PATH := device/google/kukui
 
+# Static overlay. PRODUCT_ENFORCE_RRO_TARGETS turns this into a runtime overlay.
+DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay
+
 AB_OTA_UPDATER := false
 TARGET_GRAPHICS := mesa
 TARGET_GRAPHICS_VULKAN := none
@@ -44,6 +47,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/kukui-logcat.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-logcat.sh \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_RAMDISK)/ueventd.kukui.rc \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc \
+    $(LOCAL_PATH)/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \
     $(LOCAL_PATH)/firmware/ath10k/QCA6174/hw3.0/board-2.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/ath10k/QCA6174/hw3.0/board-2.bin \
     $(LOCAL_PATH)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin \
     $(LOCAL_PATH)/modules/rfkill.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfkill.ko \
@@ -52,7 +56,11 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/mac80211.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mac80211.ko \
     $(LOCAL_PATH)/modules/ath.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath.ko \
     $(LOCAL_PATH)/modules/ath10k_core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_core.ko \
-    $(LOCAL_PATH)/modules/ath10k_sdio.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_sdio.ko
+    $(LOCAL_PATH)/modules/ath10k_sdio.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_sdio.ko \
+    $(LOCAL_PATH)/modules/modules.load:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.load \
+    $(LOCAL_PATH)/modules/modules.dep:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.dep \
+    $(LOCAL_PATH)/modules/modules.alias:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.alias \
+    $(LOCAL_PATH)/modules/modules.softdep:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.softdep
 
 PRODUCT_SYSTEM_PROPERTIES += \
     sys.use_memfd=true \
