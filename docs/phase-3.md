@@ -1,6 +1,6 @@
 # 阶段 3：亮屏
 
-2026-10-30 开始。路线图在 [roadmap.md](roadmap.md)。用阶段 2 的内核 `6.18.28-mt81-kukui2`，在 U 盘上启动第一份 Android。不写 eMMC，不启用 USB gadget，不测 Wi-Fi、蓝牙、音频和休眠。
+2026-10-31 结束。路线图在 [roadmap.md](roadmap.md)。用阶段 2 的内核 `6.18.28-mt81-kukui2`，在 U 盘上启动第一份 Android。不写 eMMC，不启用 USB gadget，不测 Wi-Fi、蓝牙、音频和休眠。
 
 源码树是 `/run/media/alpha/YMTC/lineage-23.2`。板级文件在这个仓库的 `device/google/kukui`，逐个文件链进源码树。`system/core/libcutils/ashmem-dev.cpp` 里已经先做 `F_GET_SEALS`，这一段不再改那份文件。CFI 和 shadow call stack 保持阶段 2 的 `=y`。后面两次只重编内核，分别打开 f2fs 安全标签和 dm-verity，版本字符串没变。
 
@@ -280,22 +280,20 @@ aa50a78be66cdf1b75dd8cef3b7666eeec577418e89ea009e74b4596d1910bb2
 
 写入时平板不在网上，eMMC 没有重新核对。
 
+第十四次 Ctrl+U 进入桌面。zygote 在内核时间 24.06 秒启动。开机动画在 28.85 秒起来。SurfaceFlinger 报 Mali-G72 (Panfrost)、OpenGL ES 3.1 Mesa 25.3.3。`sys.boot_completed=1` 在 55.48 秒。`configs.ko` 在 5.65 秒加载。没有再出现 `Kernel configs could not be fetched`，也没有 Rescue Party 重启。日志 231064 字节，2189 行，sha256 `9276aba962ac00e6be95a5f113f149eb5f6ffc36a301f65273bb440c983797d9`，写到 122.00 秒。
+
+这次停在灭屏之后的挂起失败上。117.08 秒 SurfaceFlinger 把显示设成 power mode 0，用户空间冻结被拒绝（先是 300 个任务，再是 308 个），任务随后恢复。不是崩溃重启。触摸、键盘盖和外接鼠标在内核里都已经注册，Android 没有收到事件。`/dev/input` 在 17.05 秒还不存在。原因和下一阶段的开头写在 [阶段 4](phase-4.md)。
+
+2026-10-31 回到内置盘之后核对过：postmarketOS v26.06，根在 `/dev/mmcblk0p3`，`uname -r` 是 `6.18.28-mt81`，`/boot/vmlinuz.kpart` 的 sha256 仍是 `15b59e3aed9710dd8bc0fbd789929c340daf973b9edf7ba98ed67e18ec3cf03e`。
+
 `lunch` 是 `lineage_kukui-trunk_staging-userdebug`。Mesa 的 gallium 只有 panfrost，Vulkan 驱动是空的。`mapper.minigbm_upstream.so` 在 vendor 里。源码树里 Gru 留下的 `stylusctld` 文件上下文缺测试行，补了一行 `system/sepolicy/contexts/file_contexts_test_data`，否则 sepolicy 检查过不了。这不是 Kukui 的功能。
 
-## 人工测试
+## 完成
 
-镜像写完、U 盘从工作站卸载之后才做。
+第十四次 Ctrl+U 三条都达到。
 
-1. 卸下 U 盘，插到 Krane 上。
-2. 重启，开发者屏幕按 Ctrl+U。
-3. 等几分钟。userdata 已经是 f2fs，这次不再格式化。开机动画应出现，然后离开动画。如果动画一直停着，或者机器自己重启，按住电源关掉。
-4. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
-5. 把 U 盘插回工作站。内核日志在 `pmOS_boot` 的 `kukui-phase3.log`，上一份在 `kukui-phase3.log.prev`。surfaceflinger 的 abort 以 `KUKUI_LOG` 写在同一份文件里。不要按 UUID 或卷标在平板上挂这份分区。
-
-大约两分钟仍然全黑时，回到内置盘，把 U 盘插回工作站，读 `pmOS_boot` 上的 `kukui-phase3.log`。黑屏本身不表示内核已经坏了。有线 adb 不是通过条件：这个 Type-C 口在 U 盘模式下是 host。
-
-完成标准：
-
-1. Ctrl+U 后面板上出现画面。
-2. 日志里 zygote 和 surfaceflinger 已经起来。
+1. 面板上进入了桌面。
+2. 日志里 zygote 在 24.06 秒启动，surfaceflinger 用 Panfrost 在合成，`sys.boot_completed=1` 在 55.48 秒。
 3. 回到内置盘仍是 v26.06，eMMC 上 `/boot/vmlinuz.kpart` 的 sha256 仍是 `15b59e3aed9710dd8bc0fbd789929c340daf973b9edf7ba98ed67e18ec3cf03e`。
+
+有线 adb 不是通过条件：这个 Type-C 口在 U 盘模式下是 host。触摸、键盘和鼠标不能用，那是阶段 4 的第一件事，见 [阶段 4](phase-4.md)。

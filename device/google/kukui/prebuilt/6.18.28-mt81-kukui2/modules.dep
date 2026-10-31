@@ -1,3 +1,4 @@
+evdev.ko:
 hid-generic.ko:
 hid-multitouch.ko:
 i2c-hid.ko:

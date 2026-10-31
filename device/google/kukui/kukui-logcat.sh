@@ -27,6 +27,7 @@ set -- \
     RenderEngine:V libEGL:E libGLESv2:E minigbm:V gralloc4:V \
     AllocatorService:E BufferQueueProducer:E \
     BootAnimation:I libc:F DEBUG:I AndroidRuntime:E tombstoned:E \
+    EventHub:I InputReader:W \
     netd:E Netd:E '*:S'
 
 logcat -b crash -b system -b main -v threadtime \
