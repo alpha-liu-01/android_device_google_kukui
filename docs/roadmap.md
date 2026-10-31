@@ -176,10 +176,10 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 ### 4 平板日常
 
-已开始，记录在 [阶段 4](phase-4.md)。Panfrost 仍是 Mali-G72。外接鼠标、键盘盖触控板和触摸屏都能用，触摸方向已对齐。Launcher3 已停住。屏幕导航键已打开。ath10k 已绑定，supplicant 还缺一次开机确认。前一项能用再做下一项。镜像保持 vanilla。
+已开始，记录在 [阶段 4](phase-4.md)。Panfrost 仍是 Mali-G72。外接鼠标、键盘盖触控板和触摸屏都能用，触摸方向已对齐。Launcher3 已停住。屏幕导航键已打开。Wi-Fi 已连上，无线 adb 可用。USI 笔方向等下次 Ctrl+U。前一项能用再做下一项。镜像保持 vanilla。
 
 1. Panfrost 加速。第十四次启动已经是 Mali-G72 GLES 3.1，镜像里没有 SwiftShader。这一项只确认后面的改动没有把它换掉。
-2. Wi-Fi，然后是无线 adb。这是后面改用户空间的通道。U 盘还插在机器上，有线 adb 仍然不可用。
+2. Wi-Fi，然后是无线 adb。第十九次已经连上，无线 adb 可用。
 3. 触摸、旋转、USI 笔。
 4. 底座键盘、触控板，以及拆下底座后的平板模式。
 5. 背光。
@@ -235,4 +235,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。触摸方向和屏幕导航键已对齐。Wi-Fi 驱动已绑定，supplicant 配置已写入 super，等待下一次 Ctrl+U，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi 和无线 adb 已在第十九次启动确认。USI 笔方向等下次 Ctrl+U，见 [阶段 4](phase-4.md)。

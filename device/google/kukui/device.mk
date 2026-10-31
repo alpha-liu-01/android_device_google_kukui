@@ -41,6 +41,7 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
     frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E30.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E30.idc \
+    $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E30_Stylus.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E30_Stylus.idc \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_RAMDISK)/fstab.kukui \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.kukui \
     $(LOCAL_PATH)/init.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.kukui.rc \

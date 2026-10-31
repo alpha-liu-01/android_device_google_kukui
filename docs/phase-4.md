@@ -106,16 +106,22 @@ SDIO 卡在 0.98 秒起来：`mmc1: new UHS-I speed SDR104 SDIO card at address 
 
 写入时没有再核对 eMMC。
 
+## 第十九次启动
+
+Wi-Fi 可用。无线 adb 先配对 `10.0.0.104:41895`，再连上 `10.0.0.104:5555`。`wlan0` 是 up，地址 `28:cd:c4:70:77:b3`，IPv4 `10.0.0.104/24`，默认路由 `10.0.0.1`。IPv6 前缀 `2607:fea8:4f03:3700::/64`，默认路由是路由通告里的 `fe80::1e9e:ccff:fe5a:8543`。连的是 `"Not 6GHz"`，WPA2，802.11ac，5765 MHz，RSSI -38，发送 702 Mbps，接收 866 Mbps，分数 100，supplicant 状态 `COMPLETED`。`ping 1.1.1.1` 两包都回来，往返大约 24.4 ms。这次没有把 U 盘拔回来抄 kmsg，上面是正在运行的系统。
+
+USI 笔已经能画。节点是 `hid-over-i2c 27C6:0E30 Stylus`，`event6`，类型已经是 touchscreen，方向仍是 `Rotation0`。手指那路用的是另一个名字，所以笔没有读到 `ORIENTATION_270`。笔从右往左画时，系统里仍是从上往下。配置写成 `hid-over-i2c_27C6_0E30_Stylus.idc`，方向同样是 `ORIENTATION_270`。这份文件已经放在 userdata 的 `/data/system/devices/idc/`。下次 Ctrl+U 会读到它。super 分区还是上一份，U 盘还在平板上，新的 super 等 U 盘回到工作站再写。
+
 ## 人工测试
 
-U 盘从工作站卸载之后再做。
+笔的配置已经在这块 U 盘的 userdata 上。不用先拿回工作站。
 
-1. 卸下 U 盘，插到 Krane 上。外接鼠标仍接在 hub 上，键盘盖装上。
+1. U 盘留在 Krane 上。外接鼠标仍接在 hub 上，键盘盖装上。
 2. 重启，开发者屏幕按 Ctrl+U。
-3. 屏幕底部的三个键应还在。
-4. 打开 Wi-Fi，看开关是否停在打开，以及能否扫到网络。能连上再试一次。这次还不能算已经可用。
+3. 用 USI 笔在玻璃上从上往下画，笔画应跟着往下走。若变成镜像，或方向仍不对，告诉我。
+4. Wi-Fi 这次已经连上 `"Not 6GHz"` 并能 ping 通。不用再为开关弹回做一次测试。
 5. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
-6. 把 U 盘插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。
+6. 把 U 盘插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。新的 super 等这时再写入。
 
 ## 顺序
 
@@ -123,8 +129,8 @@ U 盘从工作站卸载之后再做。
 
 1. `evdev.ko` 已加载。外接鼠标和键盘盖触控板能用。
 2. Panfrost。第十五次启动仍是 Mali-G72 GLES 3.1。
-3. Wi-Fi，然后是无线 adb。第十八次驱动和 `wlan0` 已起来，supplicant 缺配置。配置已写入 super，等这次 Ctrl+U。有线 adb 仍然不可用。
-4. 触摸、旋转、USI 笔。方向已经对。笔还没改。屏幕导航键已打开。
+3. Wi-Fi 和无线 adb。第十九次已连上 `"Not 6GHz"`，`10.0.0.104`，无线 adb 可用。
+4. 触摸、旋转、USI 笔。手指方向已经对。笔的 `ORIENTATION_270` 在 userdata 上，等下次 Ctrl+U。屏幕导航键已打开。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
 7. 蓝牙。上面的 SIGABRT 留到这一项。
