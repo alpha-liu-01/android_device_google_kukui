@@ -48,3 +48,7 @@ ip6table_mangle.ko
 ip6table_raw.ko
 ipt_REJECT.ko
 ip6t_REJECT.ko
+dummy.ko
+af_key.ko
+nfnetlink_log.ko
+configs.ko

@@ -61,7 +61,7 @@ super 是动态分区，8 GiB。system、vendor、product、system_ext、system_
 - Goodix 触摸：`i2c-hid`、`i2c-hid-of`、`i2c-hid-of-goodix`、`hid-generic`、`hid-multitouch`。
 - `fuse`。APEX 和存储要用，它是模块。
 
-一共 30 个未压缩模块，约 2.6 MiB，目录名是 `6.18.28-mt81-kukui2`，和 `uname -r` 一致。不加载 USB gadget、ath10k 和声卡模块。
+一开始是 30 个未压缩模块，约 2.6 MiB。后来补上 iptables 匹配，以及 `af_key`、`nfnetlink_log`、`dummy`、`configs`。现在 `modules.load` 是 54 行。目录名是 `6.18.28-mt81-kukui2`，和 `uname -r` 一致。不加载 USB gadget、ath10k 和声卡模块。
 
 `kukui-keep` 是 ramdisk 里的 `/init`。它加载 `usb-storage`，只在 `sd*` 上找 `PARTNAME=pmOS_boot` 和 `super`，把 kmsg 写到 `/bootlog/kukui-phase3.log`。读 kmsg 和写盘是两个进程：读进程只往 1 MiB 管道里送，写进程才 `fsync`。这样格式化同一根 U 盘时，卡住的 `fsync` 不会停掉对 printk 环的读取。父进程卸掉 `/bootlog`、`/kukui-proc`、`/kukui-sys`、`/dev`，再执行 `/init.android`。不喂看门狗。写进程仍握着日志文件，所以第二阶段不能再挂这块分区。
 
@@ -242,6 +242,44 @@ db535a34ba7d34dac9ff75bc0d81af2c80412e612e537b8ccc776b0589f74c35
 
 写入时平板不在网上，eMMC 没有重新核对。userdata 上的 f2fs 保留。
 
+第十二次 Ctrl+U 开机动画流畅，然后停在动画上。人在大约 508 秒强制关机，没有回到选盘界面。日志 1,320,539 字节，9734 行，sha256 `df63561e8c46b397a7e90304113d42580911fff3631388570e33d7814d5722c4`，写到内核时间 508.34 秒。上一份日志留在 `kukui-phase3.log.prev`。`eglMakeCurrent` 的 `300b` 没有再出现。`netd` 没有再以状态 1 退出。`BootAnimation` 和 `surfaceflinger` 都在。
+
+停住是因为 `system_server` 的 `batterystats-handler` 反复崩溃：`synchronizeKernelRCU failed: Unknown error -97`。网络统计要 `socket(AF_KEY, SOCK_RAW, PF_KEY_V2)` 再立刻关掉，关闭时内核在 `pfkey_release()` 里调用 `synchronize_rcu()`。`CONFIG_NET_KEY` 原来没编，`socket()` 返回 `EAFNOSUPPORT`（97）。`system_server` 反复退出，开机动画就等不到启动完成。同一份日志里 systemui 和 networkstack 的 `DeadSystemException` 是这个崩溃的连带。
+
+`netd` 每次启动还报 `Unable to create netlink socket for family 5`（`NETLINK_NFLOG`）和 `Failed NFULNL_CFG_CMD_PF_UNBIND: Invalid argument`。`CONFIG_NETFILTER_NETLINK_LOG` 原来没编。这条不让 `netd` 退出。另外有 `cannot find interface dummy0`：`CONFIG_DUMMY` 已经是模块，但没有放进 `modules.load`。`RouteController::Init` 允许 dummy 网络失败，所以这也不是动画停住的原因。
+
+内核映像没重链。版本仍是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2`，映像时间仍是 2026-10-31 01:18。`CONFIG_NET_KEY=m` 和 `CONFIG_NETFILTER_NETLINK_LOG=m` 做成 `af_key.ko`、`nfnetlink_log.ko`，加上已经编好的 `dummy.ko`，放进 ramdisk，由 `modules.load` 加载。`af_key` 依赖已经在列表里的 `xfrm_algo`，`nfnetlink_log` 依赖已经在列表里的 `nfnetlink`。super 没动。userdata 上的 f2fs 保留。
+
+命令行没改。新 FIT 12,447,744 字节，读回 `sdb1` 的 sha256：
+
+```text
+aa50a78be66cdf1b75dd8cef3b7666eeec577418e89ea009e74b4596d1910bb2
+```
+
+写入时平板不在网上，eMMC 没有重新核对。
+
+第十三次 Ctrl+U 开机动画流畅，大约 56 秒后动画自己退出，然后机器在内核时间 78 秒自己重启。日志 241796 字节，2233 行，sha256 `a76a57a60936a3b486a3cd4d253a01df85cc521569cfe78ef0402155a921db5b`，写到 78.70 秒的关机流程。上一份日志留在 `kukui-phase3.log.prev`。`synchronizeKernelRCU` 的 -97 没有再出现。`dummy0` 也没有再报找不到。`af_key.ko`、`nfnetlink_log.ko`、`dummy.ko` 都在 5.3 秒加载成功。
+
+重启是 Rescue Party 的恢复出厂。`system_server` 的 ActivityManager 线程两次 abort：`Kernel configs could not be fetched`。`Debug.isVmapStack()` 要读 `/proc/config.gz`，`CONFIG_IKCONFIG=m` 的 `configs.ko` 没有放进 `modules.load`，文件不存在，`CHECK` 在 userdebug 上直接把进程打死。zygote 跟着重启。第二次起来的 `system_server` 调用了 `RecoverySystem.rebootPromptAndWipeUserData`，misc 上的 BCB 写成 `boot-recovery` 和 `--prompt_and_wipe_data`，原因是 `RescueParty,null`。这台机器的 USB 口在 host 模式，`/sys/class/android_usb/android0/state` 不存在，userdebug 本来靠这点关掉 Rescue Party，所以它开着。第十二次启动里 `system_server` 已经崩溃过很多轮，这一次再崩就升到恢复出厂。
+
+动画退出之后，启动器和 SystemUI 的 RenderThread abort：`Failed to create context, error = EGL_NOT_INITIALIZED`。`ueventd.kukui.rc` 把 `/dev/dri/*` 设成 `0660 system graphics`。开机动画和 surfaceflinger 在 graphics 组里，能打开节点。普通应用不在这个组里，打不开 render 节点。蓝牙也在崩溃：`initializationComplete` 的状态不是成功，HAL 接着在 `FD_SET` 里用了 -1。这两处不是这次自己重启的原因。`netd` 仍然打不开 netlink family 5，`nfnetlink_log` 注册的不是 `NETLINK_NFLOG`，这条不让 `netd` 退出。
+
+`configs.ko` 放进 ramdisk。`/dev/dri/*` 改成和通用 `ueventd.rc` 一样的 `0666 root graphics`。`persist.sys.disable_rescue=true`，避免还没做完的蓝牙崩溃再把 userdata 恢复出厂。misc 上的 wipe 命令已经清掉。内核映像没重链，版本仍是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2`。userdata 上的 f2fs 保留。
+
+新 FIT 12,505,088 字节，读回 `sdb1` 的 sha256：
+
+```text
+9734b6d416026f1fb0d12e15c7566a0ddd9b7e028ea4c1acebfde0bf5fa6d86e
+```
+
+新的 `super.raw` 仍是 8,589,934,592 字节，读回 `sdb3` 的 sha256：
+
+```text
+5a65b6185ce633d5c3e5065726323a9dcc6f2036db7cff524aa33315a7dfe6e6
+```
+
+写入时平板不在网上，eMMC 没有重新核对。
+
 `lunch` 是 `lineage_kukui-trunk_staging-userdebug`。Mesa 的 gallium 只有 panfrost，Vulkan 驱动是空的。`mapper.minigbm_upstream.so` 在 vendor 里。源码树里 Gru 留下的 `stylusctld` 文件上下文缺测试行，补了一行 `system/sepolicy/contexts/file_contexts_test_data`，否则 sepolicy 检查过不了。这不是 Kukui 的功能。
 
 ## 人工测试
@@ -250,7 +288,7 @@ db535a34ba7d34dac9ff75bc0d81af2c80412e612e537b8ccc776b0589f74c35
 
 1. 卸下 U 盘，插到 Krane 上。
 2. 重启，开发者屏幕按 Ctrl+U。
-3. 等几分钟。userdata 已经是 f2fs，这次不再格式化。开机动画应从 `card0` 分到缓冲。面板上应出现画面，背光保持亮。如果背光常亮但仍然什么都不显示，或者又开始几秒一闪，按住电源关掉。
+3. 等几分钟。userdata 已经是 f2fs，这次不再格式化。开机动画应出现，然后离开动画。如果动画一直停着，或者机器自己重启，按住电源关掉。
 4. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
 5. 把 U 盘插回工作站。内核日志在 `pmOS_boot` 的 `kukui-phase3.log`，上一份在 `kukui-phase3.log.prev`。surfaceflinger 的 abort 以 `KUKUI_LOG` 写在同一份文件里。不要按 UUID 或卷标在平板上挂这份分区。
 

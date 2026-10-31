@@ -37,7 +37,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc
 
 PRODUCT_SYSTEM_PROPERTIES += \
-    sys.use_memfd=true
+    sys.use_memfd=true \
+    persist.sys.disable_rescue=true
 
 PRODUCT_PRODUCT_PROPERTIES += \
     ro.adb.secure=0 \

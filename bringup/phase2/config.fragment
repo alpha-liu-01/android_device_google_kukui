@@ -21,3 +21,11 @@ CONFIG_NETFILTER_XT_TARGET_IDLETIMER=m
 CONFIG_NETFILTER_XT_MATCH_LIMIT=m
 CONFIG_NETFILTER_XT_MATCH_STATE=m
 CONFIG_NETFILTER_XT_MATCH_U32=m
+# Closing a PF_KEY socket calls synchronize_rcu(). Network stats use that
+# to swap the bpf maps. Without it, socket(AF_KEY) returns EAFNOSUPPORT
+# and system_server crash-loops on the boot animation.
+CONFIG_NET_KEY=m
+# CONFIG_NET_KEY_MIGRATE is not set
+# netd opens NETLINK_NFLOG. The quota socket is allowed to fail, but the
+# strict-socket unbind then returns EINVAL on every start.
+CONFIG_NETFILTER_NETLINK_LOG=m

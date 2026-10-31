@@ -156,7 +156,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 ### 3 亮屏
 
-镜像已写入 U 盘。第十一次 Ctrl+U 背光常亮但没有画面，人强制关机。合成器和 DSI-1 已经起来，开机动画的 EGL 窗口在 Panfrost render 节点上分配失败。gralloc 改到 `card0`。`netd` 因缺少 bpf/policy 匹配反复退出并杀掉 zygote，这些匹配已放进 ramdisk。等待下一次 Ctrl+U。记录在 [阶段 3](phase-3.md)。
+镜像已写入 U 盘。第十三次 Ctrl+U 开机动画流畅并自己退出，随后 Rescue Party 因读不到 `/proc/config.gz` 把机器重启并写下恢复出厂命令。`configs.ko` 已放进 ramdisk，`/dev/dri` 改为应用也能打开，misc 上的 wipe 命令已清掉。等待下一次 Ctrl+U。记录在 [阶段 3](phase-3.md)。
 
 用阶段 2 的内核，在 U 盘上启动第一份 Android。源码树在 `/run/media/alpha/YMTC/lineage-23.2`。产品名 `lineage_kukui`，平板、仅 Wi-Fi。用户看见的画面是 1920×1200、密度 240。DRM 扫描是 `1200x1920@60.00`，合成器要做阶段 0 里那次旋转。
 
@@ -235,4 +235,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0、阶段 1 和阶段 2 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md) 和 [阶段 2](phase-2.md)。阶段 3 第十一次启动背光常亮但没有画面。gralloc 改到显示卡，netd 需要的 iptables 匹配已装进 ramdisk，等待下一次 Ctrl+U，见 [阶段 3](phase-3.md)。
+当前进度：阶段 0、阶段 1 和阶段 2 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md) 和 [阶段 2](phase-2.md)。阶段 3 第十三次启动的开机动画已经自己退出，随后 Rescue Party 把机器重启。缺的内核配置模块和显示节点权限已经补上，等待下一次 Ctrl+U，见 [阶段 3](phase-3.md)。

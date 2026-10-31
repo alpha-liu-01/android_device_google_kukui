@@ -48,3 +48,7 @@ ip6table_mangle.ko: x_tables.ko ip6_tables.ko ipv6.ko
 ip6table_raw.ko: x_tables.ko ip6_tables.ko
 ipt_REJECT.ko: x_tables.ko nf_reject_ipv4.ko
 ip6t_REJECT.ko: x_tables.ko nf_reject_ipv6.ko
+dummy.ko:
+af_key.ko: xfrm_algo.ko
+nfnetlink_log.ko: nfnetlink.ko
+configs.ko:
