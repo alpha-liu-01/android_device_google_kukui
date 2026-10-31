@@ -1,0 +1,84 @@
+#!/bin/busybox sh
+# Phase 1 marker init. Does not mount postmarketOS root and does not
+# touch mmcblk (the eMMC). The USB and eMMC images share labels and
+# UUIDs because the eMMC was installed with dd.
+
+/bin/busybox --install -s /bin
+export PATH=/bin
+
+mkdir -p /proc /sys /dev /bootlog
+mount -t devtmpfs devtmpfs /dev
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+echo "kukui-android phase1" > /dev/kmsg
+
+# The card reader is a standard bulk-only disk (class 08/06/50). The
+# running kernel builds usb-storage as a module, so the stick never
+# becomes an sd* device unless this init loads it.
+if insmod /lib/modules/usb-storage.ko; then
+	echo "kukui-android phase1 insmod usb-storage" > /dev/kmsg
+else
+	echo "kukui-android phase1 insmod usb-storage failed" > /dev/kmsg
+fi
+
+log_part=""
+i=0
+while [ "$i" -lt 30 ]; do
+	for uevent in /sys/block/sd*/sd*/uevent; do
+		[ -f "$uevent" ] || continue
+		if grep -q '^PARTNAME=pmOS_boot$' "$uevent"; then
+			log_part=/dev/$(basename "$(dirname "$uevent")")
+			break
+		fi
+	done
+	[ -n "$log_part" ] && break
+	i=$((i + 1))
+	sleep 1
+done
+
+mounted=0
+if [ -n "$log_part" ]; then
+	if mount -o rw "$log_part" /bootlog; then
+		mounted=1
+	fi
+fi
+
+if [ "$mounted" -eq 1 ]; then
+	{
+		echo "kukui-android phase1"
+		echo "--- uname ---"
+		cat /proc/version
+		echo "--- cmdline ---"
+		cat /proc/cmdline
+		echo "--- log_part ---"
+		echo "$log_part"
+		echo "--- block ---"
+		for uevent in /sys/block/*/uevent /sys/block/*/*/uevent; do
+			[ -f "$uevent" ] || continue
+			echo "# $uevent"
+			cat "$uevent"
+		done
+	} > /bootlog/kukui-phase1.log
+	sleep 8
+	{
+		echo "--- dmesg ---"
+		dmesg
+		echo "=== end ==="
+	} >> /bootlog/kukui-phase1.log
+	sync
+	echo "kukui-android phase1 wrote $log_part" > /dev/kmsg
+else
+	echo "kukui-android phase1 no boot partition" > /dev/kmsg
+	for block in /sys/block/*; do
+		[ -e "$block" ] || continue
+		echo "kukui-android phase1 block $(basename "$block")" > /dev/kmsg
+	done
+	if [ -d /sys/bus/usb/drivers/usb-storage ]; then
+		echo "kukui-android phase1 usb-storage registered" > /dev/kmsg
+	fi
+fi
+
+while true; do
+	sleep 3600
+done

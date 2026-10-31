@@ -1,0 +1,99 @@
+#!/bin/busybox sh
+# Phase 2 marker init. Same disk rules as phase 1: only the USB
+# pmOS_boot partition, never mmcblk, never the postmarketOS root.
+
+/bin/busybox --install -s /bin
+export PATH=/bin
+
+mkdir -p /proc /sys /dev /bootlog /binder /cpuset
+mount -t devtmpfs devtmpfs /dev
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+echo "kukui-android phase2" > /dev/kmsg
+echo "kukui-android phase2 $(cat /proc/version)" > /dev/kmsg
+
+if insmod /lib/modules/usb-storage.ko; then
+	echo "kukui-android phase2 insmod usb-storage" > /dev/kmsg
+else
+	echo "kukui-android phase2 insmod usb-storage failed" > /dev/kmsg
+fi
+
+if insmod /lib/modules/configs.ko; then
+	echo "kukui-android phase2 insmod configs" > /dev/kmsg
+else
+	echo "kukui-android phase2 insmod configs failed" > /dev/kmsg
+fi
+
+log_part=""
+i=0
+while [ "$i" -lt 30 ]; do
+	for uevent in /sys/block/sd*/sd*/uevent; do
+		[ -f "$uevent" ] || continue
+		if grep -q '^PARTNAME=pmOS_boot$' "$uevent"; then
+			log_part=/dev/$(basename "$(dirname "$uevent")")
+			break
+		fi
+	done
+	[ -n "$log_part" ] && break
+	i=$((i + 1))
+	sleep 1
+done
+
+mounted=0
+if [ -n "$log_part" ]; then
+	if mount -o rw "$log_part" /bootlog; then
+		mounted=1
+	fi
+fi
+
+binder_note="binderfs mount failed"
+if mount -t binder binder /binder; then
+	binder_note="binderfs mounted"
+	ls /binder > /binder.ls 2>/dev/null || true
+fi
+
+cpuset_note="cpuset v1 mount failed"
+if mount -t cgroup -o cpuset cgroup /cpuset; then
+	cpuset_note="cpuset v1 mounted"
+fi
+
+if [ "$mounted" -eq 1 ]; then
+	{
+		echo "kukui-android phase2"
+		echo "--- uname ---"
+		cat /proc/version
+		echo "--- cmdline ---"
+		cat /proc/cmdline
+		echo "--- log_part ---"
+		echo "$log_part"
+		echo "--- filesystems ---"
+		cat /proc/filesystems
+		echo "--- binder ---"
+		echo "$binder_note"
+		cat /binder.ls 2>/dev/null || true
+		echo "--- cpuset ---"
+		echo "$cpuset_note"
+		ls /cpuset 2>/dev/null || true
+		echo "--- config ---"
+		if [ -f /proc/config.gz ]; then
+			gzip -dc /proc/config.gz | grep -E '^(CONFIG_LOCALVERSION|CONFIG_EROFS_FS|CONFIG_EROFS_FS_XATTR|CONFIG_EROFS_FS_SECURITY|CONFIG_EROFS_FS_ZIP|CONFIG_SECURITY_SELINUX|CONFIG_SECURITY_NETWORK|CONFIG_SECURITYFS|CONFIG_ANDROID_BINDERFS|CONFIG_ANDROID_BINDER_IPC|CONFIG_CPUSETS|CONFIG_CPUSETS_V1|CONFIG_FS_ENCRYPTION|CONFIG_CFI|CONFIG_SHADOW_CALL_STACK|CONFIG_NF_TABLES|CONFIG_USB_CONFIGFS|CONFIG_LSM)='
+		else
+			echo "no /proc/config.gz"
+		fi
+	} > /bootlog/kukui-phase2.log
+	sleep 8
+	{
+		echo "--- dmesg ---"
+		dmesg
+		echo "=== end ==="
+	} >> /bootlog/kukui-phase2.log
+	sync
+	echo "kukui-android phase2 wrote $log_part" > /dev/kmsg
+else
+	echo "kukui-android phase2 no boot partition" > /dev/kmsg
+fi
+
+while true; do
+	sleep 3600
+done

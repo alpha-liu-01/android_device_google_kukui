@@ -1,0 +1,23 @@
+# Phase 2 fragment, applied on top of the running 6.18.28-mt81 config.
+# Symbols below were checked against linux-6.18.28 Kconfig before enabling.
+
+CONFIG_LOCALVERSION="-mt81-kukui2"
+CONFIG_EROFS_FS=y
+CONFIG_SECURITY_NETWORK=y
+CONFIG_SECURITY_SELINUX=y
+CONFIG_ANDROID_BINDERFS=y
+CONFIG_CPUSETS_V1=y
+CONFIG_FS_ENCRYPTION=y
+CONFIG_F2FS_FS_SECURITY=y
+CONFIG_DM_VERITY=y
+# netd's static iptables rules use these matches. They are modules so the
+# running image does not need a new built-in config; ramdisk insmod loads them.
+CONFIG_NETFILTER_XT_MATCH_BPF=m
+CONFIG_NETFILTER_XT_MATCH_POLICY=m
+CONFIG_NETFILTER_XT_MATCH_OWNER=m
+CONFIG_NETFILTER_XT_MATCH_CONNMARK=m
+CONFIG_NETFILTER_XT_TARGET_CONNMARK=m
+CONFIG_NETFILTER_XT_TARGET_IDLETIMER=m
+CONFIG_NETFILTER_XT_MATCH_LIMIT=m
+CONFIG_NETFILTER_XT_MATCH_STATE=m
+CONFIG_NETFILTER_XT_MATCH_U32=m

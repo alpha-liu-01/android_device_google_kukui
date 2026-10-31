@@ -1,0 +1,929 @@
+kukui-android phase3
+<6>[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+<5>[    0.000000] Linux version 6.18.28-mt81-kukui2 (alpha@alpha-asus) (Ubuntu clang version 21.1.8 (6ubuntu1), Ubuntu LLD 21.1.8) #1-kukui-phase2 SMP PREEMPT Fri Oct 30 20:05:58 EDT 2026
+<6>[    0.000000] KASLR enabled
+<5>[    0.000000] random: crng init done
+<6>[    0.000000] Machine model: MediaTek krane sku176 board
+<6>[    0.000000] efi: UEFI not found.
+<6>[    0.000000] Reserved memory: created DMA memory pool at 0x000000013ff00000, size 1 MiB
+<6>[    0.000000] OF: reserved mem: initialized node audio-dma-pool, compatible id shared-dma-pool
+<6>[    0.000000] OF: reserved mem: 0x000000013ff00000..0x000000013fffffff (1024 KiB) nomap non-reusable audio-dma-pool
+<6>[    0.000000] OF: reserved mem: 0x00000000ffedb000..0x00000000fffdafff (1024 KiB) map non-reusable ramoops
+<6>[    0.000000] Reserved memory: created DMA memory pool at 0x0000000050000000, size 41 MiB
+<6>[    0.000000] OF: reserved mem: initialized node memory@50000000, compatible id shared-dma-pool
+<6>[    0.000000] OF: reserved mem: 0x0000000050000000..0x00000000528fffff (41984 KiB) nomap non-reusable memory@50000000
+<6>[    0.000000] NUMA: Faking a node at [mem 0x0000000040000000-0x000000013fffffff]
+<6>[    0.000000] NODE_DATA(0) allocated [mem 0x13f6b4080-0x13f6b67ff]
+<6>[    0.000000] Zone ranges:
+<6>[    0.000000]   DMA      [mem 0x0000000040000000-0x00000000ffffffff]
+<6>[    0.000000]   DMA32    empty
+<6>[    0.000000]   Normal   [mem 0x0000000100000000-0x000000013fffffff]
+<6>[    0.000000] Movable zone start for each node
+<6>[    0.000000] Early memory node ranges
+<6>[    0.000000]   node   0: [mem 0x0000000040000000-0x000000004fffffff]
+<6>[    0.000000]   node   0: [mem 0x0000000050000000-0x00000000528fffff]
+<6>[    0.000000]   node   0: [mem 0x0000000052900000-0x00000000545fffff]
+<6>[    0.000000]   node   0: [mem 0x0000000054700000-0x00000000ffdfffff]
+<6>[    0.000000]   node   0: [mem 0x0000000100000000-0x000000013fefffff]
+<6>[    0.000000]   node   0: [mem 0x000000013ff00000-0x000000013fffffff]
+<6>[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x000000013fffffff]
+<6>[    0.000000] On node 0, zone DMA: 256 pages in unavailable ranges
+<6>[    0.000000] On node 0, zone Normal: 512 pages in unavailable ranges
+<6>[    0.000000] cma: Reserved 16 MiB at 0x00000000fee00000
+<6>[    0.000000] psci: probing for conduit method from DT.
+<6>[    0.000000] psci: PSCIv1.1 detected in firmware.
+<6>[    0.000000] psci: Using standard PSCI v0.2 function IDs
+<6>[    0.000000] psci: MIGRATE_INFO_TYPE not supported.
+<6>[    0.000000] psci: SMC Calling Convention v1.2
+<6>[    0.000000] percpu: Embedded 34 pages/cpu s99928 r8192 d31144 u139264
+<7>[    0.000000] pcpu-alloc: s99928 r8192 d31144 u139264 alloc=34*4096
+<7>[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+<6>[    0.000000] Detected VIPT I-cache on CPU0
+<6>[    0.000000] CPU features: detected: GICv3 CPU interface
+<6>[    0.000000] CPU features: kernel page table isolation forced ON by KASLR
+<6>[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
+<6>[    0.000000] CPU features: detected: ARM erratum 845719
+<6>[    0.000000] alternatives: applying boot alternatives
+<5>[    0.000000] Kernel command line: cros_secure kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=7 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11201000.usb/11200000.usb printk.devkmsg=on
+<5>[    0.000000] Unknown kernel command line parameters "cros_secure kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b", will be passed to user space.
+<6>[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+<6>[    0.000000] Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes, linear)
+<6>[    0.000000] Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+<6>[    0.000000] software IO TLB: area num 8.
+<6>[    0.000000] software IO TLB: mapped [mem 0x00000000fae00000-0x00000000fee00000] (64MB)
+<6>[    0.000000] Fallback order for Node 0: 0 
+<6>[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 1047808
+<6>[    0.000000] Policy zone: Normal
+<6>[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+<6>[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+<6>[    0.000000] ftrace: allocating 57396 entries in 226 pages
+<6>[    0.000000] ftrace: allocated 226 pages with 4 groups
+<6>[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+<6>[    0.000000] rcu: 	RCU event tracing is enabled.
+<6>[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=8.
+<6>[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+<6>[    0.000000] 	Rude variant of Tasks RCU enabled.
+<6>[    0.000000] 	Tracing variant of Tasks RCU enabled.
+<6>[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+<6>[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=8
+<6>[    0.000000] RCU Tasks: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+<6>[    0.000000] RCU Tasks Rude: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+<6>[    0.000000] RCU Tasks Trace: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+<6>[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+<6>[    0.000000] GICv3: GIC: Using split EOI/Deactivate mode
+<6>[    0.000000] GICv3: 640 SPIs implemented
+<6>[    0.000000] GICv3: 0 Extended SPIs implemented
+<6>[    0.000000] Root IRQ handler: gic_handle_irq
+<6>[    0.000000] GICv3: GICv3 features: 16 PPIs
+<6>[    0.000000] GICv3: GICD_CTLR.DS=0, SCR_EL3.FIQ=0
+<6>[    0.000000] GICv3: CPU0: found redistributor 0 region 0:0x000000000c100000
+<6>[    0.000000] GICv3: GIC: PPI partition interrupt-partition-0[0] { /cpus/cpu@0[0] /cpus/cpu@1[1] /cpus/cpu@2[2] /cpus/cpu@3[3] }
+<6>[    0.000000] GICv3: GIC: PPI partition interrupt-partition-1[1] { /cpus/cpu@100[4] /cpus/cpu@101[5] /cpus/cpu@102[6] /cpus/cpu@103[7] }
+<6>[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+<6>[    0.000000] arch_timer: cp15 timer running at 13.00MHz (phys).
+<6>[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x2ff89eacb, max_idle_ns: 440795202429 ns
+<6>[    0.000000] sched_clock: 56 bits at 13MHz, resolution 76ns, wraps every 4398046511101ns
+<6>[    0.000494] Console: colour dummy device 80x25
+<6>[    0.000505] printk: legacy console [tty0] enabled
+<6>[    0.001072] Calibrating delay loop (skipped), value calculated using timer frequency.. 26.00 BogoMIPS (lpj=52000)
+<6>[    0.001090] pid_max: default: 32768 minimum: 301
+<6>[    0.001181] LSM: initializing lsm=capability,selinux,bpf
+<6>[    0.001234] SELinux:  Initializing.
+<6>[    0.001795] LSM support for eBPF active
+<6>[    0.001862] Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+<6>[    0.001885] Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+<6>[    0.003810] rcu: Hierarchical SRCU implementation.
+<6>[    0.003824] rcu: 	Max phase no-delay instances is 1000.
+<6>[    0.003976] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+<6>[    0.004620] EFI services will not be available.
+<6>[    0.004849] smp: Bringing up secondary CPUs ...
+<6>[    0.005417] Detected VIPT I-cache on CPU1
+<6>[    0.005525] GICv3: CPU1: found redistributor 1 region 0:0x000000000c120000
+<6>[    0.005565] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+<6>[    0.006177] Detected VIPT I-cache on CPU2
+<6>[    0.006260] GICv3: CPU2: found redistributor 2 region 0:0x000000000c140000
+<6>[    0.006274] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+<6>[    0.006876] Detected VIPT I-cache on CPU3
+<6>[    0.006958] GICv3: CPU3: found redistributor 3 region 0:0x000000000c160000
+<6>[    0.006971] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+<6>[    0.007690] CPU features: detected: Spectre-v2
+<6>[    0.007701] CPU features: detected: Spectre-BHB
+<6>[    0.007706] CPU features: detected: ARM erratum 858921
+<6>[    0.007714] Detected VIPT I-cache on CPU4
+<6>[    0.007819] GICv3: CPU4: found redistributor 100 region 0:0x000000000c180000
+<6>[    0.007828] arch_timer: Enabling local workaround for ARM erratum 858921
+<6>[    0.007840] arch_timer: CPU4: Trapping CNTVCT access
+<6>[    0.007848] CPU4: Booted secondary processor 0x0000000100 [0x410fd092]
+<6>[    0.008587] Detected VIPT I-cache on CPU5
+<6>[    0.008682] GICv3: CPU5: found redistributor 101 region 0:0x000000000c1a0000
+<6>[    0.008690] arch_timer: Enabling local workaround for ARM erratum 858921
+<6>[    0.008697] arch_timer: CPU5: Trapping CNTVCT access
+<6>[    0.008704] CPU5: Booted secondary processor 0x0000000101 [0x410fd092]
+<6>[    0.009287] Detected VIPT I-cache on CPU6
+<6>[    0.009383] GICv3: CPU6: found redistributor 102 region 0:0x000000000c1c0000
+<6>[    0.009391] arch_timer: Enabling local workaround for ARM erratum 858921
+<6>[    0.009398] arch_timer: CPU6: Trapping CNTVCT access
+<6>[    0.009405] CPU6: Booted secondary processor 0x0000000102 [0x410fd092]
+<6>[    0.009987] Detected VIPT I-cache on CPU7
+<6>[    0.010084] GICv3: CPU7: found redistributor 103 region 0:0x000000000c1e0000
+<6>[    0.010092] arch_timer: Enabling local workaround for ARM erratum 858921
+<6>[    0.010100] arch_timer: CPU7: Trapping CNTVCT access
+<6>[    0.010106] CPU7: Booted secondary processor 0x0000000103 [0x410fd092]
+<6>[    0.010180] smp: Brought up 1 node, 8 CPUs
+<6>[    0.010363] SMP: Total of 8 processors activated.
+<6>[    0.010371] CPU: All CPU(s) started at EL2
+<6>[    0.010390] CPU features: detected: 32-bit EL0 Support
+<6>[    0.010398] CPU features: detected: 32-bit EL1 Support
+<6>[    0.010407] CPU features: detected: CRC32 instructions
+<6>[    0.010420] CPU features: detected: PMUv3
+<6>[    0.010477] alternatives: applying system-wide alternatives
+<6>[    0.012441] Memory: 3939024K/4191232K available (19584K kernel code, 2922K rwdata, 8088K rodata, 1920K init, 813K bss, 226704K reserved, 16384K cma-reserved)
+<6>[    0.013632] devtmpfs: initialized
+<6>[    0.021106] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+<6>[    0.021148] posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+<6>[    0.021241] futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+<6>[    0.021511] 2G module region forced by RANDOMIZE_MODULE_REGION_FULL
+<6>[    0.021522] 0 pages in range for non-PLT usage
+<6>[    0.021525] 515888 pages in range for PLT usage
+<6>[    0.021658] pinctrl core: initialized pinctrl subsystem
+<6>[    0.022114] DMI not present or invalid.
+<6>[    0.023552] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+<6>[    0.024412] DMA: preallocated 512 KiB GFP_KERNEL pool for atomic allocations
+<6>[    0.024556] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+<6>[    0.024740] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+<6>[    0.024775] audit: initializing netlink subsys (disabled)
+<5>[    0.024924] audit: type=2000 audit(0.024:1): state=initialized audit_enabled=0 res=1
+<6>[    0.025673] thermal_sys: Registered thermal governor 'step_wise'
+<6>[    0.025678] thermal_sys: Registered thermal governor 'power_allocator'
+<6>[    0.025719] cpuidle: using governor ladder
+<6>[    0.025748] cpuidle: using governor menu
+<6>[    0.025882] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+<6>[    0.026018] ASID allocator initialised with 32768 entries
+<6>[    0.026408] Serial: AMBA PL011 UART driver
+<6>[    0.031839] /soc/interrupt-controller@c000000: Fixed dependency cycle(s) with /soc/interrupt-controller@c000000
+<6>[    0.032158] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+<6>[    0.032192] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+<6>[    0.032369] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+<6>[    0.032389] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032460] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+<6>[    0.032481] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/ovl@14008000
+<6>[    0.032502] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032541] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+<6>[    0.032574] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032646] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+<6>[    0.032674] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/ovl@14009000
+<6>[    0.032697] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032735] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+<6>[    0.032770] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032841] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+<6>[    0.032876] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+<6>[    0.032900] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.032966] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+<6>[    0.033012] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/color@1400e000
+<6>[    0.033037] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.033097] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+<6>[    0.033152] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+<6>[    0.033179] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.033229] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+<6>[    0.033296] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/aal@14010000
+<6>[    0.033324] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.033363] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.033443] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/gamma@14011000
+<6>[    0.033472] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.033496] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+<6>[    0.033592] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dither@14012000
+<6>[    0.033624] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.033739] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.044972] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+<6>[    0.045022] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+<6>[    0.045899] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+<6>[    0.046001] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+<6>[    0.046022] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.046230] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+<6>[    0.046331] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+<6>[    0.046353] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/ovl@14008000
+<6>[    0.046400] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.046553] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+<6>[    0.046619] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+<6>[    0.046655] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.046874] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+<6>[    0.046974] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+<6>[    0.047002] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/ovl@14009000
+<6>[    0.047051] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.047226] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+<6>[    0.047293] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+<6>[    0.047355] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.047554] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+<6>[    0.047649] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+<6>[    0.047683] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+<6>[    0.047731] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.047945] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+<6>[    0.048035] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+<6>[    0.048078] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/color@1400e000
+<6>[    0.048127] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.048325] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+<6>[    0.048407] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+<6>[    0.048459] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+<6>[    0.048513] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.048703] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+<6>[    0.048776] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+<6>[    0.048838] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/aal@14010000
+<6>[    0.048888] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.049068] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+<6>[    0.049130] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.049203] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/gamma@14011000
+<6>[    0.049258] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.049435] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.049482] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+<6>[    0.049570] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dither@14012000
+<6>[    0.049654] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/syscon@14000000
+<6>[    0.049796] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.054913] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+<6>[    0.054933] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+<6>[    0.054945] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+<6>[    0.054953] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+<6>[    0.054963] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+<6>[    0.054971] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+<6>[    0.054980] HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+<6>[    0.054989] HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+<6>[    0.120177] raid6: neonx8   gen()  3600 MB/s
+<6>[    0.188223] raid6: neonx4   gen()  3681 MB/s
+<6>[    0.256266] raid6: neonx2   gen()  3264 MB/s
+<6>[    0.324320] raid6: neonx1   gen()  2492 MB/s
+<6>[    0.392373] raid6: int64x8  gen()  1435 MB/s
+<6>[    0.460405] raid6: int64x4  gen()  1758 MB/s
+<6>[    0.528462] raid6: int64x2  gen()  1636 MB/s
+<6>[    0.596501] raid6: int64x1  gen()  1403 MB/s
+<6>[    0.596508] raid6: using algorithm neonx4 gen() 3681 MB/s
+<6>[    0.664546] raid6: .... xor() 2764 MB/s, rmw enabled
+<6>[    0.664555] raid6: using neon recovery algorithm
+<6>[    0.665655] iommu: Default domain type: Translated
+<6>[    0.665675] iommu: DMA domain TLB invalidation policy: strict mode
+<5>[    0.666298] SCSI subsystem initialized
+<7>[    0.666414] libata version 3.00 loaded.
+<6>[    0.666543] usbcore: registered new interface driver usbfs
+<6>[    0.666576] usbcore: registered new interface driver hub
+<6>[    0.666605] usbcore: registered new device driver usb
+<6>[    0.666949] pps_core: LinuxPPS API ver. 1 registered
+<6>[    0.666958] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+<6>[    0.666977] PTP clock support registered
+<6>[    0.667004] EDAC MC: Ver: 3.0.0
+<6>[    0.667195] scmi_core: SCMI protocol bus registered
+<6>[    0.668115] FPGA manager framework
+<6>[    0.668181] Advanced Linux Sound Architecture Driver Initialized.
+<6>[    0.668777] vgaarb: loaded
+<6>[    0.669033] clocksource: Switched to clocksource arch_sys_counter
+<5>[    0.670458] VFS: Disk quotas dquot_6.6.0
+<6>[    0.670491] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+<5>[    0.670665] netfs: FS-Cache loaded
+<6>[    0.674772] NET: Registered PF_INET protocol family
+<6>[    0.674910] IP idents hash table entries: 65536 (order: 7, 524288 bytes, linear)
+<6>[    0.677247] tcp_listen_portaddr_hash hash table entries: 2048 (order: 3, 32768 bytes, linear)
+<6>[    0.677292] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+<6>[    0.677310] TCP established hash table entries: 32768 (order: 6, 262144 bytes, linear)
+<6>[    0.677436] TCP bind hash table entries: 32768 (order: 8, 1048576 bytes, linear)
+<6>[    0.677943] TCP: Hash tables configured (established 32768 bind 32768)
+<6>[    0.678041] UDP hash table entries: 2048 (order: 5, 131072 bytes, linear)
+<6>[    0.678162] UDP-Lite hash table entries: 2048 (order: 5, 131072 bytes, linear)
+<6>[    0.678379] NET: Registered PF_UNIX/PF_LOCAL protocol family
+<6>[    0.678423] PCI: CLS 0 bytes, default 64
+<6>[    0.678608] Unpacking initramfs...
+<6>[    0.691257] kvm [1]: nv: 568 coarse grained trap handlers
+<6>[    0.691568] kvm [1]: IPA Size Limit: 40 bits
+<6>[    0.692566] kvm [1]: vgic-v2@c420000
+<6>[    0.692601] kvm [1]: GIC system register CPU interface enabled
+<6>[    0.692631] kvm [1]: vgic interrupt IRQ18
+<6>[    0.692659] kvm [1]: Hyp nVHE mode initialized successfully
+<5>[    0.694033] Initialise system trusted keyrings
+<6>[    0.694175] workingset: timestamp_bits=42 max_order=20 bucket_order=0
+<6>[    0.725750] xor: measuring software checksum speed
+<6>[    0.726467]    8regs           :  4769 MB/sec
+<6>[    0.727134]    32regs          :  4990 MB/sec
+<6>[    0.728034]    arm64_neon      :  3679 MB/sec
+<6>[    0.728042] xor: using function: 32regs (4990 MB/sec)
+<5>[    0.728056] Key type asymmetric registered
+<5>[    0.728064] Asymmetric key parser 'x509' registered
+<6>[    0.728143] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 242)
+<6>[    0.728257] io scheduler mq-deadline registered
+<6>[    0.728268] io scheduler kyber registered
+<6>[    0.731593] ledtrig-cpu: registered to indicate activity on CPUs
+<6>[    0.751303] Freeing initrd memory: 2344K
+<6>[    0.753093] mtk-socinfo mtk-socinfo.0.auto: MediaTek Kompanio 500 (MT8183) SoC detected.
+<6>[    0.757780] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+<6>[    0.780063] 11002000.serial: ttyS0 at MMIO 0x11002000 (irq = 240, base_baud = 1625000) is a ST16650V2
+<6>[    0.801090] 11003000.serial: ttyS1 at MMIO 0x11003000 (irq = 241, base_baud = 1625000) is a ST16650V2
+<6>[    0.801272] serial serial0: tty port ttyS1 registered
+<6>[    0.801928] Serial: AMBA driver
+<6>[    0.813694] loop: module loaded
+<6>[    0.814035] zram: Added device: zram0
+<6>[    0.815368] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vs2
+<6>[    0.815413] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vdram1
+<6>[    0.815442] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vs1
+<6>[    0.817745] megasas: 07.734.00.00-rc1
+<4>[    0.821070] spi-nor spi1.0: supply vcc not found, using dummy regulator
+<4>[    0.821321] spi-nor spi1.0: found gd25lq64c, expected w25q64dw
+<6>[    0.825352] vsim1: Bringing 1860000uV into 2700000-2700000uV
+<6>[    0.826884] e1000: Intel(R) PRO/1000 Network Driver
+<6>[    0.826910] e1000: Copyright (c) 1999-2006 Intel Corporation.
+<6>[    0.826956] e1000e: Intel(R) PRO/1000 Network Driver
+<6>[    0.826964] e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
+<6>[    0.827001] igb: Intel(R) Gigabit Ethernet Network Driver
+<6>[    0.827009] igb: Copyright (c) 2007-2014 Intel Corporation.
+<6>[    0.827043] igbvf: Intel(R) Gigabit Virtual Function Network Driver
+<6>[    0.827052] igbvf: Copyright (c) 2009 - 2012 Intel Corporation.
+<6>[    0.827084] sky2: driver version 1.30
+<6>[    0.827380] VFIO - User Level meta-driver version: 0.3
+<6>[    0.831287] i2c_dev: i2c /dev entries driver
+<6>[    0.837310] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+<6>[    0.840125] cpu cpu0: EM: created perf domain
+<6>[    0.841072] cpufreq: cpufreq_policy_online: CPU4: Running at unlisted initial frequency: 1199999 kHz, changing to: 1248000 kHz
+<6>[    0.841380] cpu cpu4: EM: created perf domain
+<6>[    0.842857] sdhci: Secure Digital Host Controller Interface driver
+<6>[    0.842882] sdhci: Copyright(c) Pierre Ossman
+<6>[    0.843267] Synopsys Designware Multimedia Card Interface Driver
+<6>[    0.843618] sdhci-pltfm: SDHCI platform and OF driver helper
+<6>[    0.844277] SMCCC: SOC_ID: ARCH_SOC_ID not implemented, skipping ....
+<6>[    0.844460] hid: raw HID events driver (C) Jiri Kosina
+<6>[    0.844614] usbcore: registered new interface driver usbhid
+<6>[    0.844625] usbhid: USB HID core driver
+<6>[    0.844954] spi_master spi2: will run message pump with realtime priority
+<6>[    0.848148] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 (0,8000003f) counters available
+<6>[    0.848728] hw perfevents: enabled with armv8_cortex_a73 PMU driver, 7 (0,8000003f) counters available
+<6>[    0.850176] NET: Registered PF_PACKET protocol family
+<6>[    0.850224] 9pnet: Installing 9P2000 support
+<5>[    0.850261] Key type dns_resolver registered
+<6>[    0.855492] registered taskstats version 1
+<5>[    0.855636] Loading compiled-in X.509 certificates
+<4>[    0.856896] cros-ec-sensorhub cros-ec-sensorhub.2.auto: unknown type 8
+<4>[    0.857546] cros-ec-sensorhub cros-ec-sensorhub.2.auto: unknown type 7
+<6>[    0.859998] Demotion targets for Node 0: null
+<5>[    0.860112] Key type .fscrypt registered
+<5>[    0.860118] Key type fscrypt-provisioning registered
+<6>[    0.860580] Btrfs loaded, zoned=no, fsverity=no
+<6>[    0.872304] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@14008000
+<6>[    0.872371] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@14009000
+<6>[    0.872395] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@1400a000
+<6>[    0.872418] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/rdma@1400b000
+<6>[    0.872440] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/rdma@1400c000
+<6>[    0.872468] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/color@1400e000
+<6>[    0.872490] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ccorr@1400f000
+<6>[    0.872513] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/aal@14010000
+<6>[    0.872535] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/gamma@14011000
+<6>[    0.872614] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/dsi@14014000
+<6>[    0.880964] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+<6>[    0.881048] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+<6>[    0.882656] mtu3 11201000.usb: uwk - reg:0x420, version:101
+<4>[    0.882710] mtu3 11201000.usb: supply vbus not found, using dummy regulator
+<6>[    0.882763] mtu3 11201000.usb: dr_mode: 1, drd: auto
+<6>[    0.882770] mtu3 11201000.usb: u2p_dis_msk: 0, u3p_dis_msk: 0
+<6>[    0.882921] mtu3 11201000.usb: usb3-drd: 0
+<4>[    0.883456] xhci-mtk 11200000.usb: supply vbus not found, using dummy regulator
+<6>[    0.883802] xhci-mtk 11200000.usb: xHCI Host Controller
+<6>[    0.883821] xhci-mtk 11200000.usb: new USB bus registered, assigned bus number 1
+<6>[    0.883822] input: Whiskers Tablet Mode Switch as /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:cbas/input/input0
+<6>[    0.883881] xhci-mtk 11200000.usb: USB3 root hub has no ports
+<6>[    0.883898] xhci-mtk 11200000.usb: hcc params 0x01400f99 hci version 0x110 quirks 0x0000000000200010
+<6>[    0.883935] xhci-mtk 11200000.usb: irq 261, io mem 0x11200000
+<6>[    0.884079] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.18
+<6>[    0.884089] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+<6>[    0.884096] usb usb1: Product: xHCI Host Controller
+<6>[    0.884102] usb usb1: Manufacturer: Linux 6.18.28-mt81-kukui2 xhci-hcd
+<6>[    0.884108] usb usb1: SerialNumber: 11200000.usb
+<6>[    0.884372] hub 1-0:1.0: USB hub found
+<6>[    0.884390] hub 1-0:1.0: 1 port detected
+<6>[    0.884555] mtu3 11201000.usb: xHCI platform device register success...
+<6>[    0.887547] thermal_sys: No trip points found for thermal-sensor1 id=0
+<6>[    0.888203] thermal_sys: No trip points found for thermal-sensor2 id=0
+<6>[    0.889384] mtk-msdc 11240000.mmc: allocated mmc-pwrseq
+<6>[    0.895334] platform 14001000.dma-controller0: Adding to iommu group 0
+<6>[    0.895410] platform 14005000.dma-controller: Adding to iommu group 0
+<6>[    0.895462] platform 14006000.mdp3-wdma: Adding to iommu group 0
+<6>[    0.895515] platform 14008000.ovl: Adding to iommu group 0
+<6>[    0.895561] platform 14009000.ovl: Adding to iommu group 0
+<6>[    0.895608] platform 1400a000.ovl: Adding to iommu group 0
+<6>[    0.895648] platform 1400b000.rdma: Adding to iommu group 0
+<6>[    0.895692] platform 1400c000.rdma: Adding to iommu group 0
+<6>[    0.895757] platform 16020000.video-codec: Adding to iommu group 0
+<6>[    0.895809] platform 17020000.vcodec: Adding to iommu group 0
+<6>[    0.895854] platform 17030000.jpeg-encoder: Adding to iommu group 0
+<6>[    0.896091] cros-ec-spi spi2.0: Chrome EC device registered
+<6>[    0.896168] mtk-iommu 10205000.iommu: bound 14017000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896191] mtk-iommu 10205000.iommu: bound 16010000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896202] mtk-iommu 10205000.iommu: bound 1502f000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896212] mtk-iommu 10205000.iommu: bound 1a002000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896222] mtk-iommu 10205000.iommu: bound 17010000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896232] mtk-iommu 10205000.iommu: bound 15021000.larb (ops mtk_smi_larb_component_ops)
+<6>[    0.896242] mtk-iommu 10205000.iommu: bound 1a001000.larb (ops mtk_smi_larb_component_ops)
+<4>[    0.899148] panel-boe-tv101wum-nl6 14014000.dsi.0: supply pp3300 not found, using dummy regulator
+<6>[    0.899693] mediatek-drm mediatek-drm.17.auto: bound 14008000.ovl (ops mtk_disp_ovl_component_ops)
+<6>[    0.899714] mediatek-drm mediatek-drm.17.auto: bound 14009000.ovl (ops mtk_disp_ovl_component_ops)
+<6>[    0.899724] mediatek-drm mediatek-drm.17.auto: bound 1400a000.ovl (ops mtk_disp_ovl_component_ops)
+<6>[    0.899733] mediatek-drm mediatek-drm.17.auto: bound 1400b000.rdma (ops mtk_disp_rdma_component_ops)
+<6>[    0.899742] mediatek-drm mediatek-drm.17.auto: bound 1400c000.rdma (ops mtk_disp_rdma_component_ops)
+<6>[    0.899752] mediatek-drm mediatek-drm.17.auto: bound 1400e000.color (ops mtk_disp_color_component_ops)
+<6>[    0.899761] mediatek-drm mediatek-drm.17.auto: bound 1400f000.ccorr (ops mtk_disp_ccorr_component_ops)
+<6>[    0.899770] mediatek-drm mediatek-drm.17.auto: bound 14010000.aal (ops mtk_disp_aal_component_ops)
+<6>[    0.899780] mediatek-drm mediatek-drm.17.auto: bound 14011000.gamma (ops mtk_disp_gamma_component_ops)
+<6>[    0.900923] mediatek-drm mediatek-drm.17.auto: bound 14014000.dsi (ops mtk_dsi_component_ops)
+<6>[    0.900989] mediatek-drm mediatek-drm.17.auto: Not creating crtc 1 because component 10 is disabled or missing
+<6>[    0.901480] [drm] Initialized mediatek 1.0.0 for mediatek-drm.17.auto on minor 0
+<4>[    0.913584] mtk-msdc 11240000.mmc: msdc_track_cmd_data: cmd=52 arg=00000C00; host->error=0x00000002
+<4>[    0.914432] mtk-msdc 11240000.mmc: msdc_track_cmd_data: cmd=52 arg=80000C08; host->error=0x00000002
+<4>[    0.952887] mmc1: queuing unknown CIS tuple 0x01 [d9 01 ff] (3 bytes)
+<4>[    0.960224] mmc1: queuing unknown CIS tuple 0x1a [01 01 00 02 07] (5 bytes)
+<6>[    0.961499] mtk-msdc 11230000.mmc: Final PAD_DS_TUNE: 0x12c14
+<6>[    0.961593] mmc0: Host Software Queue enabled
+<6>[    0.961607] mmc0: new HS400 MMC card at address 0001
+<6>[    0.962752] mmcblk0: mmc0:0001 DV6DAB 116 GiB
+<4>[    0.963946] mmc1: queuing unknown CIS tuple 0x1b [c1 41 30 30 ff ff 32 00] (8 bytes)
+<4>[    0.964607] mmc1: queuing unknown CIS tuple 0x14 [] (0 bytes)
+<6>[    0.968841]  mmcblk0: p1 p2 p3
+<6>[    0.970694] mmcblk0boot0: mmc0:0001 DV6DAB 4.00 MiB
+<6>[    0.971089] mmc1: new UHS-I speed SDR104 SDIO card at address 0001
+<6>[    0.974551] mmcblk0boot1: mmc0:0001 DV6DAB 4.00 MiB
+<6>[    0.976850] mmcblk0rpmb: mmc0:0001 DV6DAB 16.0 MiB, chardev (237:0)
+<6>[    1.270528] Console: switching to colour frame buffer device 240x75
+<6>[    1.281173] usb 1-1: new high-speed USB device number 2 using xhci-mtk
+<6>[    1.286729] mediatek-drm mediatek-drm.17.auto: [drm] fb0: mediatekdrmfb frame buffer device
+<6>[    1.288382] panfrost 13040000.gpu: clock rate = 511999970
+<6>[    1.289882] panfrost 13040000.gpu: [drm:panfrost_devfreq_init] Failed to register cooling device
+<6>[    1.289994] panfrost 13040000.gpu: mali-g72 id 0x6221 major 0x0 minor 0x3 status 0x0
+<6>[    1.290020] panfrost 13040000.gpu: features: 00000000,000005f7, issues: 00000000,00000400
+<6>[    1.290046] panfrost 13040000.gpu: Features: L2:0x07120206 Shader:0x00000000 Tiler:0x00000809 Mem:0x1 MMU:0x00002830 AS:0xff JS:0x7
+<6>[    1.290087] panfrost 13040000.gpu: shader_present=0x7 l2_present=0x1
+<6>[    1.292863] [drm] Initialized panfrost 1.4.0 for 13040000.gpu on minor 1
+<6>[    1.296308] input: cros_ec_buttons as /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:keyboard-controller/input/input1
+<6>[    1.298722] input: wifi-wakeup as /devices/platform/wifi-wakeup/input/input2
+<6>[    1.299158] clk: Disabling unused clocks
+<6>[    1.299513] PM: genpd: Disabling unused power domains
+<6>[    1.299576] ALSA device list:
+<6>[    1.299595]   No soundcards found.
+<6>[    1.305799] Freeing unused kernel memory: 1920K
+<6>[    1.305951] Run /init as init process
+<7>[    1.305968]   with arguments:
+<7>[    1.305972]     /init
+<7>[    1.305975]     cros_secure
+<7>[    1.305977]   with environment:
+<7>[    1.305980]     HOME=/
+<7>[    1.305982]     TERM=linux
+<7>[    1.305984]     kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b
+<12>[    1.306930] kukui-android phase3
+<6>[    1.309426] usbcore: registered new interface driver usb-storage
+<6>[    1.420748] usb 1-1: New USB device found, idVendor=05e3, idProduct=0610, bcdDevice=60.60
+<6>[    1.420912] usb 1-1: New USB device strings: Mfr=0, Product=1, SerialNumber=0
+<6>[    1.420994] usb 1-1: Product: USB2.0 Hub
+<6>[    1.423123] hub 1-1:1.0: USB hub found
+<6>[    1.423554] hub 1-1:1.0: 4 ports detected
+<6>[    1.709392] usb 1-1.1: new full-speed USB device number 3 using xhci-mtk
+<6>[    1.804311] usb 1-1.1: New USB device found, idVendor=18d1, idProduct=503c, bcdDevice= 1.00
+<6>[    1.804420] usb 1-1.1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+<6>[    1.804467] usb 1-1.1: Product: Hammer
+<6>[    1.804495] usb 1-1.1: Manufacturer: Google Inc.
+<6>[    1.804526] usb 1-1.1: SerialNumber: 31003c000957424e33343920
+<6>[    1.814779] input: Google Inc. Hammer as /devices/platform/soc/11201000.usb/11200000.usb/usb1/1-1/1-1.1/1-1.1:1.0/0003:18D1:503C.0001/input/input3
+<6>[    1.870639] hammer 0003:18D1:503C.0001: input,hidraw0: USB HID v1.00 Keyboard [Google Inc. Hammer] on usb-11200000.usb-1.1/input0
+<6>[    1.953434] usb 1-1.2: new high-speed USB device number 4 using xhci-mtk
+<6>[    2.056098] usb 1-1.2: New USB device found, idVendor=0bda, idProduct=0316, bcdDevice= 2.04
+<6>[    2.056202] usb 1-1.2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+<6>[    2.058063] usb 1-1.2: Product: USB3.0-CRW
+<6>[    2.059788] usb 1-1.2: Manufacturer: Generic
+<6>[    2.061501] usb 1-1.2: SerialNumber: 20120501030900000
+<6>[    2.069693] usb-storage 1-1.2:1.0: USB Mass Storage device detected
+<6>[    2.073061] scsi host0: usb-storage 1-1.2:1.0
+<5>[    3.105537] scsi 0:0:0:0: Direct-Access     Generic- SD/MMC           1.00 PQ: 0 ANSI: 4
+<5>[    4.006732] sd 0:0:0:0: [sda] 122167296 512-byte logical blocks: (62.5 GB/58.3 GiB)
+<5>[    4.013136] sd 0:0:0:0: [sda] Write Protect is off
+<7>[    4.015516] sd 0:0:0:0: [sda] Mode Sense: 2f 00 00 00
+<5>[    4.017468] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+<6>[    4.102610]  sda: sda1 sda2 sda3 sda4 sda5 sda6
+<5>[    4.110793] sd 0:0:0:0: [sda] Attached SCSI removable disk
+<4>[    4.330212] EXT4-fs (sda2): warning: mounting unchecked fs, running e2fsck is recommended
+<6>[    4.337159] EXT4-fs (sda2): mounted filesystem 38f0e7d6-fa7d-471b-b14f-5236254f0be1 r/w without journal. Quota mode: none.
+<14>[    4.487311] init.android: init first stage started!
+<14>[    4.489631] init.android: Release specific kernel module dir 6.18.28-mt81-kukui2 found, loading modules from here with no fallbacks.
+<14>[    4.492556] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/hid-generic.ko with args ''
+<6>[    4.497567] input: Google Inc. Hammer as /devices/platform/soc/11201000.usb/11200000.usb/usb1/1-1/1-1.1/1-1.1:1.2/0003:18D1:503C.0002/input/input4
+<6>[    4.499381] hid-generic 0003:18D1:503C.0002: input,hidraw1: USB HID v1.00 Device [Google Inc. Hammer] on usb-11200000.usb-1.1/input2
+<14>[    4.500515] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/hid-generic.ko
+<14>[    4.501547] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/hid-multitouch.ko with args ''
+<6>[    4.507300] input: Google Inc. Hammer as /devices/platform/soc/11201000.usb/11200000.usb/usb1/1-1/1-1.1/1-1.1:1.2/0003:18D1:503C.0002/input/input5
+<6>[    4.508545] hid-multitouch 0003:18D1:503C.0002: input,hidraw1: USB HID v1.00 Device [Google Inc. Hammer] on usb-11200000.usb-1.1/input2
+<14>[    4.509689] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/hid-multitouch.ko
+<14>[    4.510740] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/i2c-hid.ko with args ''
+<14>[    4.512722] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/i2c-hid.ko
+<14>[    4.513886] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/i2c-hid-of-goodix.ko with args ''
+<14>[    4.516148] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/i2c-hid-of-goodix.ko
+<14>[    4.517255] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/i2c-hid-of.ko with args ''
+<4>[    4.519741] i2c_hid_of 0-005d: supply vdd not found, using dummy regulator
+<4>[    4.520897] i2c_hid_of 0-005d: supply vddl not found, using dummy regulator
+<6>[    4.731993] input: hid-over-i2c 27C6:0E30 as /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0003/input/input6
+<6>[    4.733462] input: hid-over-i2c 27C6:0E30 Stylus as /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0003/input/input7
+<6>[    4.734782] input: hid-over-i2c 27C6:0E30 Stylus as /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0003/input/input8
+<6>[    4.736089] input: hid-over-i2c 27C6:0E30 UNKNOWN as /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0003/input/input9
+<6>[    4.738451] hid-multitouch 0018:27C6:0E30.0003: input,hidraw2: I2C HID v1.00 Device [hid-over-i2c 27C6:0E30] on 0-005d
+<14>[    4.740166] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/i2c-hid-of.ko
+<14>[    4.741616] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/usb-storage.ko with args ''
+<14>[    4.743209] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/fuse.ko with args ''
+<6>[    4.750009] fuse: init (API version 7.45)
+<14>[    4.751901] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/fuse.ko
+<14>[    4.752939] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_defrag_ipv4.ko with args ''
+<14>[    4.755454] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_defrag_ipv4.ko
+<14>[    4.756456] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_reject_ipv4.ko with args ''
+<14>[    4.758976] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_reject_ipv4.ko
+<14>[    4.759977] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/ipv6.ko with args ''
+<6>[    4.768910] NET: Registered PF_INET6 protocol family
+<6>[    4.771148] Segment Routing with IPv6
+<6>[    4.772137] In-situ OAM (IOAM) with IPv6
+<14>[    4.773238] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/ipv6.ko
+<14>[    4.774248] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_defrag_ipv6.ko with args ''
+<14>[    4.776895] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_defrag_ipv6.ko
+<14>[    4.777904] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_reject_ipv6.ko with args ''
+<14>[    4.780350] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_reject_ipv6.ko
+<14>[    4.781394] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_conntrack.ko with args ''
+<14>[    4.785470] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_conntrack.ko
+<14>[    4.786611] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_nat.ko with args ''
+<14>[    4.788982] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_nat.ko
+<14>[    4.790073] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nfnetlink.ko with args ''
+<14>[    4.792219] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nfnetlink.ko
+<14>[    4.793282] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nf_tables.ko with args ''
+<14>[    4.822364] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nf_tables.ko
+<14>[    4.824809] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_chain_nat.ko with args ''
+<14>[    4.828882] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_chain_nat.ko
+<14>[    4.830270] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/x_tables.ko with args ''
+<14>[    4.834199] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/x_tables.ko
+<14>[    4.835605] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_compat.ko with args ''
+<14>[    4.838750] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_compat.ko
+<14>[    4.839800] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_ct.ko with args ''
+<14>[    4.842570] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_ct.ko
+<14>[    4.843616] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_limit.ko with args ''
+<14>[    4.846154] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_limit.ko
+<14>[    4.847178] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_log.ko with args ''
+<14>[    4.849229] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_log.ko
+<14>[    4.850248] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_masq.ko with args ''
+<14>[    4.852630] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_masq.ko
+<14>[    4.853675] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_nat.ko with args ''
+<14>[    4.856057] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_nat.ko
+<14>[    4.857098] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_numgen.ko with args ''
+<14>[    4.859555] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_numgen.ko
+<14>[    4.860579] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_quota.ko with args ''
+<14>[    4.863066] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_quota.ko
+<14>[    4.864092] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_reject.ko with args ''
+<14>[    4.866567] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_reject.ko
+<14>[    4.867600] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/nft_reject_inet.ko with args ''
+<14>[    4.870252] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/nft_reject_inet.ko
+<14>[    4.871281] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/xfrm_algo.ko with args ''
+<14>[    4.874090] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/xfrm_algo.ko
+<14>[    4.875121] init.android: Loading module /lib/modules/6.18.28-mt81-kukui2/xfrm_user.ko with args ''
+<6>[    4.877883] Initializing XFRM netlink socket
+<14>[    4.878961] init.android: Loaded kernel module /lib/modules/6.18.28-mt81-kukui2/xfrm_user.ko
+<14>[    4.880000] init.android: Loaded 29 modules from /lib/modules/6.18.28-mt81-kukui2
+<14>[    4.881082] init.android: Loaded 29 kernel modules took 391 ms
+<14>[    4.882150] init.android: [libfstab] Using Android DT directory /proc/device-tree/firmware/android/
+<14>[    4.883171] init.android: [libfstab] ReadFstabFromDt(): failed to read fstab from dt
+<11>[    4.884713] init.android: Failed to read vbmeta partitions.
+<14>[    4.905470] init.android: AVB is not enabled, skip verity setup for '/metadata'
+<14>[    4.947116] init.android: [libfs_mgr] Invalid ext4 superblock on '/dev/block/by-name/metadata'
+<14>[    5.020041] init.android: [libfs_mgr] Created logical partition system on device /dev/block/dm-0
+<14>[    5.024695] init.android: [libfs_mgr] Created logical partition vendor on device /dev/block/dm-1
+<14>[    5.028756] init.android: [libfs_mgr] Created logical partition system_ext on device /dev/block/dm-2
+<14>[    5.032532] init.android: [libfs_mgr] Created logical partition product on device /dev/block/dm-3
+<14>[    5.036818] init.android: [libfs_mgr] Created logical partition system_dlkm on device /dev/block/dm-4
+<14>[    5.040656] init.android: [libfs_mgr] Created logical partition vendor_dlkm on device /dev/block/dm-5
+<14>[    5.042109] init.android: DSU not detected, proceeding with normal boot
+<14>[    5.043840] init.android: AVB is not enabled, skip verity setup for '/system'
+<6>[    5.047219] erofs (device dm-0): mounted with root inode @ nid 58.
+<14>[    5.048532] init.android: [libfs_mgr] __mount(source=/dev/block/dm-0,target=/system,type=erofs)=0: Success
+<14>[    5.050123] init.android: Switching root to '/system'
+<14>[    5.054938] init.android: AVB is not enabled, skip verity setup for '/vendor'
+<6>[    5.057640] erofs (device dm-1): mounted with root inode @ nid 45.
+<14>[    5.058877] init.android: [libfs_mgr] __mount(source=/dev/block/dm-1,target=/vendor,type=erofs)=0: Success
+<14>[    5.060419] init.android: AVB is not enabled, skip verity setup for '/system_ext'
+<6>[    5.063002] erofs (device dm-2): mounted with root inode @ nid 39.
+<14>[    5.064249] init.android: [libfs_mgr] __mount(source=/dev/block/dm-2,target=/system_ext,type=erofs)=0: Success
+<14>[    5.065769] init.android: AVB is not enabled, skip verity setup for '/product'
+<6>[    5.067965] erofs (device dm-3): mounted with root inode @ nid 40.
+<14>[    5.069037] init.android: [libfs_mgr] __mount(source=/dev/block/dm-3,target=/product,type=erofs)=0: Success
+<14>[    5.070409] init.android: AVB is not enabled, skip verity setup for '/system_dlkm'
+<6>[    5.072356] erofs (device dm-4): mounted with root inode @ nid 38.
+<14>[    5.073437] init.android: [libfs_mgr] __mount(source=/dev/block/dm-4,target=/system_dlkm,type=erofs)=0: Success
+<14>[    5.074721] init.android: AVB is not enabled, skip verity setup for '/vendor_dlkm'
+<6>[    5.076659] erofs (device dm-5): mounted with root inode @ nid 38.
+<14>[    5.077707] init.android: [libfs_mgr] __mount(source=/dev/block/dm-5,target=/vendor_dlkm,type=erofs)=0: Success
+<14>[    5.078759] init.android: AVB is not enabled, skip verity setup for '/data'
+<14>[    5.082166] init.android: [libfs_mgr] Invalid f2fs superblock on '/dev/block/by-name/userdata'
+<14>[    5.084402] init.android: [libfs_mgr] Invalid ext4 superblock on '/dev/block/by-name/userdata'
+<14>[    5.085646] init.android: Failed to mount /data, ignoring mount for formattable partition
+<14>[    5.089608] init.android: Skipped setting INIT_AVB_VERSION (not in recovery mode)
+<14>[    5.468084] init: [libfstab] Using Android DT directory /proc/device-tree/firmware/android/
+<14>[    5.478798] init: Opening SELinux policy
+<14>[    5.510009] init: Loading SELinux policy
+<6>[    5.528424] SELinux:  Permission watch_mountns in class file not defined in policy.
+<6>[    5.529640] SELinux:  Permission watch_mountns in class dir not defined in policy.
+<6>[    5.530520] SELinux:  Permission watch_mountns in class lnk_file not defined in policy.
+<6>[    5.531387] SELinux:  Permission watch_mountns in class chr_file not defined in policy.
+<6>[    5.532242] SELinux:  Permission watch_mountns in class blk_file not defined in policy.
+<6>[    5.533105] SELinux:  Permission watch_mountns in class sock_file not defined in policy.
+<6>[    5.533949] SELinux:  Permission watch_mountns in class fifo_file not defined in policy.
+<6>[    5.534896] SELinux:  Permission watch_mountns in class anon_inode not defined in policy.
+<6>[    5.535722] SELinux:  Permission allowed in class io_uring not defined in policy.
+<6>[    5.536540] SELinux: the above unknown classes and permissions will be denied
+<6>[    5.540361] SELinux:  policy capability network_peer_controls=1
+<6>[    5.541357] SELinux:  policy capability open_perms=1
+<6>[    5.542176] SELinux:  policy capability extended_socket_class=1
+<6>[    5.542980] SELinux:  policy capability always_check_network=0
+<6>[    5.543778] SELinux:  policy capability cgroup_seclabel=0
+<6>[    5.544567] SELinux:  policy capability nnp_nosuid_transition=1
+<6>[    5.545356] SELinux:  policy capability genfs_seclabel_symlinks=0
+<6>[    5.546137] SELinux:  policy capability ioctl_skip_cloexec=0
+<6>[    5.546910] SELinux:  policy capability userspace_initial_context=0
+<6>[    5.547679] SELinux:  policy capability netlink_xperm=0
+<6>[    5.548438] SELinux:  policy capability netif_wildcard=0
+<6>[    5.549204] SELinux:  policy capability genfs_seclabel_wildcard=0
+<6>[    5.549956] SELinux:  policy capability functionfs_seclabel=1
+<5>[    5.598278] audit: type=1403 audit(5.596:2): auid=4294967295 ses=4294967295 lsm=selinux res=1
+<14>[    5.615418] selinux: SELinux: Loaded file context from:
+<14>[    5.616604] selinux: 		/system/etc/selinux/plat_file_contexts
+<14>[    5.617758] selinux: 		/system_ext/etc/selinux/system_ext_file_contexts
+<14>[    5.618834] selinux: 		/product/etc/selinux/product_file_contexts
+<14>[    5.619897] selinux: 		/vendor/etc/selinux/vendor_file_contexts
+<14>[    5.620952] selinux: 		/odm/etc/selinux/odm_file_contexts
+<14>[    5.653419] init: init second stage started!
+<14>[    5.698099] selinux: SELinux: Loaded file context from:
+<14>[    5.699565] selinux: 		/system/etc/selinux/plat_file_contexts
+<14>[    5.700903] selinux: 		/system_ext/etc/selinux/system_ext_file_contexts
+<14>[    5.702326] selinux: 		/product/etc/selinux/product_file_contexts
+<14>[    5.703661] selinux: 		/vendor/etc/selinux/vendor_file_contexts
+<14>[    5.704985] selinux: 		/odm/etc/selinux/odm_file_contexts
+<14>[    5.750365] init: [libfstab] Using Android DT directory /proc/device-tree/firmware/android/
+<12>[    5.760773] init: Overriding previous property 'ro.config.notification_sound':'OnTheHunt.ogg' with new value 'Argon.ogg'
+<12>[    5.762298] init: Overriding previous property 'ro.config.alarm_alert':'Alarm_Classic.ogg' with new value 'Hassium.ogg'
+<12>[    5.763591] init: Overriding previous property 'ro.adb.secure':'1' with new value '0'
+<14>[    5.767054] init: Setting product property ro.product.brand to 'Android' (from ro.product.product.brand)
+<14>[    5.768213] init: Setting product property ro.product.device to 'kukui' (from ro.product.product.device)
+<14>[    5.769393] init: Setting product property ro.product.manufacturer to 'Google' (from ro.product.product.manufacturer)
+<14>[    5.770553] init: Setting product property ro.product.model to 'Lenovo IdeaPad Duet' (from ro.product.product.model)
+<14>[    5.771712] init: Setting product property ro.product.name to 'lineage_kukui' (from ro.product.product.name)
+<14>[    5.772904] init: Setting property 'ro.product.cpu.abilist' to 'arm64-v8a'
+<14>[    5.774141] init: Setting property 'ro.product.cpu.abilist32' to ''
+<14>[    5.774918] init: Setting property 'ro.product.cpu.abilist64' to 'arm64-v8a'
+<14>[    5.776351] init: Running restorecon...
+<14>[    5.792543] init: Created socket '/dev/socket/property_service_for_system', mode 660, user 0, group 1000
+<14>[    5.793851] init: Created socket '/dev/socket/property_service', mode 666, user 0, group 0
+<14>[    5.796188] init: [libfs_mgr] vendor overlay: vndk version not defined
+<14>[    5.798965] init: SetupMountNamespaces done
+<14>[    5.802172] init: Forked subcontext for 'u:r:vendor_init:s0' with pid 2013
+<14>[    5.806510] init: Parsing file /system/etc/init/hw/init.rc...
+<14>[    5.810672] init: Added '/init.environ.rc' to import list
+<14>[    5.811548] init: Added '/system/etc/init/hw/init.usb.rc' to import list
+<14>[    5.812388] init: Added '/init.kukui.rc' to import list
+<14>[    5.813230] init: Added '/vendor/etc/init/hw/init.kukui.rc' to import list
+<14>[    5.814050] init: Added '/system/etc/init/hw/init.usb.configfs.rc' to import list
+<14>[    5.814872] init: Added '/system/etc/init/hw/init.zygote64.rc' to import list
+<14>[    5.816296] init: Added '/system/etc/init/hw/init.boringssl.zygote64.rc' to import list
+<14>[    5.818035] init: Added '/system/etc/init/init-perfetto.rc' to import list
+<14>[    5.819018] init: Parsing file /init.environ.rc...
+<14>[    5.820687] init: Parsing file /system/etc/init/hw/init.usb.rc...
+<14>[    5.822866] init: Parsing file /init.kukui.rc...
+<14>[    5.823656] init: Unable to read config file '/init.kukui.rc': open() failed: No such file or directory
+<14>[    5.826428] init: Parsing file /vendor/etc/init/hw/init.kukui.rc...
+<14>[    5.827404] init: Added '/vendor/etc/init/hw/init.mainline.rc' to import list
+<14>[    5.828413] init: Parsing file /vendor/etc/init/hw/init.mainline.rc...
+<14>[    5.829400] init: Added '/vendor/etc/init/hw/init.mainline.usb.rc' to import list
+<14>[    5.830340] init: Parsing file /vendor/etc/init/hw/init.mainline.usb.rc...
+<14>[    5.831265] init: Unable to read config file '/vendor/etc/init/hw/init.mainline.usb.rc': open() failed: No such file or directory
+<14>[    5.834033] init: Parsing file /system/etc/init/hw/init.usb.configfs.rc...
+<14>[    5.835973] init: Parsing file /system/etc/init/hw/init.zygote64.rc...
+<14>[    5.836902] init: Parsing file /system/etc/init/hw/init.boringssl.zygote64.rc...
+<14>[    5.838859] init: Parsing file /system/etc/init/init-perfetto.rc...
+<14>[    5.839805] init: Parsing directory /system/etc/init...
+<14>[    5.840709] init: Parsing file /system/etc/init/aconfigd.rc...
+<14>[    5.842924] init: Parsing file /system/etc/init/android.system.suspend-service.rc...
+<14>[    5.844371] init: Parsing file /system/etc/init/apexd.rc...
+<14>[    5.845315] init: Parsing file /system/etc/init/atrace.rc...
+<14>[    5.848525] init: Parsing file /system/etc/init/atrace_userdebug.rc...
+<14>[    5.850302] init: Parsing file /system/etc/init/audioserver.rc...
+<14>[    5.851881] init: Parsing file /system/etc/init/blank_screen.rc...
+<14>[    5.852821] init: Parsing file /system/etc/init/bootanim.rc...
+<14>[    5.853779] init: Parsing file /system/etc/init/bootstat-debug.rc...
+<14>[    5.854697] init: Parsing file /system/etc/init/bootstat.rc...
+<14>[    5.856536] init: Parsing file /system/etc/init/cameraserver.rc...
+<14>[    5.857522] init: Parsing file /system/etc/init/clean_scratch_files.rc...
+<14>[    5.858446] init: Parsing file /system/etc/init/cppreopts.rc...
+<14>[    5.859404] init: Parsing file /system/etc/init/credstore.rc...
+<14>[    5.860320] init: Parsing file /system/etc/init/dmesgd.rc...
+<14>[    5.861320] init: Parsing file /system/etc/init/drmserver.rc...
+<14>[    5.862256] init: Parsing file /system/etc/init/dumpstate.rc...
+<14>[    5.864013] init: Parsing file /system/etc/init/flags_health_check.rc...
+<14>[    5.864792] init: Parsing file /system/etc/init/gatekeeperd.rc...
+<14>[    5.865554] init: Parsing file /system/etc/init/gpuservice.rc...
+<14>[    5.866299] init: Parsing file /system/etc/init/gsid.rc...
+<14>[    5.867081] init: Parsing file /system/etc/init/heapprofd.rc...
+<14>[    5.867880] init: Parsing file /system/etc/init/idmap2d.rc...
+<14>[    5.868609] init: Parsing file /system/etc/init/incidentd.rc...
+<14>[    5.869359] init: Parsing file /system/etc/init/init-debug.rc...
+<14>[    5.870110] init: Parsing file /system/etc/init/init-perfetto.rc...
+<14>[    5.870859] init: Parsing file /system/etc/init/installd.rc...
+<14>[    5.873262] init: Parsing file /system/etc/init/kcmdlinectrl.rc...
+<14>[    5.873982] init: Parsing file /system/etc/init/keystore2.rc...
+<14>[    5.874703] init: Parsing file /system/etc/init/llkd.rc...
+<14>[    5.877099] init: Parsing file /system/etc/init/lmkd.rc...
+<14>[    5.879948] init: Parsing file /system/etc/init/logcatd.rc...
+<14>[    5.881165] init: Parsing file /system/etc/init/logd.rc...
+<14>[    5.882184] init: Parsing file /system/etc/init/logtagd.rc...
+<14>[    5.883092] init: Parsing file /system/etc/init/lpdumpd.rc...
+<14>[    5.885329] init: Parsing file /system/etc/init/mdnsd.rc...
+<14>[    5.886360] init: Parsing file /system/etc/init/mediaextractor.rc...
+<14>[    5.887239] init: Parsing file /system/etc/init/mediametrics.rc...
+<14>[    5.888109] init: Parsing file /system/etc/init/mediaserver.rc...
+<14>[    5.888987] init: Parsing file /system/etc/init/misctrl.rc...
+<14>[    5.889860] init: Parsing file /system/etc/init/mmd.rc...
+<14>[    5.890741] init: Parsing file /system/etc/init/mtectrl.rc...
+<14>[    5.894208] init: Parsing file /system/etc/init/netbpfload.rc...
+<14>[    5.894946] init: Parsing file /system/etc/init/netd.rc...
+<14>[    5.895600] init: Parsing file /system/etc/init/odsign.rc...
+<14>[    5.898930] init: Parsing file /system/etc/init/perfetto.rc...
+<14>[    5.902502] init: Parsing file /system/etc/init/prefetch.rc...
+<14>[    5.903558] init: Parsing file /system/etc/init/prng_seeder.rc...
+<14>[    5.904365] init: Parsing file /system/etc/init/profcollectd.rc...
+<14>[    5.905267] init: Parsing file /system/etc/init/recovery-persist.rc...
+<14>[    5.906032] init: Parsing file /system/etc/init/recovery-refresh.rc...
+<14>[    5.906780] init: Parsing file /system/etc/init/rss_hwm_reset.rc...
+<14>[    5.909237] init: Parsing file /system/etc/init/servicemanager.rc...
+<14>[    5.910039] init: Parsing file /system/etc/init/simpleperf.rc...
+<14>[    5.910654] init: Parsing file /system/etc/init/snapuserd.rc...
+<14>[    5.911281] init: Parsing file /system/etc/init/storaged.rc...
+<14>[    5.911873] init: Parsing file /system/etc/init/surfaceflinger.rc...
+<14>[    5.912470] init: Parsing file /system/etc/init/tombstoned.rc...
+<14>[    5.913079] init: Parsing file /system/etc/init/traced_perf.rc...
+<14>[    5.913717] init: Parsing file /system/etc/init/tradeinmode.rc...
+<14>[    5.914293] init: Parsing file /system/etc/init/uncrypt.rc...
+<14>[    5.914882] init: Parsing file /system/etc/init/usbd.rc...
+<14>[    5.915447] init: Parsing file /system/etc/init/virtual_camera.hal.rc...
+<14>[    5.916033] init: Parsing file /system/etc/init/vold.rc...
+<14>[    5.916586] init: Parsing file /system/etc/init/wifi.rc...
+<14>[    5.919759] init: Parsing file /system/etc/init/wificond.rc...
+<14>[    5.920465] init: Parsing directory /system_ext/etc/init...
+<14>[    5.920930] init: Parsing file /system_ext/etc/init/adb_root.rc...
+<14>[    5.923722] init: Parsing file /system_ext/etc/init/init.lineage-system_ext.rc...
+<14>[    5.924363] init: Parsing file /system_ext/etc/init/init.lineage-updater.rc...
+<14>[    5.924829] init: Parsing directory /vendor/etc/init...
+<14>[    5.925341] init: Parsing file /vendor/etc/init/android.hardware.health-service.example.rc...
+<14>[    5.925861] init: Parsing file /vendor/etc/init/android.hardware.light-service.lineage.rc...
+<14>[    5.929344] init: Parsing file /vendor/etc/init/android.hardware.wifi.supplicant-service.rc...
+<14>[    5.930155] init: Parsing file /vendor/etc/init/bluetooth-service-default.rc...
+<14>[    5.930729] init: Parsing file /vendor/etc/init/boringssl_self_test.rc...
+<14>[    5.931291] init: Added '/vendor/etc/boringssl_self_test.zygote64.rc' to import list
+<14>[    5.933157] init: Parsing file /vendor/etc/boringssl_self_test.zygote64.rc...
+<14>[    5.934189] init: Parsing file /vendor/etc/init/dlkm_loader_mainline.rc...
+<14>[    5.934790] init: Parsing file /vendor/etc/init/hostapd.android.rc...
+<14>[    5.935422] init: Parsing file /odm/etc/init...
+<14>[    5.935963] init: Unable to read config file '/odm/etc/init': open() failed: No such file or directory
+<14>[    5.936536] init: Parsing directory /product/etc/init...
+<14>[    5.937141] init: Parsing file /product/etc/init/init.openssh.rc...
+<14>[    5.940288] init: processing action (SetupCgroups) from (<Builtin Action>:0)
+<14>[    5.973248] libprocessgroup: Using system/app isolation under: /sys/fs/cgroup
+<14>[    5.984789] init: processing action (TestPerfEventSelinux) from (<Builtin Action>:0)
+<14>[    5.985662] init: Permissive SELinux boot, forcing sys.init.perf_lsm_hooks to 1.
+<14>[    5.986632] init: processing action (early-init) from (/system/etc/init/hw/init.rc:15)
+<5>[    5.988003] audit: type=1400 audit(5.984:3): avc:  denied  { read } for  pid=1653 comm="init" path="/kmsg" dev="proc" ino=4026532097 scontext=u:r:kernel:s0 tcontext=u:object_r:proc_kmsg:s0 tclass=file permissive=1
+<5>[    5.988646] audit: type=1400 audit(5.984:4): avc:  denied  { syslog_mod } for  pid=1653 comm="init" scontext=u:r:kernel:s0 tcontext=u:r:kernel:s0 tclass=system permissive=1
+<5>[    5.989288] audit: type=1400 audit(5.984:5): avc:  denied  { write } for  pid=1653 comm="init" path="/kukui-phase3.log" dev="sda2" ino=46 scontext=u:r:kernel:s0 tcontext=u:object_r:unlabeled:s0 tclass=file permissive=1
+<14>[    6.011889] init: starting service 'ueventd'...
+<12>[    6.052710] libprocessgroup: A JoinCgroup action in the SystemMemoryProcess profile is used for controller memory in the cgroup v2 hierarchy and will be ignored
+<14>[    6.056140] init: ... started service 'ueventd' has pid 2014
+<14>[    6.056987] init: Command 'start ueventd' action=early-init (/system/etc/init/hw/init.rc:73) took 65ms and succeeded
+<14>[    6.058447] init: Command 'exec_start init_dev_config' action=early-init (/system/etc/init/hw/init.rc:79) took 0ms and failed: Could not start exec service: Cannot expand path: property 'ro.vendor.init_dev_config.path' doesn't exist while expanding '${ro.vendor.init_dev_config.path}': Invalid argument
+<14>[    6.062403] init: starting service 'apexd-bootstrap'...
+<14>[    6.067892] init: ... started service 'apexd-bootstrap' has pid 2015
+<14>[    6.068786] init: SVC_EXEC service 'apexd-bootstrap' pid 2015 (uid 0 gid 1000+0 context default) started; waiting...
+<14>[    6.083232] ueventd: ueventd started!
+<14>[    6.087821] selinux: SELinux: Loaded file context from:
+<14>[    6.089149] selinux: 		/system/etc/selinux/plat_file_contexts
+<14>[    6.090374] selinux: 		/system_ext/etc/selinux/system_ext_file_contexts
+<14>[    6.091605] selinux: 		/product/etc/selinux/product_file_contexts
+<14>[    6.092840] selinux: 		/vendor/etc/selinux/vendor_file_contexts
+<14>[    6.094105] selinux: 		/odm/etc/selinux/odm_file_contexts
+<14>[    6.098426] ueventd: Parsing file /system/etc/ueventd.rc...
+<14>[    6.099964] ueventd: Added '/vendor/etc/ueventd.rc' to import list
+<14>[    6.101346] ueventd: Added '/odm/etc/ueventd.rc' to import list
+<14>[    6.103356] ueventd: Parsing file /vendor/etc/ueventd.rc...
+<14>[    6.105023] ueventd: Added '/vendor/etc/ueventd.kukui.rc' to import list
+<14>[    6.106556] ueventd: Added '/vendor/etc/ueventd.kukui.rc' to import list
+<14>[    6.108124] ueventd: Parsing file /vendor/etc/ueventd.kukui.rc...
+<14>[    6.109641] ueventd: Parsing file /vendor/etc/ueventd.kukui.rc...
+<14>[    6.111000] ueventd: Parsing file /odm/etc/ueventd.rc...
+<14>[    6.112316] ueventd: Unable to read config file '/odm/etc/ueventd.rc': open() failed: No such file or directory
+<14>[    6.114154] ueventd: [libfstab] Using Android DT directory /proc/device-tree/firmware/android/
+<14>[    6.215022] ueventd: Coldboot took 0.098 seconds
+<14>[    6.239507] apexd: Started. subcommand = --bootstrap
+<14>[    6.243338] apexd-bootstrap: Scanning /system/apex for pre-installed ApexFiles
+<14>[    6.246155] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.adbd.capex
+<14>[    6.247775] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.adservices.capex
+<14>[    6.249397] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.apex.cts.shim.apex
+<14>[    6.251013] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.appsearch.capex
+<14>[    6.252623] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.art.capex
+<14>[    6.254224] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.bt.capex
+<14>[    6.255610] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.configinfrastructure.capex
+<14>[    6.257001] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.conscrypt.capex
+<14>[    6.258401] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.crashrecovery.capex
+<14>[    6.259808] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.devicelock.apex
+<14>[    6.261205] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.extservices.capex
+<14>[    6.262596] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.healthfitness.apex
+<14>[    6.263990] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.i18n.apex
+<14>[    6.265387] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.ipsec.capex
+<14>[    6.266778] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.media.capex
+<14>[    6.268165] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.media.swcodec.capex
+<14>[    6.269559] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.mediaprovider.capex
+<14>[    6.270950] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.neuralnetworks.capex
+<14>[    6.272340] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.nfcservices.capex
+<14>[    6.273735] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.ondevicepersonalization.capex
+<14>[    6.275124] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.os.statsd.apex
+<14>[    6.276509] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.permission.capex
+<14>[    6.277900] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.profiling.capex
+<14>[    6.279275] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.resolv.capex
+<14>[    6.280638] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.rkpd.apex
+<14>[    6.282001] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.runtime.apex
+<14>[    6.283356] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.scheduling.capex
+<14>[    6.284703] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.sdkext.apex
+<14>[    6.286053] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.telephonycore.capex
+<14>[    6.287386] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.tethering.capex
+<14>[    6.288706] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.tzdata.apex
+<14>[    6.290044] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.uprobestats.capex
+<14>[    6.291358] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.uwb.capex
+<14>[    6.292735] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.virt.apex
+<14>[    6.294042] apexd-bootstrap: Found pre-installed APEX /system/apex/com.android.wifi.capex
+<14>[    6.295313] apexd-bootstrap: Scanning /system_ext/apex for pre-installed ApexFiles
+<12>[    6.296617] apexd-bootstrap: /system_ext/apex does not exist. Skipping
+<14>[    6.297940] apexd-bootstrap: Scanning /product/apex for pre-installed ApexFiles
+<12>[    6.299226] apexd-bootstrap: /product/apex does not exist. Skipping
+<14>[    6.300486] apexd-bootstrap: Scanning /vendor/apex for pre-installed ApexFiles
+<14>[    6.302092] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.audio.apex
+<14>[    6.303830] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.cas.apex
+<14>[    6.305514] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.drm.clearkey.apex
+<14>[    6.307122] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.gatekeeper.nonsecure.apex
+<14>[    6.308683] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.graphics.composer.drm_hwcomposer.apex
+<14>[    6.310318] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.keymint.rust_nonsecure.apex
+<14>[    6.311072] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.memtrack.apex
+<14>[    6.311801] apexd-bootstrap: Found pre-installed APEX /vendor/apex/com.android.hardware.power.apex
+<14>[    6.312513] apexd-bootstrap: Found pre-installed APEX /vendor/apex/org.lineageos.device.gralloc.minigbm_upstream.apex
+<14>[    6.313219] apexd-bootstrap: Scanning /odm/apex for pre-installed ApexFiles
+<12>[    6.313900] apexd-bootstrap: /odm/apex does not exist. Skipping
+<14>[    6.524766] apexd-bootstrap: Found bootstrap APEX /vendor/apex/com.android.hardware.gatekeeper.nonsecure.apex
+<14>[    6.525979] apexd-bootstrap: Found bootstrap APEX /system/apex/com.android.virt.apex
+<14>[    6.526999] apexd-bootstrap: Found bootstrap APEX /system/apex/com.android.runtime.apex
+<14>[    6.527989] apexd-bootstrap: Found bootstrap APEX /vendor/apex/org.lineageos.device.gralloc.minigbm_upstream.apex
+<14>[    6.528989] apexd-bootstrap: Found bootstrap APEX /system/apex/com.android.i18n.apex
+<14>[    6.530095] apexd-bootstrap: Found bootstrap APEX /system/apex/com.android.tzdata.apex
+<14>[    6.530685] apexd-bootstrap: Found bootstrap APEX /vendor/apex/com.android.hardware.graphics.composer.drm_hwcomposer.apex
+<14>[    6.531277] apexd-bootstrap: Found bootstrap APEX /vendor/apex/com.android.hardware.keymint.rust_nonsecure.apex
+<14>[    6.531887] apexd-bootstrap: Need to pre-allocate 52 loop devices
+<5>[    6.533391] audit: type=1400 audit(6.528:6): avc:  denied  { add_name } for  pid=57 comm="kdevtmpfs" name="loop8" scontext=u:r:kernel:s0 tcontext=u:object_r:device:s0 tclass=dir permissive=1
+<5>[    6.535886] audit: type=1400 audit(6.528:7): avc:  denied  { create } for  pid=57 comm="kdevtmpfs" name="loop8" scontext=u:r:kernel:s0 tcontext=u:object_r:device:s0 tclass=blk_file permissive=1
+<5>[    6.538420] audit: type=1400 audit(6.528:8): avc:  denied  { setattr } for  pid=57 comm="kdevtmpfs" name="loop8" dev="devtmpfs" ino=199 scontext=u:r:kernel:s0 tcontext=u:object_r:device:s0 tclass=blk_file permissive=1
+<14>[    6.575463] apexd-bootstrap: Found 8 idle loopback devices that were pre-allocated by kernel. Allocated 44 more.
+<12>[    6.603583] apexd-bootstrap: Fallback to buffered I/O for /system/apex/com.android.virt.apex
+<12>[    6.603583] apexd-bootstrap: Fallback to buffered I/O for /vendor/apex/com.android.hardware.gatekeeper.nonsecure.apex
+<12>[    6.603625] apexd-bootstrap: Fallback to buffered I/O for /system/apex/com.android.runtime.apex
+<12>[    6.603870] apexd-bootstrap: Fallback to buffered I/O for /vendor/apex/org.lineageos.device.gralloc.minigbm_upstream.apex
+<12>[    6.603959] apexd-bootstrap: Fallback to buffered I/O for /system/apex/com.android.i18n.apex
+<12>[    6.603998] apexd-bootstrap: Fallback to buffered I/O for /system/apex/com.android.tzdata.apex
+<6>[    6.604141] loop3: detected capacity change from 0 to 3112
+<6>[    6.604142] loop0: detected capacity change from 0 to 4840
+<6>[    6.604159] loop4: detected capacity change from 0 to 39608
+<6>[    6.604163] loop5: detected capacity change from 0 to 1696
+<12>[    6.604300] apexd-bootstrap: Fallback to buffered I/O for /vendor/apex/com.android.hardware.graphics.composer.drm_hwcomposer.apex
+<6>[    6.604405] loop6: detected capacity change from 0 to 4424
+<6>[    6.604414] loop1: detected capacity change from 0 to 1080
+<12>[    6.605231] apexd-bootstrap: Fallback to buffered I/O for /vendor/apex/com.android.hardware.keymint.rust_nonsecure.apex
+<6>[    6.605318] loop7: detected capacity change from 0 to 11544
+<6>[    6.605713] loop2: detected capacity change from 0 to 9640
+<6>[    6.686037] erofs (device loop3): mounted with root inode @ nid 39.
+<6>[    6.706567] erofs (device loop0): mounted with root inode @ nid 39.
+<6>[    6.710239] erofs (device loop4): mounted with root inode @ nid 39.
+<6>[    6.710941] erofs (device loop1): mounted with root inode @ nid 39.
+<6>[    6.711662] erofs (device loop7): mounted with root inode @ nid 39.
+<6>[    6.713430] erofs (device loop5): mounted with root inode @ nid 38.
+<6>[    6.714061] erofs (device loop2): mounted with root inode @ nid 39.
+<6>[    6.714606] erofs (device loop6): mounted with root inode @ nid 39.
+<14>[    6.717101] apexd-bootstrap: Activated 8 packages.
+<14>[    6.718034] apexd-bootstrap: OnBootstrap done, duration=474
+<14>[    6.756634] init: Service 'apexd-bootstrap' (pid 2015) exited with status 0 waiting took 0.691000 seconds
+<14>[    6.757906] init: Sending SIGKILL to service 'apexd-bootstrap' (pid 2015) process group...
+<14>[    6.759568] libprocessgroup: Removed cgroup /sys/fs/cgroup/system/uid_0/pid_2015
+<14>[    6.775265] init: Parsing file /apex/com.android.hardware.gatekeeper/etc/android.hardware.gatekeeper-service.nonsecure.rc...
+<14>[    6.778246] init: Parsing file /apex/com.android.hardware.graphics.composer/etc/hwc3-drm.apex.rc...
+<14>[    6.781020] init: Parsing file /apex/com.android.hardware.keymint/etc/android.hardware.security.keymint-service.nonsecure.apex.rc...
+<14>[    6.783813] init: Parsing file /apex/org.lineageos.device.gralloc/etc/org.lineageos.device.gralloc.minigbm_upstream.rc...
+<14>[    6.970620] init: linkerconfig generated /linkerconfig with mounted APEX modules info
+<14>[    6.972011] init: Command 'perform_apex_config' action=early-init (/system/etc/init/hw/init.rc:85) took 209ms and succeeded
+<14>[    6.978700] init: processing action (early-init) from (/init.environ.rc:2)
+<14>[    6.980772] init: processing action (early-init) from (/vendor/etc/init/hw/init.kukui.rc:3)
+<14>[    6.992381] init: processing action (early-init) from (/system/etc/init/aconfigd.rc:26)
+<14>[    6.994612] init: Command 'mkdir /metadata/aconfig 0775 root system' action=early-init (/system/etc/init/aconfigd.rc:27) took 0ms and failed: mkdir() failed on /metadata/aconfig: Read-only file system
+<14>[    7.000130] init: starting service 'early_system_aconfigd_platform_init'...
+<14>[    7.032689] init: ... started service 'early_system_aconfigd_platform_init' has pid 3077
+<14>[    7.036576] init: SVC_EXEC service 'early_system_aconfigd_platform_init' pid 3077 (uid 1000 gid 1000+0 context default) started; waiting...
+<11>[    8.073811] init: [libfs_mgr] mount_with_alternatives(): skipping mount due to invalid magic, mountpoint=/data blk_dev=/dev/block/sda6 rec[7].fs_type=f2fs
+<14>[    8.076154] init: [libfs_mgr] Invalid ext4 superblock on '/dev/block/by-name/userdata'
+<38>[    8.077529] type=1400 audit(8.076:11): avc:  denied  { read } for  comm="init" path="/kmsg" dev="proc" ino=4026532097 scontext=u:r:kernel:s0 tcontext=u:object_r:proc_kmsg:s0 tclass=file permissive=1
+<11>[    8.077620] init: [libfs_mgr] mount_with_alternatives(): skipping mount due to invalid magic, mountpoint=/data blk_dev=/dev/block/sda6 rec[8].fs_type=ext4

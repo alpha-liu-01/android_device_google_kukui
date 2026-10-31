@@ -1,0 +1,5 @@
+<manifest version="8.0" type="device" target-level="202604">
+    <!-- This file must exist so VINTF loads vendor and APEX fragments.
+         KeyMint and Gatekeeper come from their APEXes. USB gadget is off,
+         so the HIDL manager entries are not declared. -->
+</manifest>

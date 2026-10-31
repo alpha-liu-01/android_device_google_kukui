@@ -1,0 +1,589 @@
+kukui-android phase2
+--- uname ---
+Linux version 6.18.28-mt81-kukui2 (alpha@alpha-asus) (Ubuntu clang version 21.1.8 (6ubuntu1), Ubuntu LLD 21.1.8) #1-kukui-phase2 SMP PREEMPT Fri Oct 30 20:05:58 EDT 2026
+--- cmdline ---
+cros_secure kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b console=tty0 loglevel=7 deferred_probe_timeout=30
+--- log_part ---
+/dev/sda2
+--- filesystems ---
+nodev	sysfs
+nodev	tmpfs
+nodev	bdev
+nodev	proc
+nodev	cgroup
+nodev	cgroup2
+nodev	cpuset
+nodev	devtmpfs
+nodev	configfs
+nodev	debugfs
+nodev	tracefs
+nodev	securityfs
+nodev	sockfs
+nodev	bpf
+nodev	pipefs
+nodev	ramfs
+nodev	hugetlbfs
+nodev	devpts
+	ext3
+	ext2
+	ext4
+	vfat
+nodev	autofs
+	f2fs
+	erofs
+nodev	mqueue
+nodev	binder
+	btrfs
+--- binder ---
+binderfs mounted
+binder
+binder-control
+features
+hwbinder
+vndbinder
+--- cpuset ---
+cpuset v1 mounted
+cgroup.clone_children
+cgroup.procs
+cgroup.sane_behavior
+cpuset.cpu_exclusive
+cpuset.cpus
+cpuset.effective_cpus
+cpuset.effective_mems
+cpuset.mem_exclusive
+cpuset.mem_hardwall
+cpuset.memory_migrate
+cpuset.memory_pressure
+cpuset.memory_pressure_enabled
+cpuset.memory_spread_page
+cpuset.memory_spread_slab
+cpuset.mems
+cpuset.sched_load_balance
+cpuset.sched_relax_domain_level
+notify_on_release
+release_agent
+tasks
+--- config ---
+CONFIG_LOCALVERSION="-mt81-kukui2"
+CONFIG_CPUSETS=y
+CONFIG_CPUSETS_V1=y
+CONFIG_SHADOW_CALL_STACK=y
+CONFIG_CFI=y
+CONFIG_NF_TABLES=m
+CONFIG_USB_CONFIGFS=m
+CONFIG_ANDROID_BINDER_IPC=y
+CONFIG_ANDROID_BINDERFS=y
+CONFIG_FS_ENCRYPTION=y
+CONFIG_EROFS_FS=y
+CONFIG_EROFS_FS_XATTR=y
+CONFIG_EROFS_FS_SECURITY=y
+CONFIG_EROFS_FS_ZIP=y
+CONFIG_SECURITYFS=y
+CONFIG_SECURITY_NETWORK=y
+CONFIG_SECURITY_SELINUX=y
+CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,integrity,bpf"
+--- dmesg ---
+[    0.000000] Booting Linux on physical CPU 0x0000000000 [0x410fd034]
+[    0.000000] Linux version 6.18.28-mt81-kukui2 (alpha@alpha-asus) (Ubuntu clang version 21.1.8 (6ubuntu1), Ubuntu LLD 21.1.8) #1-kukui-phase2 SMP PREEMPT Fri Oct 30 20:05:58 EDT 2026
+[    0.000000] KASLR enabled
+[    0.000000] random: crng init done
+[    0.000000] Machine model: MediaTek krane sku176 board
+[    0.000000] efi: UEFI not found.
+[    0.000000] Reserved memory: created DMA memory pool at 0x000000013ff00000, size 1 MiB
+[    0.000000] OF: reserved mem: initialized node audio-dma-pool, compatible id shared-dma-pool
+[    0.000000] OF: reserved mem: 0x000000013ff00000..0x000000013fffffff (1024 KiB) nomap non-reusable audio-dma-pool
+[    0.000000] OF: reserved mem: 0x00000000ffedb000..0x00000000fffdafff (1024 KiB) map non-reusable ramoops
+[    0.000000] Reserved memory: created DMA memory pool at 0x0000000050000000, size 41 MiB
+[    0.000000] OF: reserved mem: initialized node memory@50000000, compatible id shared-dma-pool
+[    0.000000] OF: reserved mem: 0x0000000050000000..0x00000000528fffff (41984 KiB) nomap non-reusable memory@50000000
+[    0.000000] NUMA: Faking a node at [mem 0x0000000040000000-0x000000013fffffff]
+[    0.000000] NODE_DATA(0) allocated [mem 0x13f6b4080-0x13f6b67ff]
+[    0.000000] Zone ranges:
+[    0.000000]   DMA      [mem 0x0000000040000000-0x00000000ffffffff]
+[    0.000000]   DMA32    empty
+[    0.000000]   Normal   [mem 0x0000000100000000-0x000000013fffffff]
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000040000000-0x000000004fffffff]
+[    0.000000]   node   0: [mem 0x0000000050000000-0x00000000528fffff]
+[    0.000000]   node   0: [mem 0x0000000052900000-0x00000000545fffff]
+[    0.000000]   node   0: [mem 0x0000000054700000-0x00000000ffdfffff]
+[    0.000000]   node   0: [mem 0x0000000100000000-0x000000013fefffff]
+[    0.000000]   node   0: [mem 0x000000013ff00000-0x000000013fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x000000013fffffff]
+[    0.000000] On node 0, zone DMA: 256 pages in unavailable ranges
+[    0.000000] On node 0, zone Normal: 512 pages in unavailable ranges
+[    0.000000] cma: Reserved 16 MiB at 0x00000000fee00000
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: MIGRATE_INFO_TYPE not supported.
+[    0.000000] psci: SMC Calling Convention v1.2
+[    0.000000] percpu: Embedded 34 pages/cpu s99928 r8192 d31144 u139264
+[    0.000000] pcpu-alloc: s99928 r8192 d31144 u139264 alloc=34*4096
+[    0.000000] pcpu-alloc: [0] 0 [0] 1 [0] 2 [0] 3 [0] 4 [0] 5 [0] 6 [0] 7 
+[    0.000000] Detected VIPT I-cache on CPU0
+[    0.000000] CPU features: detected: GICv3 CPU interface
+[    0.000000] CPU features: kernel page table isolation forced ON by KASLR
+[    0.000000] CPU features: detected: Kernel page table isolation (KPTI)
+[    0.000000] CPU features: detected: ARM erratum 845719
+[    0.000000] alternatives: applying boot alternatives
+[    0.000000] Kernel command line: cros_secure kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b console=tty0 loglevel=7 deferred_probe_timeout=30
+[    0.000000] Unknown kernel command line parameters "cros_secure kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b", will be passed to user space.
+[    0.000000] printk: log buffer data + meta data: 131072 + 458752 = 589824 bytes
+[    0.000000] Dentry cache hash table entries: 524288 (order: 10, 4194304 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 262144 (order: 9, 2097152 bytes, linear)
+[    0.000000] software IO TLB: area num 8.
+[    0.000000] software IO TLB: mapped [mem 0x00000000fae00000-0x00000000fee00000] (64MB)
+[    0.000000] Fallback order for Node 0: 0 
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 1047808
+[    0.000000] Policy zone: Normal
+[    0.000000] mem auto-init: stack:off, heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=8, Nodes=1
+[    0.000000] ftrace: allocating 57396 entries in 226 pages
+[    0.000000] ftrace: allocated 226 pages with 4 groups
+[    0.000000] rcu: Preemptible hierarchical RCU implementation.
+[    0.000000] rcu: 	RCU event tracing is enabled.
+[    0.000000] rcu: 	RCU restricting CPUs from NR_CPUS=256 to nr_cpu_ids=8.
+[    0.000000] 	Trampoline variant of Tasks RCU enabled.
+[    0.000000] 	Rude variant of Tasks RCU enabled.
+[    0.000000] 	Tracing variant of Tasks RCU enabled.
+[    0.000000] rcu: RCU calculated value of scheduler-enlistment delay is 25 jiffies.
+[    0.000000] rcu: Adjusting geometry for rcu_fanout_leaf=16, nr_cpu_ids=8
+[    0.000000] RCU Tasks: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] RCU Tasks Rude: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] RCU Tasks Trace: Setting shift to 3 and lim to 1 rcu_task_cb_adjust=1 rcu_task_cpu_ids=8.
+[    0.000000] NR_IRQS: 64, nr_irqs: 64, preallocated irqs: 0
+[    0.000000] GICv3: GIC: Using split EOI/Deactivate mode
+[    0.000000] GICv3: 640 SPIs implemented
+[    0.000000] GICv3: 0 Extended SPIs implemented
+[    0.000000] Root IRQ handler: gic_handle_irq
+[    0.000000] GICv3: GICv3 features: 16 PPIs
+[    0.000000] GICv3: GICD_CTLR.DS=0, SCR_EL3.FIQ=0
+[    0.000000] GICv3: CPU0: found redistributor 0 region 0:0x000000000c100000
+[    0.000000] GICv3: GIC: PPI partition interrupt-partition-0[0] { /cpus/cpu@0[0] /cpus/cpu@1[1] /cpus/cpu@2[2] /cpus/cpu@3[3] }
+[    0.000000] GICv3: GIC: PPI partition interrupt-partition-1[1] { /cpus/cpu@100[4] /cpus/cpu@101[5] /cpus/cpu@102[6] /cpus/cpu@103[7] }
+[    0.000000] rcu: srcu_init: Setting srcu_struct sizes based on contention.
+[    0.000000] arch_timer: cp15 timer running at 13.00MHz (phys).
+[    0.000000] clocksource: arch_sys_counter: mask: 0xffffffffffffff max_cycles: 0x2ff89eacb, max_idle_ns: 440795202429 ns
+[    0.000000] sched_clock: 56 bits at 13MHz, resolution 76ns, wraps every 4398046511101ns
+[    0.000495] Console: colour dummy device 80x25
+[    0.000506] printk: legacy console [tty0] enabled
+[    0.001061] Calibrating delay loop (skipped), value calculated using timer frequency.. 26.00 BogoMIPS (lpj=52000)
+[    0.001078] pid_max: default: 32768 minimum: 301
+[    0.001166] LSM: initializing lsm=capability,bpf
+[    0.001547] LSM support for eBPF active
+[    0.001612] Mount-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.001635] Mountpoint-cache hash table entries: 8192 (order: 4, 65536 bytes, linear)
+[    0.003522] rcu: Hierarchical SRCU implementation.
+[    0.003537] rcu: 	Max phase no-delay instances is 1000.
+[    0.003684] Timer migration: 1 hierarchy levels; 8 children per group; 1 crossnode level
+[    0.004324] EFI services will not be available.
+[    0.004549] smp: Bringing up secondary CPUs ...
+[    0.005121] Detected VIPT I-cache on CPU1
+[    0.005229] GICv3: CPU1: found redistributor 1 region 0:0x000000000c120000
+[    0.005267] CPU1: Booted secondary processor 0x0000000001 [0x410fd034]
+[    0.005881] Detected VIPT I-cache on CPU2
+[    0.005963] GICv3: CPU2: found redistributor 2 region 0:0x000000000c140000
+[    0.005977] CPU2: Booted secondary processor 0x0000000002 [0x410fd034]
+[    0.006579] Detected VIPT I-cache on CPU3
+[    0.006662] GICv3: CPU3: found redistributor 3 region 0:0x000000000c160000
+[    0.006674] CPU3: Booted secondary processor 0x0000000003 [0x410fd034]
+[    0.007393] CPU features: detected: Spectre-v2
+[    0.007405] CPU features: detected: Spectre-BHB
+[    0.007410] CPU features: detected: ARM erratum 858921
+[    0.007417] Detected VIPT I-cache on CPU4
+[    0.007522] GICv3: CPU4: found redistributor 100 region 0:0x000000000c180000
+[    0.007531] arch_timer: Enabling local workaround for ARM erratum 858921
+[    0.007543] arch_timer: CPU4: Trapping CNTVCT access
+[    0.007551] CPU4: Booted secondary processor 0x0000000100 [0x410fd092]
+[    0.008290] Detected VIPT I-cache on CPU5
+[    0.008384] GICv3: CPU5: found redistributor 101 region 0:0x000000000c1a0000
+[    0.008392] arch_timer: Enabling local workaround for ARM erratum 858921
+[    0.008399] arch_timer: CPU5: Trapping CNTVCT access
+[    0.008406] CPU5: Booted secondary processor 0x0000000101 [0x410fd092]
+[    0.008990] Detected VIPT I-cache on CPU6
+[    0.009086] GICv3: CPU6: found redistributor 102 region 0:0x000000000c1c0000
+[    0.009094] arch_timer: Enabling local workaround for ARM erratum 858921
+[    0.009101] arch_timer: CPU6: Trapping CNTVCT access
+[    0.009108] CPU6: Booted secondary processor 0x0000000102 [0x410fd092]
+[    0.009691] Detected VIPT I-cache on CPU7
+[    0.009789] GICv3: CPU7: found redistributor 103 region 0:0x000000000c1e0000
+[    0.009796] arch_timer: Enabling local workaround for ARM erratum 858921
+[    0.009804] arch_timer: CPU7: Trapping CNTVCT access
+[    0.009810] CPU7: Booted secondary processor 0x0000000103 [0x410fd092]
+[    0.009885] smp: Brought up 1 node, 8 CPUs
+[    0.010067] SMP: Total of 8 processors activated.
+[    0.010075] CPU: All CPU(s) started at EL2
+[    0.010094] CPU features: detected: 32-bit EL0 Support
+[    0.010101] CPU features: detected: 32-bit EL1 Support
+[    0.010111] CPU features: detected: CRC32 instructions
+[    0.010124] CPU features: detected: PMUv3
+[    0.010180] alternatives: applying system-wide alternatives
+[    0.012139] Memory: 3939536K/4191232K available (19584K kernel code, 2922K rwdata, 8088K rodata, 1920K init, 813K bss, 226192K reserved, 16384K cma-reserved)
+[    0.013306] devtmpfs: initialized
+[    0.020580] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 7645041785100000 ns
+[    0.020623] posixtimers hash table entries: 4096 (order: 4, 65536 bytes, linear)
+[    0.020717] futex hash table entries: 2048 (131072 bytes on 1 NUMA nodes, total 128 KiB, linear).
+[    0.020984] 2G module region forced by RANDOMIZE_MODULE_REGION_FULL
+[    0.020995] 0 pages in range for non-PLT usage
+[    0.020998] 515888 pages in range for PLT usage
+[    0.021132] pinctrl core: initialized pinctrl subsystem
+[    0.021578] DMI not present or invalid.
+[    0.023016] NET: Registered PF_NETLINK/PF_ROUTE protocol family
+[    0.023812] DMA: preallocated 512 KiB GFP_KERNEL pool for atomic allocations
+[    0.023955] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA pool for atomic allocations
+[    0.024162] DMA: preallocated 512 KiB GFP_KERNEL|GFP_DMA32 pool for atomic allocations
+[    0.024194] audit: initializing netlink subsys (disabled)
+[    0.024341] audit: type=2000 audit(0.024:1): state=initialized audit_enabled=0 res=1
+[    0.025053] thermal_sys: Registered thermal governor 'step_wise'
+[    0.025058] thermal_sys: Registered thermal governor 'power_allocator'
+[    0.025095] cpuidle: using governor ladder
+[    0.025125] cpuidle: using governor menu
+[    0.025238] hw-breakpoint: found 6 breakpoint and 4 watchpoint registers.
+[    0.025378] ASID allocator initialised with 32768 entries
+[    0.025771] Serial: AMBA PL011 UART driver
+[    0.031214] /soc/interrupt-controller@c000000: Fixed dependency cycle(s) with /soc/interrupt-controller@c000000
+[    0.031519] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+[    0.031553] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+[    0.031730] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+[    0.031751] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.031821] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+[    0.031843] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/ovl@14008000
+[    0.031864] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.031903] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+[    0.031936] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032008] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+[    0.032036] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/ovl@14009000
+[    0.032059] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032097] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+[    0.032132] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032213] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+[    0.032250] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+[    0.032273] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032340] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+[    0.032385] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/color@1400e000
+[    0.032410] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032470] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+[    0.032525] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+[    0.032552] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032602] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+[    0.032669] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/aal@14010000
+[    0.032697] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032736] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.032816] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/gamma@14011000
+[    0.032845] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.032869] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+[    0.032965] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dither@14012000
+[    0.032997] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.033112] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.044222] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+[    0.044272] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+[    0.045150] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@14008000
+[    0.045252] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+[    0.045275] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.045482] /soc/ovl@14008000: Fixed dependency cycle(s) with /soc/ovl@14009000
+[    0.045582] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+[    0.045605] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/ovl@14008000
+[    0.045650] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.045804] /soc/syscon@14000000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+[    0.045870] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+[    0.045906] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.046125] /soc/ovl@14009000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+[    0.046224] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+[    0.046253] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/ovl@14009000
+[    0.046301] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.046479] /soc/ovl@1400a000: Fixed dependency cycle(s) with /soc/rdma@1400c000
+[    0.046545] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/ovl@1400a000
+[    0.046607] /soc/rdma@1400c000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.046807] /soc/rdma@1400b000: Fixed dependency cycle(s) with /soc/color@1400e000
+[    0.046902] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+[    0.046936] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/rdma@1400b000
+[    0.046983] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.047185] /soc/color@1400e000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+[    0.047272] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+[    0.047314] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/color@1400e000
+[    0.047362] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.047557] /soc/ccorr@1400f000: Fixed dependency cycle(s) with /soc/aal@14010000
+[    0.047649] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+[    0.047702] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/ccorr@1400f000
+[    0.047757] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.047948] /soc/aal@14010000: Fixed dependency cycle(s) with /soc/gamma@14011000
+[    0.048021] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+[    0.048083] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/aal@14010000
+[    0.048134] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.048314] /soc/gamma@14011000: Fixed dependency cycle(s) with /soc/dither@14012000
+[    0.048375] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.048448] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/gamma@14011000
+[    0.048502] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.048679] /soc/dither@14012000: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.048725] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+[    0.048813] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dither@14012000
+[    0.048897] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/syscon@14000000
+[    0.049038] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.054113] HugeTLB: registered 1.00 GiB page size, pre-allocated 0 pages
+[    0.054133] HugeTLB: 0 KiB vmemmap can be freed for a 1.00 GiB page
+[    0.054143] HugeTLB: registered 32.0 MiB page size, pre-allocated 0 pages
+[    0.054152] HugeTLB: 0 KiB vmemmap can be freed for a 32.0 MiB page
+[    0.054161] HugeTLB: registered 2.00 MiB page size, pre-allocated 0 pages
+[    0.054170] HugeTLB: 0 KiB vmemmap can be freed for a 2.00 MiB page
+[    0.054179] HugeTLB: registered 64.0 KiB page size, pre-allocated 0 pages
+[    0.054187] HugeTLB: 0 KiB vmemmap can be freed for a 64.0 KiB page
+[    0.120227] raid6: neonx8   gen()  3600 MB/s
+[    0.188274] raid6: neonx4   gen()  3674 MB/s
+[    0.256324] raid6: neonx2   gen()  3256 MB/s
+[    0.324372] raid6: neonx1   gen()  2485 MB/s
+[    0.392427] raid6: int64x8  gen()  1434 MB/s
+[    0.460461] raid6: int64x4  gen()  1759 MB/s
+[    0.528503] raid6: int64x2  gen()  1636 MB/s
+[    0.596564] raid6: int64x1  gen()  1404 MB/s
+[    0.596572] raid6: using algorithm neonx4 gen() 3674 MB/s
+[    0.664597] raid6: .... xor() 2735 MB/s, rmw enabled
+[    0.664605] raid6: using neon recovery algorithm
+[    0.665699] iommu: Default domain type: Translated
+[    0.665716] iommu: DMA domain TLB invalidation policy: strict mode
+[    0.666277] SCSI subsystem initialized
+[    0.666401] libata version 3.00 loaded.
+[    0.666521] usbcore: registered new interface driver usbfs
+[    0.666554] usbcore: registered new interface driver hub
+[    0.666583] usbcore: registered new device driver usb
+[    0.666915] pps_core: LinuxPPS API ver. 1 registered
+[    0.666925] pps_core: Software ver. 5.3.6 - Copyright 2005-2007 Rodolfo Giometti <giometti@linux.it>
+[    0.666943] PTP clock support registered
+[    0.666969] EDAC MC: Ver: 3.0.0
+[    0.667158] scmi_core: SCMI protocol bus registered
+[    0.668069] FPGA manager framework
+[    0.668133] Advanced Linux Sound Architecture Driver Initialized.
+[    0.668718] vgaarb: loaded
+[    0.668945] clocksource: Switched to clocksource arch_sys_counter
+[    0.670370] VFS: Disk quotas dquot_6.6.0
+[    0.670404] VFS: Dquot-cache hash table entries: 512 (order 0, 4096 bytes)
+[    0.670575] netfs: FS-Cache loaded
+[    0.674412] NET: Registered PF_INET protocol family
+[    0.674554] IP idents hash table entries: 65536 (order: 7, 524288 bytes, linear)
+[    0.676873] tcp_listen_portaddr_hash hash table entries: 2048 (order: 3, 32768 bytes, linear)
+[    0.676914] Table-perturb hash table entries: 65536 (order: 6, 262144 bytes, linear)
+[    0.676932] TCP established hash table entries: 32768 (order: 6, 262144 bytes, linear)
+[    0.677079] TCP bind hash table entries: 32768 (order: 8, 1048576 bytes, linear)
+[    0.677585] TCP: Hash tables configured (established 32768 bind 32768)
+[    0.677685] UDP hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    0.677805] UDP-Lite hash table entries: 2048 (order: 5, 131072 bytes, linear)
+[    0.678014] NET: Registered PF_UNIX/PF_LOCAL protocol family
+[    0.678058] PCI: CLS 0 bytes, default 64
+[    0.678228] Unpacking initramfs...
+[    0.680608] Freeing initrd memory: 1832K
+[    0.682892] kvm [1]: nv: 568 coarse grained trap handlers
+[    0.683179] kvm [1]: IPA Size Limit: 40 bits
+[    0.684174] kvm [1]: vgic-v2@c420000
+[    0.684208] kvm [1]: GIC system register CPU interface enabled
+[    0.684237] kvm [1]: vgic interrupt IRQ18
+[    0.684268] kvm [1]: Hyp nVHE mode initialized successfully
+[    0.685626] Initialise system trusted keyrings
+[    0.685769] workingset: timestamp_bits=42 max_order=20 bucket_order=0
+[    0.717167] xor: measuring software checksum speed
+[    0.717870]    8regs           :  4767 MB/sec
+[    0.718548]    32regs          :  4914 MB/sec
+[    0.719480]    arm64_neon      :  3551 MB/sec
+[    0.719488] xor: using function: 32regs (4914 MB/sec)
+[    0.719500] Key type asymmetric registered
+[    0.719507] Asymmetric key parser 'x509' registered
+[    0.719554] Block layer SCSI generic (bsg) driver version 0.4 loaded (major 242)
+[    0.719654] io scheduler mq-deadline registered
+[    0.719665] io scheduler kyber registered
+[    0.722882] ledtrig-cpu: registered to indicate activity on CPUs
+[    0.743409] mtk-socinfo mtk-socinfo.0.auto: MediaTek Kompanio 500 (MT8183) SoC detected.
+[    0.747772] Serial: 8250/16550 driver, 4 ports, IRQ sharing enabled
+[    0.770117] 11002000.serial: ttyS0 at MMIO 0x11002000 (irq = 240, base_baud = 1625000) is a ST16650V2
+[    0.791141] 11003000.serial: ttyS1 at MMIO 0x11003000 (irq = 241, base_baud = 1625000) is a ST16650V2
+[    0.791326] serial serial0: tty port ttyS1 registered
+[    0.791962] Serial: AMBA driver
+[    0.803586] loop: module loaded
+[    0.803909] zram: Added device: zram0
+[    0.805277] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vs2
+[    0.805324] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vdram1
+[    0.805352] /soc/pwrap@1000d000/pmic/regulators: Fixed dependency cycle(s) with /soc/pwrap@1000d000/pmic/regulators/buck_vs1
+[    0.807740] megasas: 07.734.00.00-rc1
+[    0.811075] spi-nor spi1.0: supply vcc not found, using dummy regulator
+[    0.811324] spi-nor spi1.0: found gd25lq64c, expected w25q64dw
+[    0.814989] vsim1: Bringing 1860000uV into 2700000-2700000uV
+[    0.816493] e1000: Intel(R) PRO/1000 Network Driver
+[    0.816519] e1000: Copyright (c) 1999-2006 Intel Corporation.
+[    0.816565] e1000e: Intel(R) PRO/1000 Network Driver
+[    0.816573] e1000e: Copyright(c) 1999 - 2015 Intel Corporation.
+[    0.816610] igb: Intel(R) Gigabit Ethernet Network Driver
+[    0.816619] igb: Copyright (c) 2007-2014 Intel Corporation.
+[    0.816654] igbvf: Intel(R) Gigabit Virtual Function Network Driver
+[    0.816663] igbvf: Copyright (c) 2009 - 2012 Intel Corporation.
+[    0.816693] sky2: driver version 1.30
+[    0.816930] VFIO - User Level meta-driver version: 0.3
+[    0.820657] i2c_dev: i2c /dev entries driver
+[    0.826598] device-mapper: ioctl: 4.50.0-ioctl (2025-04-28) initialised: dm-devel@lists.linux.dev
+[    0.829284] cpu cpu0: EM: created perf domain
+[    0.830211] cpufreq: cpufreq_policy_online: CPU4: Running at unlisted initial frequency: 1199999 kHz, changing to: 1248000 kHz
+[    0.830519] cpu cpu4: EM: created perf domain
+[    0.831875] sdhci: Secure Digital Host Controller Interface driver
+[    0.831898] sdhci: Copyright(c) Pierre Ossman
+[    0.832235] Synopsys Designware Multimedia Card Interface Driver
+[    0.832585] sdhci-pltfm: SDHCI platform and OF driver helper
+[    0.833254] SMCCC: SOC_ID: ARCH_SOC_ID not implemented, skipping ....
+[    0.833415] hid: raw HID events driver (C) Jiri Kosina
+[    0.833577] usbcore: registered new interface driver usbhid
+[    0.833591] usbhid: USB HID core driver
+[    0.833846] spi_master spi2: will run message pump with realtime priority
+[    0.836928] hw perfevents: enabled with armv8_cortex_a53 PMU driver, 7 (0,8000003f) counters available
+[    0.838797] hw perfevents: enabled with armv8_cortex_a73 PMU driver, 7 (0,8000003f) counters available
+[    0.840373] NET: Registered PF_PACKET protocol family
+[    0.840424] 9pnet: Installing 9P2000 support
+[    0.840464] Key type dns_resolver registered
+[    0.845602] cros-ec-sensorhub cros-ec-sensorhub.2.auto: unknown type 8
+[    0.846107] cros-ec-sensorhub cros-ec-sensorhub.2.auto: unknown type 7
+[    0.846150] registered taskstats version 1
+[    0.846281] Loading compiled-in X.509 certificates
+[    0.850583] Demotion targets for Node 0: null
+[    0.850710] Key type .fscrypt registered
+[    0.850717] Key type fscrypt-provisioning registered
+[    0.851195] Btrfs loaded, zoned=no, fsverity=no
+[    0.862433] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@14008000
+[    0.862501] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@14009000
+[    0.862525] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ovl@1400a000
+[    0.862548] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/rdma@1400b000
+[    0.862571] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/rdma@1400c000
+[    0.862599] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/color@1400e000
+[    0.862621] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/ccorr@1400f000
+[    0.862643] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/aal@14010000
+[    0.862666] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/gamma@14011000
+[    0.862744] mediatek-drm mediatek-drm.17.auto: Adding component match for /soc/dsi@14014000
+[    0.870494] input: Whiskers Tablet Mode Switch as /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:cbas/input/input0
+[    0.871234] /soc/dsi@14014000: Fixed dependency cycle(s) with /soc/dsi@14014000/panel@0
+[    0.871297] /soc/dsi@14014000/panel@0: Fixed dependency cycle(s) with /soc/dsi@14014000
+[    0.872773] mtu3 11201000.usb: uwk - reg:0x420, version:101
+[    0.872822] mtu3 11201000.usb: supply vbus not found, using dummy regulator
+[    0.872884] mtu3 11201000.usb: dr_mode: 1, drd: auto
+[    0.872891] mtu3 11201000.usb: u2p_dis_msk: 0, u3p_dis_msk: 0
+[    0.873062] mtu3 11201000.usb: usb3-drd: 0
+[    0.873675] xhci-mtk 11200000.usb: supply vbus not found, using dummy regulator
+[    0.874046] xhci-mtk 11200000.usb: xHCI Host Controller
+[    0.874068] xhci-mtk 11200000.usb: new USB bus registered, assigned bus number 1
+[    0.874128] xhci-mtk 11200000.usb: USB3 root hub has no ports
+[    0.874141] xhci-mtk 11200000.usb: hcc params 0x01400f99 hci version 0x110 quirks 0x0000000000200010
+[    0.874179] xhci-mtk 11200000.usb: irq 261, io mem 0x11200000
+[    0.874328] usb usb1: New USB device found, idVendor=1d6b, idProduct=0002, bcdDevice= 6.18
+[    0.874338] usb usb1: New USB device strings: Mfr=3, Product=2, SerialNumber=1
+[    0.874345] usb usb1: Product: xHCI Host Controller
+[    0.874351] usb usb1: Manufacturer: Linux 6.18.28-mt81-kukui2 xhci-hcd
+[    0.874357] usb usb1: SerialNumber: 11200000.usb
+[    0.874647] hub 1-0:1.0: USB hub found
+[    0.874667] hub 1-0:1.0: 1 port detected
+[    0.874834] mtu3 11201000.usb: xHCI platform device register success...
+[    0.877960] thermal_sys: No trip points found for thermal-sensor1 id=0
+[    0.878675] thermal_sys: No trip points found for thermal-sensor2 id=0
+[    0.879942] mtk-msdc 11240000.mmc: allocated mmc-pwrseq
+[    0.881559] cros-ec-spi spi2.0: Chrome EC device registered
+[    0.886456] platform 14001000.dma-controller0: Adding to iommu group 0
+[    0.886527] platform 14005000.dma-controller: Adding to iommu group 0
+[    0.886574] platform 14006000.mdp3-wdma: Adding to iommu group 0
+[    0.886622] platform 14008000.ovl: Adding to iommu group 0
+[    0.886674] platform 14009000.ovl: Adding to iommu group 0
+[    0.886720] platform 1400a000.ovl: Adding to iommu group 0
+[    0.886764] platform 1400b000.rdma: Adding to iommu group 0
+[    0.886810] platform 1400c000.rdma: Adding to iommu group 0
+[    0.886881] platform 16020000.video-codec: Adding to iommu group 0
+[    0.886939] platform 17020000.vcodec: Adding to iommu group 0
+[    0.886988] platform 17030000.jpeg-encoder: Adding to iommu group 0
+[    0.887304] mtk-iommu 10205000.iommu: bound 14017000.larb (ops mtk_smi_larb_component_ops)
+[    0.887326] mtk-iommu 10205000.iommu: bound 16010000.larb (ops mtk_smi_larb_component_ops)
+[    0.887338] mtk-iommu 10205000.iommu: bound 1502f000.larb (ops mtk_smi_larb_component_ops)
+[    0.887351] mtk-iommu 10205000.iommu: bound 1a002000.larb (ops mtk_smi_larb_component_ops)
+[    0.887362] mtk-iommu 10205000.iommu: bound 17010000.larb (ops mtk_smi_larb_component_ops)
+[    0.887392] mtk-iommu 10205000.iommu: bound 15021000.larb (ops mtk_smi_larb_component_ops)
+[    0.887403] mtk-iommu 10205000.iommu: bound 1a001000.larb (ops mtk_smi_larb_component_ops)
+[    0.890313] panel-boe-tv101wum-nl6 14014000.dsi.0: supply pp3300 not found, using dummy regulator
+[    0.890854] mediatek-drm mediatek-drm.17.auto: bound 14008000.ovl (ops mtk_disp_ovl_component_ops)
+[    0.890875] mediatek-drm mediatek-drm.17.auto: bound 14009000.ovl (ops mtk_disp_ovl_component_ops)
+[    0.890885] mediatek-drm mediatek-drm.17.auto: bound 1400a000.ovl (ops mtk_disp_ovl_component_ops)
+[    0.890895] mediatek-drm mediatek-drm.17.auto: bound 1400b000.rdma (ops mtk_disp_rdma_component_ops)
+[    0.890903] mediatek-drm mediatek-drm.17.auto: bound 1400c000.rdma (ops mtk_disp_rdma_component_ops)
+[    0.890913] mediatek-drm mediatek-drm.17.auto: bound 1400e000.color (ops mtk_disp_color_component_ops)
+[    0.890923] mediatek-drm mediatek-drm.17.auto: bound 1400f000.ccorr (ops mtk_disp_ccorr_component_ops)
+[    0.890932] mediatek-drm mediatek-drm.17.auto: bound 14010000.aal (ops mtk_disp_aal_component_ops)
+[    0.890940] mediatek-drm mediatek-drm.17.auto: bound 14011000.gamma (ops mtk_disp_gamma_component_ops)
+[    0.892082] mediatek-drm mediatek-drm.17.auto: bound 14014000.dsi (ops mtk_dsi_component_ops)
+[    0.892157] mediatek-drm mediatek-drm.17.auto: Not creating crtc 1 because component 10 is disabled or missing
+[    0.892877] [drm] Initialized mediatek 1.0.0 for mediatek-drm.17.auto on minor 0
+[    0.905531] mtk-msdc 11240000.mmc: msdc_track_cmd_data: cmd=52 arg=00000C00; host->error=0x00000002
+[    0.906097] mtk-msdc 11240000.mmc: msdc_track_cmd_data: cmd=52 arg=80000C08; host->error=0x00000002
+[    0.944091] mmc1: queuing unknown CIS tuple 0x01 [d9 01 ff] (3 bytes)
+[    0.951492] mmc1: queuing unknown CIS tuple 0x1a [01 01 00 02 07] (5 bytes)
+[    0.954667] mmc1: queuing unknown CIS tuple 0x1b [c1 41 30 30 ff ff 32 00] (8 bytes)
+[    0.955311] mmc1: queuing unknown CIS tuple 0x14 [] (0 bytes)
+[    0.962512] mmc1: new UHS-I speed SDR104 SDIO card at address 0001
+[    1.018775] mtk-msdc 11230000.mmc: Final PAD_DS_TUNE: 0x12c14
+[    1.018914] mmc0: Host Software Queue enabled
+[    1.018938] mmc0: new HS400 MMC card at address 0001
+[    1.020472] mmcblk0: mmc0:0001 DV6DAB 116 GiB
+[    1.024258]  mmcblk0: p1 p2 p3
+[    1.025109] mmcblk0boot0: mmc0:0001 DV6DAB 4.00 MiB
+[    1.028673] mmcblk0boot1: mmc0:0001 DV6DAB 4.00 MiB
+[    1.031170] mmcblk0rpmb: mmc0:0001 DV6DAB 16.0 MiB, chardev (237:0)
+[    1.266104] Console: switching to colour frame buffer device 240x75
+[    1.269395] usb 1-1: new high-speed USB device number 2 using xhci-mtk
+[    1.278310] mediatek-drm mediatek-drm.17.auto: [drm] fb0: mediatekdrmfb frame buffer device
+[    1.280833] panfrost 13040000.gpu: clock rate = 511999970
+[    1.282970] panfrost 13040000.gpu: [drm:panfrost_devfreq_init] Failed to register cooling device
+[    1.283123] panfrost 13040000.gpu: mali-g72 id 0x6221 major 0x0 minor 0x3 status 0x0
+[    1.283176] panfrost 13040000.gpu: features: 00000000,000005f7, issues: 00000000,00000400
+[    1.283230] panfrost 13040000.gpu: Features: L2:0x07120206 Shader:0x00000000 Tiler:0x00000809 Mem:0x1 MMU:0x00002830 AS:0xff JS:0x7
+[    1.283310] panfrost 13040000.gpu: shader_present=0x7 l2_present=0x1
+[    1.285320] [drm] Initialized panfrost 1.4.0 for 13040000.gpu on minor 1
+[    1.288510] input: cros_ec_buttons as /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:keyboard-controller/input/input1
+[    1.291965] input: wifi-wakeup as /devices/platform/wifi-wakeup/input/input2
+[    1.292459] clk: Disabling unused clocks
+[    1.292876] PM: genpd: Disabling unused power domains
+[    1.292997] ALSA device list:
+[    1.293025]   No soundcards found.
+[    1.299997] Freeing unused kernel memory: 1920K
+[    1.300149] Run /init as init process
+[    1.300167]   with arguments:
+[    1.300171]     /init
+[    1.300173]     cros_secure
+[    1.300177]   with environment:
+[    1.300179]     HOME=/
+[    1.300182]     TERM=linux
+[    1.300184]     kern_guid=61e1577f-bd28-2941-90fc-972eb9557a1b
+[    1.312570] kukui-android phase2
+[    1.314147] kukui-android phase2 Linux version 6.18.28-mt81-kukui2 (alpha@alpha-asus) (Ubuntu clang version 21.1.8 (6ubuntu1), Ubuntu LLD 21.1.8) #1-kukui-phase2 SMP PREEMPT Fri Oct 30 20:05:58 EDT 2026
+[    1.318435] usbcore: registered new interface driver usb-storage
+[    1.319158] kukui-android phase2 insmod usb-storage
+[    1.322478] kukui-android phase2 insmod configs
+[    1.408613] usb 1-1: New USB device found, idVendor=05e3, idProduct=0610, bcdDevice=60.60
+[    1.408776] usb 1-1: New USB device strings: Mfr=0, Product=1, SerialNumber=0
+[    1.408859] usb 1-1: Product: USB2.0 Hub
+[    1.411232] hub 1-1:1.0: USB hub found
+[    1.411649] hub 1-1:1.0: 4 ports detected
+[    1.697351] usb 1-1.1: new full-speed USB device number 3 using xhci-mtk
+[    1.789256] usb 1-1.1: New USB device found, idVendor=18d1, idProduct=503c, bcdDevice= 1.00
+[    1.789420] usb 1-1.1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[    1.789505] usb 1-1.1: Product: Hammer
+[    1.789553] usb 1-1.1: Manufacturer: Google Inc.
+[    1.789607] usb 1-1.1: SerialNumber: 31003c000957424e33343920
+[    1.795509] input: Google Inc. Hammer as /devices/platform/soc/11201000.usb/11200000.usb/usb1/1-1/1-1.1/1-1.1:1.0/0003:18D1:503C.0001/input/input3
+[    1.850767] hammer 0003:18D1:503C.0001: input,hidraw0: USB HID v1.00 Keyboard [Google Inc. Hammer] on usb-11200000.usb-1.1/input0
+[    1.937562] usb 1-1.2: new high-speed USB device number 4 using xhci-mtk
+[    2.041732] usb 1-1.2: New USB device found, idVendor=0bda, idProduct=0316, bcdDevice= 2.04
+[    2.044792] usb 1-1.2: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+[    2.047789] usb 1-1.2: Product: USB3.0-CRW
+[    2.050703] usb 1-1.2: Manufacturer: Generic
+[    2.053601] usb 1-1.2: SerialNumber: 20120501030900000
+[    2.062007] usb-storage 1-1.2:1.0: USB Mass Storage device detected
+[    2.066714] scsi host0: usb-storage 1-1.2:1.0
+[    3.105651] scsi 0:0:0:0: Direct-Access     Generic- SD/MMC           1.00 PQ: 0 ANSI: 4
+[    4.028259] sd 0:0:0:0: [sda] 122167296 512-byte logical blocks: (62.5 GB/58.3 GiB)
+[    4.035053] sd 0:0:0:0: [sda] Write Protect is off
+[    4.037271] sd 0:0:0:0: [sda] Mode Sense: 2f 00 00 00
+[    4.040215] sd 0:0:0:0: [sda] Write cache: disabled, read cache: enabled, doesn't support DPO or FUA
+[    4.133998]  sda: sda1 sda2 sda3
+[    4.138828] sd 0:0:0:0: [sda] Attached SCSI removable disk
+[    4.358686] EXT4-fs (sda2): mounting ext2 file system using the ext4 subsystem
+[    4.372435] EXT4-fs (sda2): warning: mounting unchecked fs, running e2fsck is recommended
+[    4.376246] EXT4-fs (sda2): mounted filesystem 38f0e7d6-fa7d-471b-b14f-5236254f0be1 r/w without journal. Quota mode: none.
+=== end ===

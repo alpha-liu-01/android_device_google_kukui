@@ -1,0 +1,16 @@
+# Logical volumes live inside super. GPT names select the other partitions.
+system                                                  /system         erofs   ro                                                      wait,logical,first_stage_mount
+vendor                                                  /vendor         erofs   ro                                                      wait,logical,first_stage_mount
+system_ext                                              /system_ext     erofs   ro                                                      wait,logical,first_stage_mount
+product                                                 /product        erofs   ro                                                      wait,logical,first_stage_mount
+system_dlkm                                             /system_dlkm    erofs   ro                                                      wait,logical,first_stage_mount
+vendor_dlkm                                             /vendor_dlkm    erofs   ro                                                      wait,logical,first_stage_mount
+
+/dev/block/by-name/metadata                             /metadata       ext4    noatime,nosuid,nodev,discard                            wait,formattable,first_stage_mount,check
+# No fileencryption and no keydirectory. encryptFstab waits for keystore2,
+# and keystore2 is early_hal, which init starts only after mount_all returns.
+/dev/block/by-name/userdata                             /data           f2fs    nodev,noatime,nosuid,reserve_root=32768                 wait,formattable,first_stage_mount,quota,check,checkpoint=fs
+/dev/block/by-name/userdata                             /data           ext4    discard,noatime,noauto_da_alloc,data=ordered,user_xattr,barrier=1   wait,formattable,first_stage_mount,quota
+/dev/block/by-name/misc                                 /misc           emmc    defaults                                                defaults
+
+/dev/block/zram0                                        none            swap    defaults                                                zramsize=50%

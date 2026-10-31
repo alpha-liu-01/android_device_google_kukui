@@ -1,0 +1,367 @@
+# 阶段 4：平板日常
+
+在外置盘已经点亮进入桌面的 `6.6.34-phase2` Android 16（LineageOS 23.2）上，按顺序补齐硬件加速与平板日常外设。不换 6.12 或 6.18，不写 eMMC，不重分外置盘 GPT，不格式化 `userdata`。阶段 3 的记录在 [阶段 3](phase-3.md)。
+
+产品形态仍以 `third_party/android_device_google_trogdor-lineage-24` 为准。两边不一致时，跟做完的设备树。镜像保持 vanilla（不装 GApps、Widevine）。耳机插孔是物理损坏，不测。摄像头和 Hantro 硬解码不在这段的完成标准里。
+
+## 完成标准
+
+1. **流畅桌面与应用**：启用 Panfrost（Mesa）硬件加速、启用 zram，并补齐基础软件特性权限后，桌面（Launcher3）和设置应用不再因缺服务崩溃或软渲染卡死。
+2. **外设可用**：触摸和旋转、Wacom 手写笔、背光调节、Wi-Fi 联网（含无线 `adb`）、蓝牙、扬声器音频播放、电量和充电指示均正常工作。电量不出现 postmarketOS 上突然掉到 0、插电又回到 60% 到 70% 的跳变。
+3. **一次完整日常闭环**：在 4 GB 内存上完成一次「开机、联网、打开网页、安装应用、睡眠、唤醒」。唤醒后仍是同一次启动，而不是被看门狗打进 bootloader。
+4. **内置盘完好**：切回内置盘，postmarketOS v25.06 正常进桌面，`uname -r` 仍是 `6.6.34`，根在 `/dev/mmcblk1p3`，eMMC 的分区表和 `pmOS_kernel` 校验和未变。
+
+## 这次做什么
+
+按 `docs/roadmap.md` 定下的顺序推进，每一小步验证通过后再进下一步：
+
+| 顺序 | 模块 | 做什么 |
+| --- | --- | --- |
+| 1 | 基础软件权限与 zram | 对照做完的 Trogdor 树，在 `device.mk` 补齐 `android.software.xml`、`android.software.app_widgets.xml`、`android.software.backup.xml`、`android.software.print.xml`、`android.software.voice_recognizers.xml`、`android.software.device_admin.xml` 等基础软件权限，修复 `Launcher3`（`AppWidgetManager` 空指针）和 `Seedvault`（`IBackupManager` 空指针）崩溃。在 `fstab.gru` 和 `init.gru.rc` 启用 `zram`（`swapon_all`）。 |
+| 2 | Panfrost 硬件加速 | 把 `TARGET_GRAPHICS` 从 `swiftshader` 切到 `mesa`（Panfrost，Mali-T860，`panfrost.ko` 及依赖模块按需加载），渲染走 `skiagl`，替换掉 1～2 秒一帧的 CPU 软渲染。核对 `minigbm` / `gbm` 与 `drm_hwcomposer` 在 Panfrost 下的 buffer 分配与合成。 |
+| 3 | 触摸、旋转与手写笔 | 确认 `elants_i2c`（`ekth3500`）、`wacom`（`2D1F:0036`）、`cros_ec_keyb` 的输入设备分类与 IDC 配置；接入 `cros-ec` 传感器（加速度计 / 陀螺仪）subhal 与方向配置，使屏幕旋转正常工作。 |
+| 4 | 背光调节 | 打通 `/sys/class/backlight/backlight`（`pwm-backlight`）与 Android light HAL / 框架亮度滑条的读写权限和映射。 |
+| 5 | Wi-Fi 与无线 adb | 放入 `ath10k`（QCA6174 `hw3.0`）固件并加载 `ath10k_pci.ko` 及 mac80211/cfg80211 模块，配置 `wpa_supplicant`（nl80211）与 Wi-Fi HAL。连上局域网后恢复 `adbd`，通过 TCP/IP 验证无线 `adb`（若有线 Type-C OTG 角色切换可行则一并核对）。 |
+| 6 | 蓝牙 | 放入 `qca` 蓝牙 USB 固件并加载 `btusb.ko` 等模块，恢复 `vendor.bluetooth-default` HAL 与 `android.hardware.bluetooth` 特性声明，并在系统中重新 enable `com.android.bluetooth`。 |
+| 7 | 音频播放 | 按 `rk3399-gru-sound`（DA7219 + MAX98357A）编写音频路由（alsa / tinymix）与 `audio_policy_configuration.xml`，打通 AIDL 音频 HAL 的内置扬声器播放。不测已损坏的耳机插孔。 |
+| 8 | 电量与充电 | 核对 `sbs-battery`（`sbs-9-000b`）和 `cros_usbpd_charger` 与 health AIDL HAL 的属性读取，处理 `current_avg` / `technology` 返回 `-5` 的兼容，确认充放电状态和百分比稳定。 |
+| 9 | 睡眠与唤醒 | 在确认 `dw_wdt` 30 秒看门狗保活正常的前提下，解开阶段 3 为防崩溃加上的 `/sys/power/state` 封锁，排查并验证 6.6 下睡眠与唤醒不掉回 bootloader、唤醒后仍是同一次启动。 |
+
+## 你来做
+
+1. 每次写入前停在内置盘的 postmarketOS（或已打通无线 `adb` / SSH 的环境）。如果地址变了就告诉我。
+2. 我准备好新的 `super.img` 或 `kernel.kpart` 并校验无误后，你在机器终端执行对应的 `doas /home/user/phase3/write-super.sh` 或 `doas /home/user/phase3/write-kernel.sh`。看到 `WRITE_OK` 之后再重启。
+3. 启动菜单选外置盘进入 Android，按当前步骤验证对应功能（桌面流畅度、触摸/笔、背光、Wi-Fi、蓝牙、外放声音、充电显示、睡眠唤醒），把现象告诉我。
+4. 需要读外置盘 `bootlog` 或重刷分区时，重启选回内置盘，执行 `doas /home/user/phase3/readlog.sh`。
+
+## 我来做
+
+1. 每次写入前确认目标只在外置盘 `mmcblk0`（`KernelA` 为 `mmcblk0p1`，`super` 为 `mmcblk0p6`），不改 GPT，不格式化 `userdata`（`mmcblk0p7`），不动 `mmcblk1`。
+2. 按上面的 9 个步骤逐项修改 `device/google/gru`（及必要的内核/模块配置），编译并把产物传到 `/home/user/phase3/`，核对远端 sha256 与镜像大小（FIT 小于 32 MiB）。
+3. 每次测试后拉取 `/home/user/phase3/bootlog-copy.txt`（或通过已连通的 `adb` 抓取日志），分析并把进展和问题记录到本文的「实现笔记」和「事件」中，并核对 eMMC `pmOS_kernel` 校验和仍是 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。
+
+## 实现顺序
+
+| 步 | 谁 | 做什么 | 通过条件 |
+| --- | --- | --- | --- |
+| 1 | 我 / 你 | 补齐基础软件权限、启用 zram、切换 Panfrost 硬件加速，写入并启动外置盘 | 桌面与设置流畅，Launcher3 不再反复崩溃 |
+| 2 | 我 / 你 | 配好触摸、旋转、手写笔和背光，写入并验证 | 触控、笔、自动旋转、亮度调节正常 |
+| 3 | 我 / 你 | 配好 Wi-Fi、蓝牙、扬声器音频、电量和充电，写入并验证 | 能连 Wi-Fi、打开网页、安装应用、外放发声、电量正常 |
+| 4 | 我 / 你 | 调试并验证睡眠与唤醒 | 睡眠唤醒后仍是同一次启动，不掉回 bootloader |
+| 5 | 你 / 我 | 选回内置盘，读日志并做最终安全核对 | postmarketOS 进桌面，根在 `mmcblk1p3`，eMMC 校验和未变 |
+
+第 1 步到第 5 步全部通过后，阶段 4 结束。
+
+## 实现笔记
+
+### 1. 基础软件权限与 zram（2026-10-19）
+
+- **基础软件权限**：对照 `third_party/android_device_google_trogdor-lineage-24/device.mk`，新增 `device/google/gru/etc/permissions/android.software.xml`，并在 `device/google/gru/device.mk` 中拷贝 `android.software.xml`、`android.software.cts.xml`、`android.software.app_widgets.xml`、`android.software.backup.xml`、`android.software.voice_recognizers.xml`、`android.software.print.xml`、`android.software.device_admin.xml` 与 `android.hardware.keystore.app_attest_key.xml` 到 `/vendor/etc/permissions/`。使 `SystemServer` 正常启动 `AppWidgetService` 与 `BackupManagerService`，修复 `com.android.launcher3`（`AppWidgetManager.getInstalledProvidersForProfile` 空指针）和 `com.stevesoltys.seedvault`（`IBackupManager` 空指针）崩溃。
+- **zram 启用**：`6.6.34-phase2` 内核中 `CONFIG_ZRAM=m`、`CONFIG_CRYPTO_LZ4=m`、`CONFIG_ZSMALLOC=y`、`CONFIG_CRYPTO_ZSTD=y`。从内核构建目录取出零外部模块依赖的 `zram.ko`（50792 字节）和 `lz4.ko`（9856 字节）放入 `device/google/gru/modules/` 并拷入 `/vendor/lib/`；在 `device.mk` 设置 `persist.sys.zram_enabled=1`；在 `init.gru.rc` 的 `on early-init` 加载 `lz4.ko` 和 `zram.ko`，`on init` 写 `/sys/block/zram0/comp_algorithm lz4`，`on fs` 和 `on sys-boot-completed-set && property:persist.sys.zram_enabled=1` 执行 `swapon_all /vendor/etc/fstab.${ro.hardware}`（对应 `fstab.gru` 的 `/dev/block/zram0 none swap defaults zramsize=75%`）。同时在 `gru-logcat.sh` 启动时将 `/proc/swaps` 以 `GRU_SWAP` 前缀打印到 `/dev/kmsg` 以便从启动日志核对。
+- **构建产物**：`out/target/product/gru/super.img` 大小 `1258664340` 字节，sha256 `5905b1e2a47c7f5f33e4675bad0452451aeeae6c34d774659d856e0f63a81d0a`。
+- **实机验证（`/tmp/bootlog18.txt`，7818 行）**：
+  - `zram` 在 `on fs` 阶段成功挂载：`zram: Added device: zram0`、`Adding 2919648k swap on /dev/block/zram0`（约 2.78 GiB，占 `MemTotal` 75%），`GRU_SWAP /dev/block/zram0 partition 2919648 0 -2`。（`sys-boot-completed-set` 里的第二次 `swapon_all` 因 `zram0` 已初始化返回 `Cannot change disksize for initialized device`，已在 `init.gru.rc` 中移除重复触发，只保留 `on fs` 的一次 `swapon_all`。）
+  - 崩溃与 ANR 清零：`com.android.launcher3`（PID 3832）和 `com.stevesoltys.seedvault`（PID 4544）各只启动 1 次，0 次崩溃；整份日志 `FATAL EXCEPTION` 为 0 次，`E AndroidRuntime` 为 0 次，`ANR in` 为 0 次。约 535 秒正常关机（`sys.powerctl='shutdown,userrequested'`）。关机末尾 `libprocessgroup: Failed to write 1 to .../cgroup.kill: No such file or directory` 是收到 `SIGTERM` 的服务已先行退出、内核回收了对应 `pid_*` cgroup 目录所致。
+
+### 2. Panfrost 硬件加速（2026-10-19）
+
+- **内核模块与加载时序**：`6.6.34-phase2` 中 GPU 电源域（`CONFIG_ROCKCHIP_PM_DOMAINS=y`）、IOMMU（`CONFIG_ROCKCHIP_IOMMU=y`）、调压器（`CONFIG_REGULATOR_VCTRL=y`、`CONFIG_REGULATOR_PWM=y`）与 devfreq 调速器（`CONFIG_PM_DEVFREQ=y`、`CONFIG_DEVFREQ_GOV_SIMPLE_ONDEMAND=y`）均已内建；`panfrost.ko` 仅依赖 `drm_shmem_helper.ko` 与 `gpu-sched.ko`。从 `modinstall/lib/modules/6.6.34-phase2` 解压这 3 个模块放入 `device/google/gru/modules/` 并拷入 `/vendor/lib/`，在 `init.gru.rc` 的 `on early-init` 按顺序 `insmod`（在 `surfaceflinger` / `allocator` / `hwcomposer` 启动前生成 `/dev/dri/renderD128` 与 `/dev/dri/card1`，而内建 `rockchip-drm` 固定为 `/dev/dri/card0`）。
+- **Mesa（Panfrost）与 Gralloc / HWC 节点分离**：
+  - 将 `BoardConfig.mk` 和 `device.mk` 的 `TARGET_GRAPHICS` 切换为 `mesa`，设 `TARGET_GRAPHICS_VULKAN := none`（Mali-T860 为 Midgard v5，仅支持 OpenGL ES 3.1，不支持 PanVK）、`BOARD_MESA3D_GALLIUM_DRIVERS := panfrost`、`TARGET_GRAPHICS_ALLOCATOR_HAL := minigbm-upstream`、`TARGET_MINIGBM_PLATFORM := generic`。
+  - 关键防坑：`minigbm-upstream` 的 `init_try_nodes()` 默认优先打开 `/dev/dri/renderD128`，且 `drv_get_backend()` 在找不到 `panfrost` 后端时会回退到 `backend_dumb_generic` 并返回成功，导致后续在 `renderD128` 上调用 `DRM_IOCTL_MODE_CREATE_DUMB` 失败。为此在 `device.mk` 设置 `vendor.minigbm.device=/dev/dri/card0` 与 `vendor.hwc.drm.device=/dev/dri/card0`，使 `minigbm-upstream` 和 `drm_hwcomposer` 固定打开 `/dev/dri/card0`（`rockchip`），而 Mesa（`libEGL_mesa.so` + `libgallium_dri.so`）通过 `DRM_NODE_RENDER` 打开 `/dev/dri/renderD128`（`panfrost`）并通过 PRIME dma-buf 导入 `rockchip` 线性 buffer 进行硬件渲染。
+  - 设置 `ro.opengles.version=196609`（OpenGL ES 3.1）、`debug.renderengine.backend=skiaglthreaded`、`debug.hwui.renderer=skiagl`、`ro.surface_flinger.supports_background_blur=0`。
+- **构建产物**：
+  - 初版（仅 Panfrost）：`out/target/product/gru/super.img` 大小 `1248559508` 字节，sha256 `345ebd9a63dd4d4ed9cb0faf7d65a2c6dd76c37e4e3dad7ff16768381dacf146`。
+  - 补齐调频模块版（含 `cpufreq-dt.ko`、`rockchip_thermal.ko`、`rockchip-dfi.ko`、`rk3399_dmc.ko`）：`out/target/product/gru/super.img` 大小 `1248600468` 字节，sha256 `04155eb44d30f74ba84dfc6f3de15d62add9720afd4e971dd7fabab17755e416`，已上传至 `/home/user/phase3/super.img` 并校验一致。
+- **实机验证与性能分析（`/tmp/bootlog19.txt`，7542 行）**：
+  - **内核驱动上线（`9.96s`，`on early-init`）**：`drm_shmem_helper.ko`、`gpu-sched.ko`、`panfrost.ko` 按序加载成功，`panfrost ff9a0000.gpu: mali-t860 id 0x860 major 0x2 minor 0x0 status 0x0`、`shader_present=0xf l2_present=0x1`（4 核 Mali-T860 MP4 全部就绪，初始频率 500 MHz，OPP 表上限 800 MHz），注册为 `minor 1`（`/dev/dri/renderD128` 与 `/dev/dri/card1`）。
+  - **SurfaceFlinger 与 Mesa 硬件渲染确认（`95.47s`，无任何软渲染回退）**：
+    - `SurfaceFlinger` 输出 `vendor: Mesa`、`renderer: Mali-T860 (Panfrost)`、`version: OpenGL ES 3.1 Mesa 25.3.3`、`GL_MAX_TEXTURE_SIZE = 16384`。
+    - 编译 `libgallium_dri.so` 时仅启用了 `-Dgallium-drivers=panfrost`（未编译 `llvmpipe`/`softpipe`/`swrast`），且移除了 `com.android.hardware.graphics.allocator.minigbm_dmabuf` 与 SwiftShader APEX，从构建产物与日志两方面确认 100% 走 Panfrost 硬件管线，不存在 fallback 到软件渲染或低效模式的情况。
+    - `drmhwc`（`hwc3-drm`）成功绑定 `/dev/dri/card0`（`Backend 'generic' for 'DSI-1' and driver 'rockchip' was successfully set`）。
+  - **启动耗时与稳定性**：从 `starting service 'surfaceflinger'` 到 `sys.boot_completed=1` 耗时从 SwiftShader 的 `145.71s` 缩短至 `64.36s`（提速 2.26 倍），总开机时间从 `320.06s` 降至 `156.92s`。整次运行至 `220.6s` 用户请求正常关机期间，`FATAL EXCEPTION` 为 0 次，`ANR` 为 0 次，GPU 报错/超时为 0 次。
+  - **划屏 30–45 fps 体感原因分析与调频补齐**：
+    1. **CPU 调频与内存控制器调频模块补齐与实机验证（`/tmp/bootlog20.txt`，7799 行）**：
+       - 排查 `6.6.34-phase2` 内核配置与内置盘 `lsmod`/`dmesg` 发现，`CONFIG_CPUFREQ_DT=m`（`cpufreq-dt.ko`）、`CONFIG_ROCKCHIP_THERMAL=m`（`rockchip_thermal.ko`）、`CONFIG_DEVFREQ_EVENT_ROCKCHIP_DFI=m`（`rockchip-dfi.ko`）与 `CONFIG_ARM_RK3399_DMC_DEVFREQ=m`（`rk3399_dmc.ko`）均为零外部依赖的模块。未加载 `cpufreq-dt.ko` 时，RK3399（OP1）的 4×A53 与 2×A72 锁死在 bootloader 初始频率 `600000 KHz`（600 MHz），无法升频至 `1512000 KHz`（1.512 GHz）/ `2016000 KHz`（2.016 GHz），内存控制器也停留在 `400000000 Hz`（400 MHz）而非上限 `928000000 Hz`（928 MHz）。
+       - 从 `modinstall/lib/modules/6.6.34-phase2` 提取这 4 个模块放入 `device/google/gru/modules/` 并拷入 `/vendor/lib/`，在 `init.gru.rc` 的 `on early-init` 按序 `insmod`，同时在 `gru-logcat.sh` 增加 `GRU_FREQ` 输出。
+       - **实机验证（`bootlog20.txt`）**：
+         - `7.79s` 内核打印 `cpufreq: cpufreq_online: CPU4: Running at unlisted initial frequency: 600000 KHz, changing to: 816000 KHz`，确认解除了 600 MHz 锁频。
+         - `73.7s` `GRU_FREQ` 读数确认所有调频器与频率上限全部就位：
+           - `policy0`（4×Cortex-A53）：`cur=1512000 max=1512000 gov=schedutil`（满频 1.512 GHz）
+           - `policy4`（2×Cortex-A72）：`cur=2016000 max=2016000 gov=schedutil`（满频 2.016 GHz）
+           - `ff9a0000.gpu`（Mali-T860 MP4）：`cur=500000000 max=800000000 gov=simple_ondemand`（上限 800 MHz）
+           - `memory-controller`（LPDDR3 DMC）：`cur=400000000 max=928000000 gov=simple_ondemand`（上限 928 MHz）
+         - **启动耗时三连降**：`surfaceflinger` 启动时间从 `92.56s` 提前至 `73.55s`（提早 19.0 秒），`sys.boot_completed=1` 从 `156.92s` 提前至 `125.21s`（再缩短 31.7 秒，对比 SwiftShader 的 `320.06s` 总计快了 194.8 秒），上次关机前的 `Failed to create DrmKmsPlan` 也降为 0 次。
+         - **附带发现（Emulated Storage / `fuse.ko`）**：`bootlog20.txt` 中用户在打开「设置 -> 存储」时触发 1 次 `IllegalArgumentException: Volume external_primary not found`（`StorageAsyncLoader`），排查确认 `CONFIG_FUSE_FS=m`（`kernel/fs/fuse/fuse.ko.xz`，零外部依赖）尚未加载导致 `/dev/fuse` 缺失、`/storage/emulated/0` 未挂载，将在下一轮构建中一并加载 `fuse.ko`。
+    2. **2048×1536 高分屏与线性 Buffer 带宽上限（30–45 fps 客观硬件边界）**：在 CPU（1.51 / 2.02 GHz）、GPU（800 MHz）、内存（928 MHz）全部满血工作后，应用打开与触控响应速度明显提升，但桌面划屏帧率仍稳定在 30–45 fps。这确认该帧率是 RK3399 的硬件边界：Scarlet 面板为 2048×1536（314.5 万像素，比 1920×1200 多 36.5%），且 `minigbm-upstream` generic 后端在 `rockchip` VOP 上分配的是未压缩线性 buffer（`DRM_FORMAT_MOD_LINEAR`，单帧 32-bit RGBA 约 12.6 MB），2016 年 Midgard 架构的 4 核 Mali-T860 MP4 在双通道 LPDDR3 共享内存带宽下推动 2K 视网膜屏合成的吞吐上限即在 30–45 fps 区间。
+
+### 3. 触摸、旋转与手写笔（含 `fuse.ko` 补齐）
+
+- **当前实机基线状态记录（2026-10-19）**：
+  1. **触摸屏（`Elan Touchscreen`，`elants_i2c 3-0010`）**：在默认方向（竖屏）下基本触控正常（已由第一阶段 ramdisk 加载 `elants_i2c.ko` 注册为 `input0`），待后续进一步核对边缘/多点触控与横竖屏坐标映射等隐性边界情况。
+  2. **屏幕旋转**：
+     - 在内置盘 postmarketOS v25.06（运行 `kwin_wayland`）上点击自动旋转会直接导致整机卡死；排查内置盘发现 `iio-sensor-proxy` 在后台早已开启 `iio:device0/buffer/enable=1` 正常读取传感器而未卡死。在 Android 下，90°/270° 旋转因 `rockchip` VOP plane 的 `transform_enum_mask_` 不包含 `DRM_MODE_ROTATE_270`，`drm_hwcomposer`（`DrmPlane::IsValidForLayer`）会安全回退到 `SurfaceFlinger` GPU Client 合成。
+     - 在外置盘 LineageOS 23.2 上点击自动旋转不会卡死，但旋转无任何效果；手动旋转入口暂未测试。
+     - 日志与系统排查：`bootlog19.txt` / `bootlog20.txt` 中 `system_server` 报错 `Could not find android.hardware.sensors.ISensors/default in the VINTF manifest`，且内核 IIO 传感器模块（`kfifo_buf.ko`、`industrialio-triggered-buffer.ko`、`cros-ec-sensorhub.ko`、`cros_ec_sensors_core.ko`、`cros_ec_sensors.ko`）尚未在 Android 下加载。
+  3. **Wacom 电磁笔（`2D1F:0036`）**：
+     - 在 LineageOS 23.2 下完全无反应（即使已在开发者选项开启“使用手写笔”）。
+     - 日志与系统排查：对比内置盘 `/proc/bus/input/devices` 发现，Scarlet 的 Wacom 电磁笔挂在 `/devices/platform/ff120000.i2c/i2c-2/2-0009/0018:2D1F:0036.0001`（`hid-over-i2c 2D1F:0036 Stylus`），驱动模块为 `i2c-hid.ko` 与 `i2c-hid-of.ko`（`CONFIG_I2C_HID_CORE=m`、`CONFIG_I2C_HID_OF=m`，而 `CONFIG_HID_GENERIC=y` 已内建），此外笔槽插拔检测 `switch-pen-insert`（`SW_PEN_INSERTED`）在 `gpio_keys.ko` 中；外置盘 Android 尚未加载这几个模块，因此内核根本未注册 Stylus input 节点。
+- **修改与实施方案**：
+  1. **补齐内核模块（`device/google/gru/modules/` 与 `init.gru.rc` `on early-init`）**：
+     - 存储挂载：`fuse.ko`（`kernel/fs/fuse/fuse.ko.xz`，解决 `/dev/fuse` 缺失导致 `external_primary` 模拟存储未挂载的问题）。
+     - Wacom 电磁笔与笔槽开关：`i2c-hid.ko`、`i2c-hid-of.ko`、`gpio_keys.ko`。
+     - ChromeOS EC IIO 传感器栈：`kfifo_buf.ko`、`industrialio-triggered-buffer.ko`、`cros-ec-sensorhub.ko`、`cros_ec_sensors_core.ko`、`cros_ec_sensors.ko`（注册 `iio:device0` `cros-ec-accel` 与 `iio:device1` `cros-ec-gyro`）。
+  2. **输入设备 IDC 配置（`device/google/gru/idc/`）**：
+     - `Vendor_04f3_Product_0b03.idc`（`Elan Touchscreen`，`1856x2496` 原生竖屏）与 `Vendor_2d1f_Product_0036.idc`（`hid-over-i2c 2D1F:0036 Stylus`，`14746x19661` 原生竖屏）：均配置 `device.internal = 1`、`touch.deviceType = touchScreen`、`touch.orientationAware = 1`，使触摸与手写笔坐标在横竖屏切换时自动跟随屏幕方向。
+  3. **接入 ChromeOS EC IIO 传感器 HAL（`device/google/gru/hal/sensors/`）**：
+     - 参照 `third_party/android_device_google_trogdor-lineage-24/hal/sensors/` 移植 `android.hardware.sensors@2.1-gru-subhal`（配合 `android.hardware.sensors-service.multihal` 及自带 VINTF fragment `android.hardware.sensors-multihal.xml`），在 `scan_elements` 前先确保 `enable_sensor(..., false)` 关闭 buffer。
+     - 配置 `/vendor/etc/sensors/hals.conf` 与 `/vendor/etc/sensors/sensor_hal_configuration.xml`（ChromeOS EC 已将 `lid_accel` 校正为面板自然方向，平放时实测 `in_accel_z_raw = +8130` 即 `+9.73 m/s²`，与 Android 标准坐标系一致，故 `x/y/z` 采用 `0/1/2` 恒等映射）。
+     - 添加 `/vendor/etc/ueventd.gru.rc` 并在 `init.gru.rc` `on post-fs` 双重设置 `/dev/iio:device0..1` 与 `/sys/bus/iio/devices/iio:device0..1` 下 `buffer/*`、`sampling_frequency`、`scan_elements/*_en` 的 `0660 system system` 权限；补齐 `android.hardware.sensor.accelerometer.xml` 与 `android.hardware.sensor.gyroscope.xml` 权限声明。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1249505684` 字节，sha256 `1e240695d3c4ef4e60755942ae2d0d75095c6a8d4236b4d286caa87662656ab4`。
+- **实机验证与日志对照分析（`/tmp/bootlog21.txt`，8231 行）**：
+  - **启动耗时与调频复核**：`surfaceflinger` 在 `72.90s` 启动，`sys.boot_completed=1` 在 `124.53s` 完成（比上一轮 `125.21s` 再快 0.68 秒）；`GRU_FREQ` 确认小核 `1.512 GHz`、大核 `2.016 GHz`、GPU `800 MHz`、内存控制器 `cur=928000000 max=928000000` 全程生效；内置盘 eMMC `mmcblk1p1` 校验和保持 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。
+  - **本轮验证通过的 3 项功能**：
+    1. **Wacom 手写笔（`hid-over-i2c 2D1F:0036 Stylus`）**：`7.45s` `i2c-hid-of` 探测成功并注册 `/dev/input/event3`（`Stylus`）与 `/dev/input/event4`，`EventHub` 加载 `/vendor/usr/idc/Vendor_2d1f_Product_0036.idc` 并绑定至 `display id 0`（`mode DIRECT`）。实测全部 4 个方向点击与悬停（Hover）完全正常，无任何方向错位（手写与压感暂缺测试软件条件）。同时 `gpio_keys.ko` 成功注册 `/dev/input/event5`（`SW_PEN_INSERTED`）。
+    2. **自动旋转与四向帧率一致性**：`74.3s` `GoogleIIOSensorSubHal` 成功发现并初始化 `/sys/bus/iio/devices/iio:device0`（`cros-ec-accel`）与 `iio:device1`（`cros-ec-gyro`）。实测自动旋转完全正常，且全部 4 个方向的帧率一致，**未出现** Debian XFCE 下横屏远比竖屏卡顿的问题（原因：Debian XFCE 下 Xorg 使用 CPU 软旋转，而 Android 下当 `rockchip` VOP 硬件平面不支持 90°/270° 时，`drm_hwcomposer` 自动回退由 `Mali-T860 (Panfrost)` 在 GPU 硬件合成阶段直接完成旋转纹理渲染）。
+    3. **「设置 -> 存储」（`fuse.ko`）**：`7.26s` `fuse: init (API version 7.39)` 初始化成功，`external_primary`（`/storage/emulated/0`）正常挂载，「设置 -> 存储」打开完全正常，上一轮的 `Volume external_primary not found` 异常彻底消失。
+  - **本轮实测新发现的问题与 `bootlog21.txt` 根因定位及修复排期**：
+    1. **缺少虚拟导航栏（三键导航 / 手势导航均不显示，且设置中无入口或打不开）**：
+       - **根因**：`device/google/gru` 尚未像 `third_party/android_device_google_trogdor-lineage-24` 一样配置 `DEVICE_PACKAGE_OVERLAYS := $(LOCAL_PATH)/overlay`。AOSP 默认 `config_showNavigationBar = false`（假定机身带实体 Home/Back 按键），导致 `WindowManagerService.hasNavigationBar()` 返回 `false`，`SystemUI` 不渲染导航栏，且「设置 -> 系统 -> 导航模式」隐藏入口。
+       - **修复排期**：**放入第 4 步（背光调节）一并修复**——参照 Trogdor 补齐 `device/google/gru/overlay/frameworks/base/core/res/res/values/config.xml`（开启 `<bool name="config_showNavigationBar">true</bool>`，并声明 `config_voice_capable=false`、`config_sms_capable=false`）。
+    2. **点击搜索框时屏幕虚拟键盘（IME）不弹出**：
+       - **根因（见 `bootlog21.txt` 第 6550 行）**：`rk3399-gru.dtsi` 默认 `#include <arm/cros-ec-keyboard.dtsi>`（`compatible = "google,cros-ec-keyb"`，含完整笔记本 8×13 矩阵键盘映射），而纯平板 `rk3399-gru-scarlet.dtsi` 未将其覆写为仅按键的 `google,cros-ec-keyb-switches`。因此 `cros_ec_keyb.ko` 除了注册音量/电源键的 `cros_ec_buttons`（`/dev/input/event2`）外，还额外注册了一个名为 `cros_ec`（`/dev/input/event1`）的全尺寸键盘设备；`EventHub` 检测到其包含 `AKEYCODE_Q` 且 `builtinKeyboard=false`，将其归类为外接全键盘（`classes=KEYBOARD | ALPHAKEY`），Android 默认在外接硬键盘连接时隐藏屏幕软键盘（`show_ime_with_hard_keyboard=0`）。
+       - **修复排期**：**放入第 4 步（背光调节）一并修复**——① 新增 `/vendor/usr/keylayout/cros_ec.kl`（仅保留功能键、不映射字母键 `Q`，使 `EventHub` 不把 `cros_ec` 虚报为外接 `ALPHAKEY` 硬键盘）；② 同时在 `overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml` 中配置 `<bool name="def_show_ime_with_hard_keyboard">true</bool>`（并在 `init.gru.rc` `on property:sys.boot_completed=1` 执行 `settings put secure show_ime_with_hard_keyboard 1` 以覆盖旧 `userdata`），即使未来真接上实体键盘也默认允许弹出软键盘。
+    3. **「设置 -> 声音」与「设置 -> 无障碍（Accessibility）」闪退**：
+       - **根因（见 `bootlog21.txt` 第 7572 行与第 7868 行）**：两处崩溃均由「系统尚未声明蓝牙支持（`android.hardware.bluetooth`），导致 `LocalBluetoothManager.getInstance()` 返回 `null`」引发：
+         - 打开「设置 -> 声音」时：`LocalMediaManager` 构造函数（`LocalMediaManager.java:160`）发现 `mLocalBluetoothManager == null` 后打印 `Bluetooth is not supported on this device` 并提前 `return`，导致成员变量 `mInfoMediaManager` 保持 `null`；随后 `MediaOutputPreferenceController.onStart()` 调用 `LocalMediaManager.registerCallback()` 时触发 `mInfoMediaManager.registerCallback()` 空指针（NPE）。
+         - 打开「设置 -> 无障碍」时：因未启用蓝牙助听器支持，`use(AccessibilityHearingAidPreferenceController.class)` 返回 `null`，`AccessibilitySettings.onAttach(AccessibilitySettings.java:196)` 直接调用 `.setFragmentManager()` 触发空指针（NPE）。
+       - **与 `docs/phase-3.md` 蓝牙无法开机记录的核对与安全修复方案**：
+         - 核对 [阶段 3](phase-3.md) 第 148～159 行记录可知：在阶段 3 中，`init.gru.rc` 曾执行 `pm disable com.android.bluetooth`，并将该禁用状态持久化写入了外置盘 `userdata`（`/data/system/users/0/package-restrictions.xml`）；而在我们未格式化的同一份 `userdata` 上，若此时在第 4 步贸然恢复 `/vendor/etc/permissions/android.hardware.bluetooth.xml` 权限声明，`SystemServer` 启动 `BluetoothService` 时就会立即重现阶段 3 第 157 行的致命异常 `No service can handle intent { act=android.bluetooth.IAdapter pkg=com.android.bluetooth }`，再次导致 `system_server` 崩溃无法开机！（且在未放入 `btusb.ko` 前恢复蓝牙 HAL 也会重现 `FD_SET: file descriptor -1` 反复 abort。）
+         - **100% 零风险修复**：在第 4 步中**绝不提前开启** `android.hardware.bluetooth` 声明（保持 `TARGET_BLUETOOTH_HAL := none` 直至第 6 步蓝牙硬件模块就绪，且第 6 步开启前必须先在 `init.gru.rc` 执行 `pm enable com.android.bluetooth`），而是直接在 `SettingsLib`（`LocalMediaManager.java`）和 `Settings`（`AccessibilitySettings.java`、`AccessibilityHearingAidPreferenceController.java`、`HearingAidHelper.java`）中补齐对 `mInfoMediaManager` / `hearingAidPreferenceController` / `mLocalBluetoothManager` / `mBluetoothAdapter` 的空指针保护。这样既彻底消除了「设置 -> 声音」与「设置 -> 无障碍」的闪退，又从根源上保证 0% 概率触发阶段 3 的蓝牙死循环。
+  - **日志中未在表面显现的隐性问题排查（`bootlog21.txt`）**：
+    1. **`Elan Touchscreen` 的 IDC 文件名匹配（第 2187、6546 行）**：`6.6.34-phase2` 的 `elants_i2c` 驱动上报 `Vendor=0000 Product=0000`、`Name="Elan Touchscreen"`，因此 `EventHub` 未匹配按 VID/PID 命名的 `Vendor_04f3_Product_0b03.idc`（日志显示 `configuration=''`），而是靠内置启发式规则识别为 `TOUCH | TOUCH_MT`。在第 4 步中增加按设备名匹配的 `/vendor/usr/idc/Elan_Touchscreen.idc` 以确保显式加载 IDC。
+    2. **横屏/倒置时 `drmhwc: Failed to create DrmKmsPlan`（第 7886、7920、7937 行）**：仅在屏幕处于 90°/180°/270° 旋转方向且有界面刷新时打印。这是因为 `rockchip` VOP 硬件图层仅暴露 `DRM_MODE_ROTATE_0`，`drm_hwcomposer` 尝试为旋转后的图层建立硬件 KMS plane 计划失败后，按设计安全回退给 `SurfaceFlinger`（Panfrost GPU）合成，属于正常回退日志，不影响稳定性或帧率。
+    3. **`BpfLoader-rs: Failed to read fuse prog type`（第 1950 行）**：主线 `6.6.34` 内核不包含 Android common kernel 私有的 `CONFIG_FUSE_BPF` 补丁，因此 `fuse` 自动走标准内核 FUSE 通道，功能完全正常。
+
+### 4. 背光曲线校正与第 3 步遗留 UI 修复（2026-10-19）
+
+- **背光手动调节现状与指数曲线根因定位**：
+  - `device/mainline/common` 自带的 `vendor.light-default`（`hardware/lineage/interfaces/light`）已默认运行并控制 `/sys/class/backlight/backlight/brightness`（`max_brightness = 4095`），下拉菜单亮度滑块手动调节本身已打通；Scarlet 机身无环境光传感器（ALS），自动亮度在硬件上不支持，直接跳过。
+  - **为什么亮度滑块只有后一小段才明显变亮（双重非线性/指数叠加）**：
+    1. 在内核设备树 `rk3399-gru-scarlet.dtsi` 中，`backlight`（`pwm-backlight`）未定义 `brightness-levels` 数组。内核驱动 `drivers/video/backlight/pwm_bl.c` 的 `pwm_backlight_brightness_default()` 因此自动按 **CIE 1931 三次方感知曲线**（`retval *= retval * retval`）生成了 4096 级查找表——也就是说，内核暴露的 `/sys/class/backlight/backlight/brightness`（`0..4095`）本身**已经是人眼感知线性的**（例如滑到 50% 即 `2048` 时，内核对应的物理 PWM 占空比约为 \(0.5^3 = 12.5\%\)）。
+    2. 然而 Android 的 `BrightnessUtils`（`com.android.settingslib.display.BrightnessUtils` 与 `com.android.internal.display.BrightnessUtils`）假定底层背光值是物理线性的，默认在滑块上又叠加了一层 **Hybrid Log Gamma (HLG) 指数曲线**（`MathUtils.exp((normalizedVal - C) / A) + B`）：当滑块在 50% 时，Android 只向内核输出约 `8.3%`（`340 / 4095`），再经内核 CIE 三次方后物理占空比仅剩 **0.14%**（`6 / 4095`）；即使滑到 75%，物理占空比也仅有 **2.3%**，直到最后 25% 才陡然升亮。
+  - **校正方案**：
+    - `com.android.settingslib.display.BrightnessUtils` 原生预留了系统属性开关 `sys.brightness.disable_gamma_conversion`（当设为 `true` 时，`convertGammaToLinearFloat` 与 `convertLinearToGammaFloat` 直接使用线性插值 `MathUtils.lerp`）。
+    - 同步在 `frameworks/base/core/java/com/android/internal/display/BrightnessUtils.java`（供 `system_server` `RampAnimator` 亮度过渡动画使用）中接入同一个 `sys.brightness.disable_gamma_conversion` 开关，并在 `device/google/gru/device.mk` 与 `init.gru.rc` 中设置 `sys.brightness.disable_gamma_conversion=true`，消除双重 Gamma 叠加，使下拉菜单亮度滑块直接线性映射到内核的 CIE 1931 感知曲线。
+- **同轮一并执行的 3 项修复**：
+  1. **虚拟导航栏（三键导航 / 手势导航）与设备 Overlay**：在 `device.mk` 启用 `DEVICE_PACKAGE_OVERLAYS := $(LOCAL_PATH)/overlay`，新增 `overlay/frameworks/base/core/res/res/values/config.xml`（开启 `config_showNavigationBar=true`，设 `config_voice_capable=false`、`config_sms_capable=false`）与 `overlay/frameworks/base/packages/SettingsProvider/res/values/defaults.xml`（`def_auto_time_zone=false`、`def_accelerometer_rotation=true`、`def_show_ime_with_hard_keyboard=true`）。
+  2. **屏幕虚拟键盘（IME）自动弹出与触摸屏 IDC 显式匹配**：新增 `device/google/gru/keylayout/cros_ec.kl`（拷入 `/vendor/usr/keylayout/cros_ec.kl`），仅映射 `VOLUME_DOWN`、`VOLUME_UP`、`POWER` 而不映射字母键，使 `EventHub` 将 `cros_ec` 识别为纯按键（不再带 `ALPHAKEY` 外接硬键盘标志），并配合 `init.gru.rc` 的 `settings put secure show_ime_with_hard_keyboard 1` 恢复点击输入框弹出软键盘；同时新增 `/vendor/usr/idc/Elan_Touchscreen.idc` 按设备名显式匹配触摸屏。
+  3. **「设置 -> 声音」与「设置 -> 无障碍」空指针修复（不触碰蓝牙开关）**：在 `LocalMediaManager.java`、`AccessibilitySettings.java`、`AccessibilityHearingAidPreferenceController.java` 与 `HearingAidHelper.java` 中加入空指针判空，在不开启 `android.hardware.bluetooth` 的前提下彻底修复两处设置页崩溃。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1249522068` 字节，sha256 `0d9351346989a5326707f5fb777c5c34a04c1c01ebae156badbb682e6f5e5146`，已上传至 `10.0.0.133:/home/user/phase3/super.img` 并校验一致。
+- **实机验证与日志对照分析（`/tmp/bootlog22.txt`，8130 行）**：
+  - **启动耗时与调频复核**：`zram0` swap（`2919648 kB`）在 `76.15s` 启用，`surfaceflinger` 在 `76.20s` 启动，`sys.boot_completed=1` 在 `128.54s` 完成（`surfaceflinger` 至 `boot_completed` 耗时 `52.3s`）；`GRU_FREQ` 确认小核 `1.512 GHz`、大核 `2.016 GHz`、GPU `800 MHz`、内存控制器 `928 MHz` 全程生效；内置盘 eMMC `mmcblk1p1` 校验和保持 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。
+  - **本轮验证通过的 4 项功能**：
+    1. **背光滑块线性化校正（`sys.brightness.disable_gamma_conversion=true`）**：消除 Android HLG 曲线与内核 `pwm-backlight` CIE 1931 三次方曲线的双重非线性叠加，下拉菜单亮度滑块全程均匀线性调节。
+    2. **虚拟导航栏（`config_showNavigationBar=true`）**：三键导航与手势导航均正常显示与切换。
+    3. **屏幕虚拟键盘（IME）自动弹出（`cros_ec.kl` + `show_ime_with_hard_keyboard=1`）**：`EventHub`（`bootlog22.txt` 第 6129 行）显式加载 `/vendor/usr/keylayout/cros_ec.kl`，将 `cros_ec` 识别为纯 `classes=KEYBOARD`（不再携带 `ALPHAKEY` 外接硬键盘标志），同时 `Elan Touchscreen`（第 6135 行）显式加载 `/vendor/usr/idc/Elan_Touchscreen.idc`；点击输入框时屏幕软键盘正常弹出。
+    4. **「设置 -> 隐私（Privacy）」与「设置 -> 无障碍（Accessibility）」不再闪退**：此前闪退的两个页面现均正常打开，`bootlog22.txt` 中 `AccessibilitySettings` 崩溃次数为 0。
+  - **尚存预期内现象（待第 6/7 步蓝牙与音频启用后自然消解）**：
+    - 「设置 -> 已连接的设备（Connected devices）」与「设置 -> 声音（Sound）」在蓝牙模块（第 6 步）与音频（第 7 步）尚未启用前仍会因 `BluetoothAdapter.getDefaultAdapter() == null`（`BluetoothUtils.isAudioSharingSupported:736`）及 `mInfoMediaManager == null`（`LocalMediaManager.getRemoteRoutingSessions:548`）触发空指针退出，待第 6 步启用蓝牙后复核。
+  - **日志中未在表面显现的隐性问题排查（`bootlog22.txt`，直接关系第 5 步 Wi-Fi）**：
+    1. **VINTF 缺少 `android.hardware.wifi.IWifi/default`（第 6592 行）**：`bootlog22.txt` 记录 `servicemanager: Caller(pid=3414,uid=1000,sid=u:r:system_server:s0) Could not find android.hardware.wifi.IWifi/default in the VINTF manifest`，而仅找到了 `ISupplicant/default`。原因是 `device/mainline/common` 默认只打包了 `com.android.hardware.wpa_supplicant` APEX，**没有包含 `android.hardware.wifi-service`（AIDL Vendor Wi-Fi HAL）**，且 APEX 版的 `wpa_supplicant` 只从 `/apex/com.android.hardware.wpa_supplicant/etc/wifi/` 读取配置而忽略 `/vendor/etc/wifi/wpa_supplicant_overlay.conf`。若不参照 Trogdor 切换为 `legacy` 形态并补齐 `android.hardware.wifi-service`、`BOARD_WLAN_DEVICE := qcwcn` 与 `libcld80211`，即使内核加载了 `ath10k_pci.ko` 生成 `wlan0`，Android 框架也无法打开 Wi-Fi 开关。
+    2. **恢复 `adbd` 时必须隔离 `/dev/usb-ffs/adb`（避免无 UDC 空转刷屏）**：Scarlet 的两路 Type-C 控制器在 `rk3399-gru.dtsi` / `rk3399-gru-chromebook.dtsi` 中均硬编码为 `dr_mode = "host"`，内核中无 UDC。`adbd`（`packages/modules/adb/daemon/main.cpp:259`）只要检测到 `/dev/usb-ffs/adb/ep0` 存在就会启动 `usb_init()` 线程死循环写入 functionfs 描述符（每秒刷屏 `read descriptors` / `bcdVersion`）。`init.mainline.usb.rc` 会在 `on early-boot` 无条件挂载 `/dev/usb-ffs/adb`；因此在第 5 步恢复 `adbd` 监听 TCP `5555` 端口的同时，必须设 `TARGET_USB_INIT_SCRIPT := none` 阻止挂载 `/dev/usb-ffs/adb`，使 `adbd` 纯净运行在 TCP/IP 模式。
+
+### 5. Wi-Fi（QCA6174 `ath10k_pci`）与无线 `adb`（2026-10-19，已完成并验证）
+
+- **固件与内核模块清单**：
+  - 从机身 postmarketOS `/lib/firmware/ath10k/QCA6174/hw3.0/` 提取并解压 4 个固件文件放入 `device/google/gru/firmware/ath10k/QCA6174/hw3.0/`（安装至 `/vendor/firmware/ath10k/QCA6174/hw3.0/`）：`board-2.bin`（723 KB）、`board.bin`（8 KB）、`firmware-6.bin`（690 KB，`WLAN.RM.4.4.1-00309` API 6）、`firmware-4.bin`（717 KB）；配合 `wireless-regdb` 已安装的 `/vendor/firmware/regulatory.db` 与 `regulatory.db.p7s`。
+  - 从 `6.6.34-phase2` `modinstall` 提取 `ath10k` 依赖链及 WPA2/WPA3（CCMP/AES-CMAC）硬件加密模块共 13 个 `.ko` 放入 `/vendor/lib/`：
+    - 无线协议栈与驱动：`rfkill.ko`、`libarc4.ko`、`cfg80211.ko`、`mac80211.ko`、`ath.ko`、`ath10k_core.ko`、`ath10k_pci.ko`。
+    - 802.11i / WPA2 / WPA3 加密模块（内核配置为 `=m`）：`arc4.ko`、`ccm.ko`、`cmac.ko`、`aes-ce-cipher.ko`、`aes-ce-ccm.ko`、`aes-ce-blk.ko`。
+  - 在 `init.gru.rc` 的 `on early-init` 最开头执行 `write /sys/module/firmware_class/parameters/path /vendor/firmware`（确保在 `insmod ath10k_pci.ko` 触发 PCIe `0000:01:00.0` 异步请求固件前固件路径已生效），随后按依赖拓扑顺序加载上述模块。
+- **Wi-Fi HAL 与 `wpa_supplicant`（参照 `third_party/android_device_google_trogdor-lineage-24`）**：
+  - 在 `BoardConfig.mk` 与 `device.mk` 中设 `TARGET_HOSTAPD_AND_WPA_SUPPLICANT_FORM := legacy`、`BOARD_WLAN_DEVICE := qcwcn`、`WIFI_HIDL_UNIFIED_SUPPLICANT_SERVICE_RC_ENTRY := false`，加入 `hardware/qcom/wlan` 与 `hardware/qcom/wlan/legacy` Soong 命名空间。
+  - 打包 `android.hardware.wifi-service`（提供 `android.hardware.wifi.IWifi/default` VINTF AIDL 服务，静态链接 `libwifi-hal-qcom`）、`libcld80211`、`wpa_supplicant`、`wpa_supplicant.conf`、`hostapd`、`wificond`、`libwpa_client`。
+  - 拷入 `wpa_supplicant_overlay.conf`（`disable_scan_offload=1`、`p2p_disabled=1`、`tdls_external_control=1`）与 `p2p_supplicant_overlay.conf` 至 `/vendor/etc/wifi/`，以及 `android.hardware.wifi.xml`、`android.hardware.wifi.direct.xml`、`android.hardware.wifi.passpoint.xml` 权限声明；配置 `wifi.interface=wlan0`。
+  - 在 `init.gru.rc` 中添加 `on zygote-start` 创建 `/data/vendor/wifi/wpa/sockets` 与 `/data/vendor/wifi/hostapd/sockets`（`0770 wifi wifi`），并定义 `wpa_supplicant` 服务（`-O/data/vendor/wifi/wpa/sockets -Dnl80211 -g@android:wpa_wlan0`）。
+- **无线 `adb`（TCP/IP 端口 `5555`）与 Type-C 角色核对**：
+  - 核对 `rk3399-gru.dtsi` 与 `rk3399-gru-chromebook.dtsi`：两路 `usbdrd_dwc3_0` / `usbdrd_dwc3_1` 在设备树中均为 `dr_mode = "host"`，无 peripheral/otg UDC。
+  - 设置 `TARGET_USB_INIT_SCRIPT := none` 排除 `init.mainline.usb.rc`（不挂载 `/dev/usb-ffs/adb`，避免 `adbd` 启动 USB functionfs 线程触发内核每秒刷屏），移除 `init.gru.rc` 中旧的 `on property:init.svc.adbd=running stop adbd`，改为设置 `service.adb.tcp.port=5555` 并在 `on boot && property:service.adb.tcp.port=5555` 启动 `adbd`，连上局域网后可直接 `adb connect <平板IP>:5555`。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1251934612` 字节，sha256 `00a872f695f2ee091496a310e8294d95ad4e82b7389fa3ec51dc2f476e1ea6fb`，已上传至 `10.0.0.133:/home/user/phase3/super.img` 并校验一致。
+- **实机无线 `adb` 直连验证与日志排查（`/tmp/adb_dmesg_step5.txt` 2022 行、`/tmp/adb_logcat_step5.txt` 23575 行）**：
+  - **无线 `adb` 双通道直连成功**：平板在 LineageOS 23.2 下同时支持 Android 16 原生 TLS 无线调试配对连接（`10.0.0.119:43583`，`TlsServer: Handshake succeeded` -> `adbd_wifi_secure_connect: connected`）与 `init.gru.rc` 预设的 TCP `5555` 端口 root 连接（`10.0.0.119:5555`），从此可直接在运行中的 Android 系统内抓取完整 `dmesg`、`logcat` 与 `dumpsys`，无需切回 postmarketOS 导出日志。由于 `TARGET_USB_INIT_SCRIPT := none` 阻止挂载 `/dev/usb-ffs/adb`，`dmesg` 中 USB `functionfs` / `bcdVersion` 报错为 **0 条**。
+  - **QCA6174 `ath10k_pci` 固件、驱动与硬件加密验证**：
+    - `early-init` 阶段 `ath10k_pci 0000:01:00.0` 一次成功加载 `/vendor/firmware/ath10k/QCA6174/hw3.0/` 下的 `firmware-6.bin`（`WLAN.RM.4.4.1-00309- api 6 features wowlan,ignore-otp,mfp crc32 0793bcf2`）与 `board-2.bin`（`board_file api 2 bmi_id N/A crc32 d2863f91`），启用 `hwcrypto 1`（`htt-ver 3.87 wmi-op 4 htt-op 3`）。
+    - `lsmod` 确认 `aes_ce_ccm`（`Used by 2`）与 `aes_ce_cipher`（`Used by 2`）被 `mac80211` 实际绑定并承载 ARMv8 硬件加速 WPA2-CCMP 加解密。
+  - **Wi-Fi AIDL HAL、`wpa_supplicant` 与 802.11ac 5 GHz 链路验证**：
+    - `servicemanager` 成功解析 `android.hardware.wifi.IWifi/default` 与 `android.hardware.wifi.supplicant.ISupplicant/default`；`WifiVendorHal`（`Vendor Hal started successfully`）与 `WifiNative`（`Successfully setup Iface:{Name=wlan0,Id=0,Type=STA_CONNECTIVITY}`）顺利拉起 `wlan0`。
+    - `cmd wifi status` 确认已关联 5 GHz 802.11ac AP（`SSID: "Not 6GHz"`, `Frequency: 5765MHz`, `RSSI: -22 dBm`, `Tx/Max Link speed: 866Mbps`, `retriedTxPackets: 0`, `lostTxPackets: 0`），同时拿到 IPv4（`10.0.0.119/24`）与 IPv6 地址，网络能力通过 `INTERNET & VALIDATED` 校验。
+  - **内置盘安全核对**：在 Android root shell 下直接执行 `sha256sum /dev/block/mmcblk1p1`，返回值仍为 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`，eMMC 分毫未动。
+  - **日志中发现并顺手修掉的 2 处隐性问题**：
+    1. **`android.hardware.sensors-service.multihal` 启动瞬间纯虚函数竞态（`Pure virtual function called!`）**：`adb_logcat_step5.txt` 第 2296–2328 行记录 `vendor.sensors-hal-multihal`（`pid 3048`）在开机早期 `19:01:17.425` 触发了一次 `SIGABRT`（`Abort message: 'Pure virtual function called!'`），随后在 `19:01:20.853` 被 `init` 自动拉起（`pid 3416`）并正常工作（因此用户侧无感知，`dumpsys sensorservice` 中陀螺仪和加速度计均正常输出事件）。定位 `device/google/gru/hal/sensors/Sensor.cpp` 发现基类构造函数 `SensorBase::SensorBase()` 在第 65 行直接调用了 `mSensorThread.start()`，此时派生类 `HWSensorBase::HWSensorBase()` 尚未执行完毕、对象 `vptr` 仍指向 `SensorBase`（其中 `pollSensor()` 为纯虚函数 `__cxa_pure_virtual`），一旦新线程在派生类构造完成前被调度就会触发纯虚函数调用。已将 `mSensorThread.start()` 移至派生类构造函数 `HWSensorBase::HWSensorBase()` 末尾（完成 `mPollFdIio.fd` 打开与 `mSensorRawData.resize()` 之后），彻底消除该竞态。
+    2. **`gru-logcat.sh` 将 `HalDevMgr:I` 与 `WifiHAL:I` 镜像至 `/dev/kmsg` 导致 `dmesg` 周期性刷屏**：主线 `ath10k` 驱动仅声明单 `STA` 接口且不支持高通私有 logger nl80211 命令；Android 框架每 3 秒扫描检查是否可创建第二 `STA` 接口时，`HalDevMgr` 会打印 `I HalDevMgr: bestIfaceCreationProposal is null, requestIface=STA, existingIface=[name=wlan0 type=STA]`，`WifiHAL` 打印 `E WifiHAL : wifi_get_logger_supported_feature_set: Error -3 happened`。这两条日志本身不影响 Wi-Fi 功能，但 `gru-logcat.sh` 将它们实时写入 `/dev/kmsg` 会冲刷内核 `dmesg` 缓冲区。已在 `gru-logcat.sh` 中将过滤级别调整为 `HalDevMgr:W WifiHAL:S`。
+
+### 6. 蓝牙（QCA6174A USB `0cf3:e300` `btusb` 与 AIDL Bluetooth HAL）（2026-10-20）
+
+- **固件与内核模块清单**：
+  - 通过无线 `adb` 在运行中的 Android 平板上直接探测 USB 总线确认内置蓝牙控制器为 `1-1: 0cf3:e300`（QCA6174A Rome 3.2 USB），并从只读挂载的内置盘 `/lib/firmware/qca/` 提取并解压 QCA Rome USB 蓝牙固件放入 `device/google/gru/firmware/qca/`（安装至 `/vendor/firmware/qca/`）：`rampatch_usb_00000302.bin`（68 KB，`rome 0x302 build 0x3e8`）、`nvm_usb_00000302.bin`（2 KB）、`nvm_usb_00000302_eu.bin` 及同系列 `00000200` / `00000201` / `00000300` 固件。
+  - 从 `6.6.34-phase2` `modinstall` 提取蓝牙协议栈、控制器驱动及 BLE/HID 依赖模块共 13 个 `.ko` 放入 `/vendor/lib/`：`ecc.ko`、`ecdh_generic.ko`、`uhid.ko`、`bluetooth.ko`、`rfcomm.ko`、`bnep.ko`、`hidp.ko`、`btbcm.ko`、`btintel.ko`、`btrtl.ko`、`btmtk.ko`、`btqca.ko`、`btusb.ko`。
+  - 在实机上通过无线 `adb` 预演加载模块：`btusb` 一次成功匹配 `0cf3:e300` 并加载 `qca/rampatch_usb_00000302.bin` 与 `qca/nvm_usb_00000302.bin`，生成 `/sys/class/bluetooth/hci0`（硬件自带 OTP 公网 MAC `30:D1:6B:79:6B:36`，与 `wlan0` 的 `30:D1:6B:79:6B:35` 相邻）与 `rfkill1`（`type=bluetooth state=1`）。
+- **AIDL Bluetooth HAL、设备节点权限与 `com.android.bluetooth` 恢复**：
+  - 对照 `third_party/android_device_google_trogdor-lineage-24` 与 `device/mainline/common`：在 `device.mk` 中将 `TARGET_BLUETOOTH_HAL` 从 `none` 切换为 `default-aidl`，打包 `android.hardware.bluetooth-service.default`（提供 `android.hardware.bluetooth.IBluetoothHci/default` VINTF AIDL 服务，通过 `NetBluetoothMgmt` 管理 `rfkill` 与 `HCI_CHANNEL_USER` 套接字）、`bdaddr`（含 `set_bdaddr.sh`），并安装 `android.hardware.bluetooth.xml` 与 `android.hardware.bluetooth_le.xml` 权限声明。
+  - **修复 `/dev/rfkill` 与 `/dev/uhid` 权限隐患**：`vendor.bluetooth-default` 以 `uid=bluetooth (1002)` 运行并在 `openHci()` 中打开 `/dev/rfkill` 解除蓝牙软屏蔽，而内核 `rfkill.ko` 作为模块在 `early-init` 加载时 `/dev/rfkill` 默认是 `0600 root:root`；同时蓝牙键鼠/手柄 HID 协议栈需要读写 `/dev/uhid`（`uhid.ko`）。已在 `ueventd.gru.rc` 与 `init.gru.rc` 的 `on post-fs` 中双保险设置 `/dev/rfkill` 为 `0660 bluetooth:bluetooth`、`/dev/uhid` 为 `0660 uhid:uhid`。
+  - **修复保留 `userdata` 分区上 `package-restrictions.xml` 导致的 `BluetoothComponent.<init>` 开机崩溃循环，并在一次性清理完成后移除 `rm` 语句**：
+    - 阶段 3 曾在实机执行 `pm disable com.android.bluetooth`，并将 `COMPONENT_ENABLED_STATE_DISABLED` 持久化到 `/data/system/users/0/package-restrictions.xml`。Android 16 的 `BluetoothManagerService`（`BluetoothComponent.<init>`）在 `SystemServer.startOtherServices()` 中（早于 `sys.boot_completed=1`）检查 `com.android.bluetooth` 状态，若被禁用则直接抛出 `IllegalStateException: Bluetooth package can not be disabled` 导致 `system_server` 崩溃重启。
+    - 为什么这两次开机弹出了初始设置向导（`LineageSetupWizard`），但已保存的设置与已安装的应用都在：Android 的系统设置项（`/data/system/users/0/settings_*.xml`）与已安装应用（`/data/system/packages.xml`、`/data/app/`）保存在各自独立的文件中，而各个应用的**组件启用/禁用状态**（`setComponentEnabledSetting`）保存在 `/data/system/users/0/package-restrictions.xml` 中。`LineageSetupWizard` 在首次完成设置向导时，正是通过将自身的 `SetupWizardActivity`、`WizardManager`、`DeviceSpecificActivity` 设为 `COMPONENT_ENABLED_STATE_DISABLED` 记录在 `package-restrictions.xml` 中来避免后续开机再次弹出。因此前两次开机 `on zygote-start` 执行 `rm /data/system/users/0/package-restrictions*.xml` 清理历史蓝牙禁用状态时，把 `LineageSetupWizard` 的组件禁用标记也一并重置回了默认的 `enabled`，从而重新弹出了向导（同时由于 `settings_*.xml` 与 `/data/app` 未动，所有既有设置和应用均完好保留）。
+    - 目前实机 `userdata` 上的 `com.android.bluetooth` 已恢复为 `enabled=1` 且 `LineageSetupWizard` 已重新写入 `disabledComponents`，因此已从 `device/google/gru/init.gru.rc` 的 `on zygote-start` 中移除 `rm /data/system/users/0/package-restrictions*.xml`，后续开机不会再弹出设置向导。
+  - **修复 QCA6174A `LE_ADV_FILTER (0xFD57)` 扩展特性查询触发 `hci_layer.cc` 断言崩溃与蓝牙 Profile 默认关闭问题**：
+    - 实机无线 `adb` 日志（`logcat -b crash`）定位到开启蓝牙时 `com.android.bluetooth` 触发 `SIGABRT`：`system/gd/hci/hci_layer.cc:251 handle_command_response: Waiting for LE_ADV_FILTER(0xfd57), got Unknown OpCode(0x0157)`。原因是 QCA6174A（Rome 3.2 `v0.95`）不支持 APCF 扩展子命令（`0xFF`），且固件在回复 `CommandComplete` 时截断了高 6 位厂商 OGF（`0xFC00`）仅返回低 10 位 OCF `0x0157`。对照 `third_party/android_device_google_trogdor-lineage-24/product.prop` 设置 `bluetooth.le.disable_apcf_extended_features=1` 后，蓝牙稳定开启不再崩溃。
+    - 对照 `trogdor/product.prop` 在 `device.mk` 的 `PRODUCT_PRODUCT_PROPERTIES` 中补齐 Android 16 必需的 `bluetooth.profile.*.enabled=true` 属性（A2DP Source、AVRCP Target、GATT、HFP AG、HID Host/Device、OPP、PAN、MAP、PBAP、SAP、ASHA）及 `bluetooth.device.class_of_device=90,2,12`、`persist.bluetooth.a2dp_aac.vbr_supported=true`。
+  - **修复日志中发现的隐性问题（缺少 `/dev/dma_heap/system` 导致 `Codec2` / `MediaCodec` 报 `NO_MEMORY`）**：
+    - 实机 `logcat` 发现 `DMABUFHEAPS: Could not open DMA-BUF heap named: system: No such file or directory` 导致 `c2.android.vorbis.decoder`（系统提示音解码）等 Codec2 组件报 `0xfffffff4/NO_MEMORY`。原因是 `6.6.34-phase2` 内核启用了 `CONFIG_DMABUF_HEAPS_CMA=y`（生成 `/dev/dma_heap/reserved`，字符设备 `253:0`）而未启用 `CONFIG_DMABUF_HEAPS_SYSTEM`。已在 `init.gru.rc` 的 `on post-fs` 中通过 `mknod /dev/dma_heap/system c 253 0` 创建节点、赋予 `0444 system:system` 权限并执行 `restorecon /dev/dma_heap/system`（标记为 `u:object_r:dmabuf_system_heap_device:s0`）。
+- **刷机重启后实机完整日志复核（`10.0.0.119:5555`）**：
+  - `logcat -b crash -d` 输出为 **0 行（完全无崩溃）**：此前 `vendor.sensors-hal-multihal` 的开机单次纯虚函数竞态崩溃与 `com.android.bluetooth` 的 `LE_ADV_FILTER` 崩溃均已彻底清零。
+  - `/dev/dma_heap/system` 在开机 `post-fs` 阶段自动创建（`cr--r--r-- 1 system system u:object_r:dmabuf_system_heap_device:s0 253, 0`），`c2.android.vorbis.decoder` 正常初始化并绑定缓冲区（`buffers are bound to CCodec for this session`），无任何 `DMABUFHEAPS` 或 `NO_MEMORY` 报错。
+  - `dumpsys bluetooth_manager` 确认开机后蓝牙自动开启（`enabled: true, state: ON`），已配对的手机（`OnePlus Ace 5`）与蓝牙鼠标（`XX:XX:XX:XX:BD:B8`，BLE HOGP `connection state=2`，`GATT_CH_OPEN, ACL holders gatt_if: hid`）自动重连并正常工作。
+  - 内置盘 `mmcblk1p1` sha256 校验和保持 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1253228948` 字节，sha256 `08b6e808e420e71bbb38ad6ff385359eed6a3a8b2d823f08a4a7a8c093a37c06`。
+
+### 7. 音频播放（`rk3399-gru-sound`：MAX98357A 内置扬声器 + DMIC 内置麦克风 + DA7219）（2026-10-20）
+
+- **为什么刚才在运行中的 Android 上测试时铃声已经能正常发声（以及为什么此前开机没有按键音）**：
+  1. **开机时为什么没有按键音/提示音**：此前 `super.img` 的 `/vendor/lib/` 与 `init.gru.rc` 中**尚未打包和加载任何音频内核模块**（`CONFIG_SOUND=m`、`CONFIG_SND=m`、`CONFIG_SND_SOC=m`、`CONFIG_SND_SOC_ROCKCHIP_MAX98357A=m`、`CONFIG_SND_SOC_RK3399_GRU_SOUND=m` 等在 `6.6.34-phase2` 中全部为 `.ko` 模块）。因此开机时 `/proc/asound/cards` 为空、`/dev/snd/*` 不存在；当 `system_server` 在 `01:02:54` 初始化 `SoundEffects`（`Effect_Tick.ogg` 等触摸提示音）以及 `audioserver` 尝试打开声卡时，ALSA 声卡 `0` 根本不存在，所以按音量加减和点击应用均无声音。
+  2. **为什么你刚刚点开铃声时能听到声音**：在收到你上一条指令后，我通过无线 `adb` 将 `6.6.34-phase2` 内核的 16 个音频模块（`soundcore.ko`、`snd.ko`、`snd-timer.ko`、`snd-pcm.ko`、`snd-pcm-dmaengine.ko`、`snd-soc-core.ko`、`snd-soc-rockchip-i2s.ko`、`snd-soc-rockchip-spdif.ko`、`snd-soc-max98357a.ko`、`snd-soc-da7219.ko`、`snd-soc-rl6231.ko`、`snd-soc-rt5514-spi.ko`、`snd-soc-rt5514.ko`、`snd-soc-dmic.ko`、`snd-soc-hdmi-codec.ko`、`snd-soc-rk3399-gru-sound.ko`）临时推送到平板 `/data/local/tmp/snd/` 并用 `insmod` 动态加载进内核，接着重启了 `vendor.audio-hal-aidl` 与 `audioserver`，并用 `am start -a android.settings.SOUND_SETTINGS` 打开了「设置 -> 提示音和振动」触发了铃声试听！但由于这些模块只是临时加载在内存与 `/data/local/tmp/snd/` 中，一旦重启就会消失；且 `system_server` 早在无声卡时初始化的 `SoundPool` 通道在 `audioserver` 重启后未重新绑定，因此必须将这 16 个音频模块正式打入 `super.img` 并在 `init.gru.rc` 的 `on early-init` 中加载，才能让每次开机原生自带声音（包括触摸提示音、音量键提示音与媒体/铃声播放）。
+- **声卡拓扑与 ALSA 控件核对（`card 0: rk3399-gru-sound`）**：
+  - 加载 `snd-soc-rk3399-gru-sound.ko` 后，内核注册声卡 `0 [rk3399grusound]: rk3399-gru-soun - rk3399-gru-sound`，包含 4 个 PCM 设备：
+    - `pcmC0D0p`（`00-00: MAX98357A PCM HiFi-0`）：内置立体声扬声器功放（`S16_LE`，2 声道，`8000..96000 Hz`）
+    - `pcmC0D1c`（`00-01: DMIC PCM dmic-hifi-1`）：内置数字麦克风（`S16_LE`，2～8 声道，`8000..96000 Hz`）
+    - `pcmC0D2p` / `pcmC0D2c`（`00-02: DA7219 PCM da7219-hifi-2`）：3.5mm 耳机插孔编解码器（本机物理损坏，不测）
+    - `pcmC0D3p`（`00-03: DP PCM spdif-hifi-3`）：Type-C DP 音频输出
+  - `tinymix2 -D 0 contents` 核对：驱动默认已开启 `73 BOOL 1 Speakers Switch: On` 与 `76 BOOL 1 Int Mic Switch: On`，且 `64 BOOL 1 Headphones Jack: Off`（物理损坏的耳机孔未误触发插入检测，`dumpsys audio` 默认路由至 `speaker(2)`），无需额外 `tinymix` 开关脚本即可直接发声与录音（实机通过 `tinyplay2` 48 kHz 立体声与 `tinycap2 -D 0 -d 1` 录音均验证通过）。
+- **音频策略配置（`device/google/gru/etc/audio_policy_configuration.xml`）**：
+  - 此前默认继承自 `cuttlefish` 的 `primary_audio_policy_configuration.xml` 存在两处不匹配：
+    1. 包含平版不存在的虚拟 `Telephony Tx`、`Telephony Rx`、`FM Tuner` 附着设备；
+    2. `Speaker` 与 `Built-In Mic` 的 `<devicePort>` 缺少 `<profile>` 声明，且 `Built-In Mic` 地址写死为 `address="bottom"`（而非 `CARD_0_DEV_1`），导致 `AHAL_Module` 在 `setAudioPortConfigImpl` 时连续报 `requested format PCM INT_16_BIT / sample rate 48000 is not supported by the port` 并在打开麦克风时默认去开 `card 0 device 0`（MAX98357A 仅支持播放、无 `pcmC0D0c` 录音节点）。
+  - 对照 `third_party/android_device_google_trogdor-lineage-24/etc/audio_policy_configuration.xml` 与 `hardware/interfaces/audio/aidl/default/primary/StreamPrimary.cpp`（解析 `CARD_%d_DEV_%d`），新增 `device/google/gru/etc/audio_policy_configuration.xml`（在 `device.mk` 设 `TARGET_AUDIO_POLICY := custom`）：
+    - `Speaker`（`AUDIO_DEVICE_OUT_SPEAKER`）：显式指定 `address="CARD_0_DEV_0"`，`AUDIO_FORMAT_PCM_16_BIT`、`48000`、`AUDIO_CHANNEL_OUT_STEREO`；
+    - `Built-In Mic`（`AUDIO_DEVICE_IN_BUILTIN_MIC`）：显式指定 `address="CARD_0_DEV_1"`，`AUDIO_FORMAT_PCM_16_BIT`、`8000..48000`、`AUDIO_CHANNEL_IN_MONO AUDIO_CHANNEL_IN_STEREO`；
+    - 移除不存在的 `Telephony Tx/Rx` 与 `FM Tuner`；实机 bind-mount 重启 `vendor.audio-hal-aidl` 与 `audioserver` 验证 0 警告通过。
+- **同轮包含的开机弹出 `LineageSetupWizard` 修复**：
+  - 已从 `device/google/gru/init.gru.rc` 的 `on zygote-start` 中移除一次性清理语句 `rm /data/system/users/0/package-restrictions.xml` 与 `rm /data/system/users/0/package-restrictions-backup.xml`。实机 `dumpsys package org.lineageos.setupwizard` 与 `com.android.bluetooth` 均已确认：`org.lineageos.setupwizard` 的 `SetupWizardActivity`、`WizardManager`、`DeviceSpecificActivity` 已处于 `disabledComponents` 状态，`user_setup_complete=1`、`device_provisioned=1`，且 `com.android.bluetooth` 保持 `enabled=1`，后续开机不再弹出设置向导。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1253716372` 字节，sha256 `74e5fc1de1c6782c7e857dbbf94080582c9b1bc5a57bdb5b2ee61e9ee593cf05`。
+
+### 8. 电量与充电（`sbs-battery` `sbs-9-000b`、`cros_usbpd-charger` 与 `BatteryMonitor` 兼容）（2026-10-20）
+
+- **此前两次突然掉回 bootloader 的真实根因（非锁屏超时、无需用户在平板上做任何额外设置）**：
+  - 此前两次瞬间黑屏回到 depthcharge 启动界面，**并不是**因为锁屏超时或看门狗，而是因为我们在通过无线 `adb` 运行自定义 EC 诊断工具（`ec_diag`）排查 PD 充电状态时，向 `/dev/cros_ec` 发送了 `EC_CMD_USB_PD_POWER_INFO (0x0103)` 并遍历了 `port = 0`、`port = 1`、`port = 0xff`。
+  - Scarlet（Acer Chromebook Tab 10）机身只有 **1 个** USB-C 端口（`EC_CMD_USB_PD_PORTS` 返回 `num_ports = 1`，有效端口号仅为 `port = 0`）。Scarlet 的 EC 固件（`scarlet_v1.1.7878-f57c60917`）在收到越界的 `port = 1` 查询时触发固件内部越界异常并立即复位 EC，EC 复位瞬间切断 AP 供电，导致机器立刻回到 bootloader。
+  - **防坑结论**：在 Scarlet 上任何工具或驱动访问 `/dev/cros_ec` 的 USB-PD 命令时，严禁查询 `port >= 1`。内核标准驱动 `cros_usbpd-charger.ko` 在 `probe` 时会先调用 `EC_CMD_USB_PD_PORTS` 获取真实端口数（`1`），只注册和查询 `port 0`（`CROS_USBPD_CHARGER0`），因此 **100% 安全，绝不会触发该重启**，用户也无需修改锁屏超时或做任何额外防重启操作。
+- **为什么此前插入充电器时 Android 完全没有充电反应，以及为什么功率计显示 5V 2.5A（而非 9V）**：
+  1. **缺少 `cros_usbpd-charger.ko` 导致无充电器节点与插拔通知**：
+     - `6.6.34-phase2` 内核中 `CONFIG_CHARGER_CROS_USBPD=m`（`drivers/power/supply/cros_usbpd-charger.ko`）编译为模块，此前尚未打入 `super.img`。
+     - 未加载该模块时，`/sys/class/power_supply/` 下只有智能电池 `sbs-9-000b`，没有充电器节点 `CROS_USBPD_CHARGER0`；不仅 Android `BatteryMonitor` 看不到任何在线充电器（`AC powered: false`、`USB powered: false`），而且插拔充电线时 EC 发出的 MKBP 事件也无人接收去调用 `power_supply_changed()` 触发 `sbs-battery` 的 `sbs_external_power_changed()` 重采样。
+  2. **为什么外接功率计显示 5V 2.5A～3A（15W PD）且实际正在正常快充**：
+     - 通过仅查询 `port = 0` 的安全工具与加载 `cros_usbpd-charger.ko` 后读取 `/sys/class/power_supply/CROS_USBPD_CHARGER0/` 确认：
+       - **USB-PD 握手完全成功**：EC PD 状态机处于 `SNK_READY`（`PD_CAPABLE`），`CROS_USBPD_CHARGER0/usb_type` 为 `[PD]`，协商档位为 **5V / 3A（15W）**（`voltage_max_design: 5000000` uV、`current_max: 3000000` uA），EC 充电状态机显示 `ac=1 chg_v=4400mV chg_i=4000mA in_i=3000mA`。
+       - **电池确实在高速充入电量**：Scarlet 采用的是 **单电芯（1S，标称 3.84V / 满电 4.40V，设计容量 8734 mAh / 33.5 Wh）** 低压大容量锂聚合物电池。在当前高电量恒压（CV）阶段（88% -> 91%，电池端电压 `4.416V`），从 5V 母线降压至 4.4V 的压差极小、转换效率最高，实测 `sbs-9-000b/current_now` 稳定在 **`+1379000` ～ `+1695000` uA（+1.38A ～ +1.70A 净流入电池）**，剩余容量 `charge_now` 从 `7209000 uAh`（88%）稳步涨至 `7446000 uAh`（91%），无任何跳变。
+- **修复与兼容方案**：
+  1. **打包并开机加载 `cros_usbpd-charger.ko`**：将 `cros_usbpd-charger.ko` 放入 `device/google/gru/modules/`，在 `device.mk` 中安装至 `/vendor/lib/cros_usbpd-charger.ko`，并在 `init.gru.rc` 的 `on early-init` 中 `insmod`，注册 `/sys/class/power_supply/CROS_USBPD_CHARGER0`。
+  2. **修复 `system/core/healthd/BatteryMonitor.cpp`（编译进 `/vendor/bin/hw/android.hardware.health-service.example`）的 4 项兼容性问题**：
+     - **彻底消除 `sbs-9-000b` 每分钟 `-5`（`-EIO`）报错刷屏**：Scarlet 电池的 SBS 固件不支持可选寄存器 `0x0B`（`current_avg`）和 `0x22`（`technology`），每次读取都会经 EC I2C 隧道重试失败并在 `dmesg` 打印 `power_supply sbs-9-000b: driver failed to report 'current_avg' / 'technology' property: -5`。修改 `BatteryMonitor::init()`：在绑定 `batteryCurrentAvgPath` 与 `batteryTechnologyPath` 前先试读一次（`readFromFile(path, &buf) > 0`）；若读取失败则不注册该无效路径，`current_avg` 自动回退使用正常工作的 `current_now`，`technology` 在电池在位时默认回退为 `"Li-ion"`。由此 `healthd` 运行期每分钟轮询与插拔 uevent 更新实现了 **0 条 `-5` 内核报错**。
+     - **修正 USB-PD 充电器类型映射（`AC powered: true`）**：`cros_usbpd-charger.c` 将顶层 `type` 固定设为 `"USB"`，而将具体协议放在 `usb_type`（`Unknown SDP DCP CDP C [PD] PD_DRP BrickID`）。修改 `readPowerSupplyType()`：当 `type` 为 `"USB"` 时进一步读取同目录下的 `usb_type`，若激活项为 `[PD]`、`[PD_DRP]`、`[DCP]`、`[CDP]`、`[C]` 或 `[BrickID]`，则映射为 `ANDROID_POWER_SUPPLY_TYPE_AC`（`AC powered: true`，状态栏与锁屏显示快速/交流电充电而非慢速 USB 充电）。
+     - **补齐 `Charge counter`（`charge_now` 回退）与 `time_to_full_avg` 回退**：`sbs-battery` 暴露的是标准属性 `charge_now`（而非 `charge_counter`）和 `time_to_full_avg`（而非 `time_to_full_now`）。在 `BatteryMonitor::init()` 中当 `charge_counter` / `time_to_full_now` 不存在时自动回退绑定 `charge_now` / `time_to_full_avg`，使 `dumpsys battery` 的 `Charge counter` 准确报告实时库仑计毫安时数（如 `7446000` uAh）。
+     - **修正 `health` 状态显示**：SBS 规范无通用健康度寄存器，`sbs-battery` 在无需校准时固定返回 `Unknown`（导致 Android 显示 `health: 1` Unknown）。在 `BatteryMonitor::updateValues()` 中，当电池在位（`batteryPresent == true`）且内核返回 `Unknown` 时，映射为 `BatteryHealth::GOOD`（`health: 2`）。
+- **实机在线验证（`10.0.0.119:36615`）**：
+  - 将 `cros_usbpd-charger.ko` 与更新后的 `android.hardware.health-service.example` 推送至正在运行的平板验证：
+    - `dumpsys battery` 输出：`AC powered: true`、`Max charging current: 3000000`、`Max charging voltage: 5000000`、`Charge counter: 7446000`、`status: 2`（Charging）、`health: 2`（Good）、`present: true`、`level: 91`、`voltage: 4416`、`temperature: 308`、`technology: Li-ion`、`Maximum capacity: 8113000`、`Design capacity: 8734000`。
+    - 连续触发多次充电器 uevent 与周期轮询，`dmesg` 中 `healthd: battery l=90 v=4416 t=30.8 h=2 st=2 c=1482000 fc=8113000 cc=27 chg=a` 更新正常，且全程不再出现任何 `driver failed to report 'current_avg' / 'technology' property: -5` 报错。
+  - 内置盘 `mmcblk1p1` sha256 校验和保持 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。
+- **构建产物**：
+  - `out/target/product/gru/super.img` 大小 `1253716372` 字节，sha256 `5310e948452e703eeac8437dbbf453a75150606c99d686777aa836a5723f6961`。
+
+### 9. 睡眠与唤醒（`dw_wdt` 内核 `[watchdogd]` 托管移交、`rtc-cros-ec.ko` 与 S3 `deep` 唤醒）（2026-10-20，已实机验证并固化）
+
+- **为什么此前 `6.6.34-phase2` 一进入 S3 `deep` 睡眠就会在 30 秒内掉回 depthcharge 启动界面**：
+  1. **硬件约束**：RK3399 的 `dw_wdt`（Synopsys DesignWare Watchdog）硬件最大心跳周期 `max_hw_heartbeat_ms = 21474` ms（21.474 秒），且设备树中无独立复位线（`!dw_wdt->rst`），一旦启动就无法从硬件寄存器关闭。
+  2. **旧 `gru-keep` 用户态喂狗在 `Freezing user space processes` 时的必死机理**：
+     - 此前 `gru-keep.c` 打开 `/dev/watchdog`（使内核设置 `WDOG_ACTIVE = 1`），设置 `timeout = 30`，并 `fork` 一个用户态子进程持续保持 `/dev/watchdog` 打开、每 200 ms 调用 `WDIOC_KEEPALIVE`。
+     - 根据 `drivers/watchdog/watchdog_dev.c`：只要 `WDOG_ACTIVE == 1`，内核 `watchdog_next_keepalive()` 计算出的内核代喂截止时间就是 `virt_timeout = last_keepalive + 30s`。当系统进入 S3 `deep` 休眠冻结用户态进程（`Freezing user space processes`）时，用户态 `gru-keep` 子进程被冻结停止喂狗；`30s - 21.474s = 8.53s` 后，超过 `virt_timeout`，内核不再代喂硬件看门狗；再过 `21.474s`（即休眠后整 **30.0 秒**），硬件看门狗超时拉低 SoC 复位，整机掉回 bootloader。
+     - 即使直接 `kill -9` 杀掉 `gru-keep` 子进程，由于未写入魔术字符 `'V'`，`watchdog_release()` 会打印 ` watchdog0: watchdog did not stop!` 且不调用 `watchdog_stop()`，`WDOG_ACTIVE` 依然为 `1`，机器照样在 30.0 秒后硬复位。
+  3. **内核 `[watchdogd]` 永久托管移交方案（`write("V")` + `WDIOS_DISABLECARD` + `close()`）**：
+     - 当打开 `/dev/watchdog` 后，执行 `ioctl(fd, WDIOC_SETOPTIONS, &WDIOS_DISABLECARD)`、写入魔术字符 `write(fd, "V", 1)` 并 `close(fd)`：
+       - `watchdog_release()` 识别到 `_WDOG_ALLOW_RELEASE`，正式调用 `watchdog_stop(wdd)`。
+       - `dw_wdt_stop(wdd)` 检测到 `!dw_wdt->rst`，置位 `WDOG_HW_RUNNING = 1` 并返回 `0`。
+       - `watchdog_stop(wdd)` 清除 `WDOG_ACTIVE = 0` 并调用 `watchdog_update_worker(wdd)`。
+       - 此时 `!watchdog_active(wdd) && watchdog_hw_running(wdd)` 为真，且 `wd_data->open_deadline == KTIME_MAX`（由 `watchdog_open()` 设为无穷大），因此 `watchdog_need_worker()` 恒为 **`true`**，`virt_timeout` 恒为 **`KTIME_MAX`（永不过期）**！
+       - 内核内置的不可冻结实时线程 `[watchdogd]`（`SCHED_FIFO`、`HRTIMER_MODE_REL_HARD`）随即接管，在内核态每 **`10.737` 秒**（`max_hw_heartbeat_ms / 2`）自动喂一次 `dw_wdt`，无论正常运行时还是 S3 `deep` 休眠冻结用户空间期间均不中断；在挂起进入 ATF `rockchip_soc_suspend` 期间，CPU 切至 32.768 kHz 慢时钟，`dw_wdt` 时钟同步门控暂停，唤醒瞬间恢复。
+- **补齐 ChromeOS EC RTC 模块（`rtc-cros-ec.ko`）与解封 `/sys/power/state`**：
+  - `6.6.34-phase2` 中 `CONFIG_RTC_DRV_CROS_EC=m`（`drivers/rtc/rtc-cros-ec.ko`，零外部依赖）。从 `modinstall` 提取 `rtc-cros-ec.ko` 放入 `device/google/gru/modules/`，在 `device.mk` 安装至 `/vendor/lib/rtc-cros-ec.ko`，并在 `init.gru.rc` 的 `on early-init` 加载，注册 `/dev/rtc0`（`cros-ec-rtc.2.auto`）与内核 `alarmtimer`，供 `SystemSuspend` 与 `AlarmManager` 在休眠期间设置定时唤醒。
+  - 移除 `init.gru.rc` `on post-fs` 中阶段 3 的临时封锁 `chmod 000 /sys/power/state`，保留 `init` 默认设置的 `0660 system:system` 权限，使 `android.system.suspend-service` 正常读写 `/sys/power/state` 与 `/sys/power/wakeup_count`。
+- **实机长时 S3 `deep` 休眠与物理电源键唤醒验证（`10.0.0.119:5555`）**：
+  - 实机拔掉外部保活连接、进入真实长时 S3 `deep` 睡眠后，按机身物理电源键一次点亮唤醒成功：`boot_id` 保持 `66e5ea3e-118f-4346-965f-538890364924` 不变（同一次启动，未掉回 bootloader），`/sys/power/suspend_stats/success` 增至 `9`（`fail: 0`）。
+- **为什么刚才测试唤醒后 Wi-Fi 曾出现数分钟「已连接但带感叹号 / 正在连接 / 无法访问互联网（`ENONET`）」的根因与修复验证**：
+  - **日志直接证据（`dumpsys netd` 与 `logcat`）**：
+    - `logcat` 中 `NetworkMonitor/104` 报错：`PROBE_DNS connectivitycheck.gstatic.com 4ms FAIL in type ADDRCONFIG android.net.DnsResolver$DnsException: android.system.ErrnoException: resNetworkQuery failed: ENONET (Machine is not on the network)`。
+    - `dumpsys netd` 的 `NetworkController` 日志显示：
+      ```text
+      10-20 03:26:24.539 networkCreate(netId: 102, PHYSICAL)
+      10-20 03:26:24.549 networkAddInterface(102, wlan0) <6.51ms>
+      ...
+      10-20 03:39:41.111 networkCreate(netId: 104, PHYSICAL)
+      10-20 03:39:41.202 networkAddInterface(104, wlan0) -> ServiceSpecificException(16, "Device or resource busy")
+      ```
+  - **为什么会出现 `ServiceSpecificException(16, "Device or resource busy")`**：
+    - 在测试休眠前，为了在**不重启平板**的情况下让修改后的 `/sys/power/state` 权限被 `system_server` 重新打开，我们手动执行了热重启命令 `stop zygote; start zygote`（但**没有**同时重启守护进程 `netd`）。
+    - 旧的 `system_server` 在被 `stop zygote` 强制杀掉前，已经在 `netd` 中创建了 `netId: 102` 并把网卡 `wlan0` 绑定到了 `netId 102`（路由规则 `fwmark 0x10066 lookup wlan0`）。由于旧 `system_server` 是被直接杀死的，它没来得及调用 `netd` 的 `networkDestroy(102)`。
+    - 新启动的 `system_server` 从头分配了新的网络号（最终为 `netId: 104`），并调用 `netd.networkAddInterface(104, "wlan0")`；但常驻未重启的 `netd` 认为 `wlan0` 仍然归旧的孤儿网络 `102` 所有，于是拒绝绑定并返回 `EBUSY (16, "Device or resource busy")`！
+    - 结果导致新 `system_server` 的默认网络 `104` 名下没有任何网卡（`104 PHYSICAL` 后方为空，而 `102 PHYSICAL wlan0` 仍占着 `wlan0`），DNS 探测全部因找不到出口网卡立即返回 `ENONET`，UI 因此一边显示已连上 AP、一边在顶部状态栏显示感叹号并在前几分钟反复重连尝试（这与第 5 步首次在线热调试 Wi-Fi 时手动重启框架层而未重启整机是同一个原因；正常开机或正常睡眠唤醒绝对不会杀 `zygote`，因此不会发生 `netId` 孤儿占用）。
+  - **实机在线清理验证**：通过 `adb` 执行 `ndc network destroy 102` 释放孤儿 `netId 102` 并重连 Wi-Fi 后，`dumpsys netd` 立即显示 `Default network: 105` -> `105 PHYSICAL wlan0` 绑定成功，`cmd wifi status` 立即恢复 `Capabilities: ...&INTERNET&...&VALIDATED`，状态栏感叹号消失。
+- **代码与镜像固化**：
+  - `device/google/gru/gru-keep.c`：新增 `handoff_watchdog_to_kernel()`，在 `execv("/init.android")` 前执行 `WDIOC_SETOPTIONS(WDIOS_DISABLECARD)` + `write("V")` + `close(watchdog)` 将 `dw_wdt` 移交内核 `[watchdogd]` 实时线程，重新静态编译 `device/google/gru/prebuilt/gru-keep` 并通过 `wrap-ramdisk.sh` 生成 `/tmp/gru-ramdisk/ramdisk-wrapped.cpio`（`6971904` 字节）。
+  - `device/google/gru/device.mk` 与 `device/google/gru/init.gru.rc`：打包并在 `early-init` 加载 `/vendor/lib/rtc-cros-ec.ko`，移除 `on post-fs` 的 `chmod 000 /sys/power/state`。
+  - 重新打包生成 `out/target/product/gru/super.img`（大小 `1253544340` 字节，sha256 `7fa1d151bf2c0872c9e33181d4a5e184c85d81032f9b86d8cb17c460a9fe9e90`），并在内置盘 postmarketOS 上通过 `depthchargectl build` 生成新 `/home/user/phase3/kernel.kpart`（大小 `14159872` 字节，sha256 `823de9e15560fdfd89b23c4c511bf86a8e07790b97ef3d66876cd9734248b793`）。
+- **S3 唤醒后续细节问题定位与修复（2026-10-20）**：
+  1. **唤醒后 Wi-Fi 感叹号（`!`）持续约 20~30 秒才恢复正常**：
+     - **日志根因**：S3 唤醒亮屏后，`wpa_supplicant` 在约 4~5 秒内即完成 5 GHz 信标被动扫描、解除 `no_ir` 限制并完成 WPA2 四次握手（`CTRL-EVENT-CONNECTED`）；但 `ConnectivityService` 的 `NetworkStateTrackerHandler` 线程在清理上一轮断开网络的残留 TCP 套接字时，调用 `InetDiagMessage.destroyLiveTcpSockets()` 向内核 `NETLINK_SOCK_DIAG` 发送 `SOCK_DIAG_BY_FAMILY`（`nlmsg_type=20`）请求。由于 `6.6.34-phase2` 内核的 `inet_diag.ko`、`tcp_diag.ko`、`udp_diag.ko`、`raw_diag.ko` 模块此前未打包加载，内核返回 `-ENOENT`（`error{-2}`），触发 Android 16 `NetlinkUtils` 连续 10 次等待 `SO_RCVTIMEO`（每次 3.0 秒，共阻塞 **30.0 秒**，`ErrnoException: read failed: EAGAIN`），导致新网络的 `Adding iface wlan0 to network` 与 `NetworkMonitor` 连通性验证在队列中被卡住整整 30 秒（一旦开始验证仅需 294 ms 即通过）。
+     - **修复**：从 `modinstall` 提取 `inet_diag.ko`、`tcp_diag.ko`、`udp_diag.ko`、`raw_diag.ko` 放入 `device/google/gru/modules/`，在 `device.mk` 安装至 `/vendor/lib/` 并在 `init.gru.rc` 的 `on early-init` 中加载。
+  2. **S3 深度睡眠唤醒时短按一次电源键屏幕不亮（需再按一次或连按两次）**：
+     - **日志与内核根因**：ChromeOS EC 的 `EC_MKBP_EVENT_BUTTON` 事件上报的是读取时刻的**瞬时按钮位图**而非历史按键队列。RK3399 从 S3 `deep` 唤醒到 `dpm_resume` 阶段执行 `cros_ec_spi_resume()` 发送 `EC_CMD_GET_NEXT_EVENT` 耗时约 **200~250 ms**，而人手正常短按一次电源键仅持续 **100~200 ms**。当 `cros_ec_spi_resume()` 读取事件时，手指已松开电源键，EC 返回 `buttons = 0`；`cros_ec_keyb_work()` 调用 `input_event(idev, EV_KEY, KEY_POWER, 0)`，被 Linux `input` 核心因状态未变（`0 -> 0`）静默丢弃（`/sys/class/wakeup/` 中 `keyboard-controller` `wakeup_count=7` 而 `event2` `wakeup_count=1`）。
+     - **修复**：修改 `drivers/input/keyboard/cros_ec_keyb.c`（补丁归档于 `patches/kernel_6.6.34_cros_ec_keyb_s3_power_button_wakeup.patch`），当 `cros_ec_keyb_work()` 收到 `EC_MKBP_EVENT_BUTTON` 且 `val == 0`、同时 `bs_idev->key` 中无任何按键处于按下状态时，先补发一次 `input_report_key(ckdev->bs_idev, KEY_POWER, 1); input_sync(ckdev->bs_idev);`，再执行原有的释放上报。重新编译 `cros_ec_keyb.ko` 更新至 `device/google/gru/prebuilt/6.6.34-phase2/cros_ec_keyb.ko` 并重新打包 `/tmp/gru-ramdisk/ramdisk-wrapped.cpio`；实机验证单击电源键立即唤醒点亮屏幕（`intercept_power: [ACTION_DOWN,0,1]` -> `[ACTION_UP,0,0]` -> `screen_toggled: 1`）。
+  3. **S3 唤醒后 Wi-Fi 卡在「正在获取 IP 地址…」并反复提示「IP 配置失败」（需开关一次 Wi-Fi 才能连上）**：
+     - **日志与源码根因**：
+       - 在 `dumpsys network_stack` 的 `IpClient.wlan0` 状态机日志与 `logcat` `am_wtf` 中捕获到直接原因：
+         - `ERROR readPacket error: : read failed: EINVAL (Invalid argument)`
+         - `am_wtf: [...,IpClient/wlan0,NetlinkMonitor is not running when setting interface parameter!]`
+       - `IpClientLinkObserver` 创建了一个绑定到 `NETLINK_ROUTE` 广播组（`RTMGRP_LINK | RTMGRP_IPV4_IFADDR | RTMGRP_IPV6_IFADDR | ...`）的 `IpClientNetlinkMonitor`（继承自 `NetlinkMonitor` -> `PacketReader` -> `FdEventsReader`）。
+       - Linux 内核 `net/netlink/af_netlink.c` 的 `rtnl_set_sk_err()` 在某次 rtnetlink 广播通知返回错误码（如 `-EINVAL`）时，会将所有订阅该广播组的 `NETLINK_ROUTE` 套接字置为 `sk->sk_err = EINVAL`；下一次 `Os.read(fd)` 时 `sock_error(sk)` 原地清除并返回 `ErrnoException: EINVAL`。
+       - 然而 `packages/modules/Connectivity/staticlibs/device/com/android/net/module/util/ip/NetlinkMonitor.java` 的 `handleReadError(ErrnoException e)` 仅对 `ENOBUFS` 返回 `false`（继续读取），对 `EINVAL` 返回了 `true`（停止读取），导致父类 `FdEventsReader.handleInput()` 立即调用 `unregisterAndDestroyFd()` **永久关闭了该 `NETLINK_ROUTE` 广播套接字**！
+       - 由于 `WifiClientModeImpl` 在 S3 休眠/唤醒周期内复用同一个 `IpClient` 实例（仅在用户手动关闭再打开 Wi-Fi 开关时才销毁重建 `IpClient`），唤醒后 `DhcpClient` 虽然在 35 ms 内就拿到了 `10.0.0.109/24` 租约并通过 `netd` 配上了网卡地址，但已停止的 `IpClientNetlinkMonitor` 永远收不到内核 `RTM_NEWADDR` 广播，`IpClient` 的 `mLinkProperties` 中 `LinkAddresses` 始终为空，苦等 18 秒后触发 `EVENT_PROVISIONING_TIMEOUT`（IP 配置失败）并断开重连循环。
+     - **修复**：
+       1. 修改 `NetlinkMonitor.java`（`patches/packages_modules_Connectivity_netlink_monitor_einval.patch`）：在 `handleReadError()` 中将 `EINVAL` 与 `ENOBUFS` 一并返回 `false`，忽略瞬态 `sk_err` 而不销毁 `NETLINK_ROUTE` 监听套接字。
+       2. 修改 `IpClientLinkObserver.java`（`patches/packages_modules_NetworkStack_restart_netlink_monitor.patch`）：在 `setIfindex()` 中增加自愈逻辑，若检测到 `!mNetlinkMonitor.isRunning()`，立即调用 `mNetlinkMonitor.start()` 重新打开监听套接字。
+       3. 重新编译 `NetworkStack` 与 `super.img`（大小 `1253753236` 字节，sha256 `fa3f44ba8ec16b37f0fe2b4cd2205d3c65f63d63e9d335197beb0345f61fdf3d`），并上传至 postmarketOS `/home/user/phase3/` 生成最新 `/home/user/phase3/kernel.kpart`（大小 `14159872` 字节，sha256 `969cabf7e851b3ce6b802c5a2cec582beff44ad18a37a1cf7291dba8beb82f98`）。
+
+## 事件
+
+| 日期 | 事件 |
+| --- | --- |
+| 2026-10-19 | 阶段 4 第 1 项验证通过：写入 `super.img`（`5905b1e2...`）后启动外置盘，`zram0` 2919648 kB swap 启用，`Launcher3` 与 `Seedvault` 崩溃以及设置应用 ANR 全部归零。内置盘 eMMC `pmOS_kernel` 校验和保持 `5c188eeb7a89fdb1bf442ccccd61a556ad5e232149454659853e7dee98f0068a`。 |
+| 2026-10-19 | 阶段 4 第 2 项验证通过：写入 `super.img`（`345ebd9a...`）后启动外置盘，`panfrost` 驱动与 Mesa 25.3.3 `Mali-T860 (Panfrost)` OpenGL ES 3.1 硬件加速正常启用，无软渲染回退，`SurfaceFlinger` 至开机完成耗时从 145.7 秒缩短至 64.4 秒，0 次崩溃/ANR。 |
+| 2026-10-19 | 补齐 CPU/内存调频模块（`cpufreq-dt.ko`、`rockchip_thermal.ko`、`rockchip-dfi.ko`、`rk3399_dmc.ko`）并写入 `super.img`（`04155eb4...`）验证通过：`GRU_FREQ` 确认小核 `1.512 GHz`、大核 `2.016 GHz`、GPU `800 MHz`、内存控制器 `928 MHz` 全部上线，总开机时间从 156.9 秒进一步缩短至 125.2 秒，响应速度明显提升，确认 2048×1536 线性合成下 30–45 fps 为 Mali-T860 MP4 硬件带宽边界。 |
+| 2026-10-19 | 完成阶段 4 第 3 项（触摸、旋转、Wacom 手写笔）及 `fuse.ko` 构建并上传至 `/home/user/phase3/super.img`：新 `super.img` 校验和 `1e240695d3c4ef4e60755942ae2d0d755942ae2d0d75095c6a8d4236b4d286caa87662656ab4`（`1249505684` 字节），包含 `fuse.ko`、`i2c-hid` 手写笔模块、`cros_ec_sensors` IIO 传感器模块、`android.hardware.sensors@2.1-gru-subhal` 与触摸/手写笔 IDC 配置。 |
+| 2026-10-19 | 阶段 4 第 3 项实机验证通过（`bootlog21.txt`）：Wacom 手写笔四个方向点击与悬停全部正常、自动旋转四个方向流畅且帧率一致、「设置 -> 存储」正常打开；同时定位了缺少虚拟导航栏、软键盘不弹出、「设置 -> 声音 / 无障碍」因缺蓝牙声明触发 NPE 等问题，排入第 4 步（背光调节）一并修复。 |
+| 2026-10-19 | 完成阶段 4 第 4 项（背光滑块线性化校正、虚拟导航栏 Overlay、软键盘 `cros_ec.kl` 修复、「设置 -> 声音 / 无障碍」NPE 修复）构建并上传至 `/home/user/phase3/super.img`：新 `super.img` 校验和 `0d9351346989a5326707f5fb777c5c34a04c1c01ebae156badbb682e6f5e5146`（`1249522068` 字节）。 |
+| 2026-10-19 | 阶段 4 第 4 项实机验证通过（`bootlog22.txt`）：下拉菜单亮度滑块全程线性调节、三键与手势虚拟导航栏正常、屏幕虚拟键盘正常弹出、「设置 -> 隐私」与「设置 -> 无障碍」不再闪退；同时从日志发现 VINTF 缺少 `IWifi/default` 及 `adbd` 需隔离 `/dev/usb-ffs/adb`，并完成阶段 4 第 5 项（QCA6174 `ath10k_pci` 固件与 13 个无线/加密模块、`android.hardware.wifi-service`、nl80211 `wpa_supplicant`、TCP `5555` 无线 `adb`）构建与上传（新 `super.img` 校验和 `00a872f695f2ee091496a310e8294d95ad4e82b7389fa3ec51dc2f476e1ea6fb`，`1251934612` 字节）。 |
+| 2026-10-19 | 阶段 4 第 5 项实机验证通过（通过无线 `adb` 直接拉取 `adb_dmesg_step5.txt` 与 `adb_logcat_step5.txt`）：QCA6174 `ath10k_pci` 802.11ac 5 GHz 联网满速（866 Mbps，0 丢包，IPv4/IPv6 双栈 `INTERNET & VALIDATED`），无线 `adb`（TLS 端口与 TCP `5555` root 端口）直连稳定且无 USB functionfs 报错；同时从日志排查并修复了 `SensorBase` 构造函数过早启动线程导致的开机单次纯虚函数崩溃竞态与 `gru-logcat.sh` 中 `HalDevMgr` 刷屏 `dmesg` 的问题。 |
+| 2026-10-20 | 完成阶段 4 第 6 项（蓝牙：QCA6174A USB `0cf3:e300` 固件、`btusb.ko` 等 13 个蓝牙/加密/UHID 模块、`android.hardware.bluetooth-service.default` AIDL HAL、`/dev/rfkill` 与 `/dev/uhid` 权限、清理遗留 `package-restrictions.xml`、`bluetooth.le.disable_apcf_extended_features=1`、全部蓝牙 Profile 属性及 `/dev/dma_heap/system` 节点）：实机验证「已连接的设备」与「提示音和振动」不闪退、手机双模配对与蓝牙鼠标连接完全可用，更新后的 `super.img`（`08b6e808e420e71bbb38ad6ff385359eed6a3a8b2d823f08a4a7a8c093a37c06`）已上传至设备 `/home/user/phase3/super.img`。 |
+| 2026-10-20 | 完成阶段 4 第 7 项（音频播放：打包 `rk3399-gru-sound` 及 `MAX98357A` / `DMIC` / `DA7219` / `rockchip-i2s` 等 16 个 ALSA SoC 内核模块并在 `early-init` 加载、编写 `device/google/gru/etc/audio_policy_configuration.xml` 绑定扬声器 `CARD_0_DEV_0` 与内置麦克风 `CARD_0_DEV_1`）及移除 `init.gru.rc` 中导致开机弹出 `LineageSetupWizard` 的一次性 `rm package-restrictions*.xml` 语句；实机先行动态加载验证外放铃声与麦克风采集正常，新 `super.img` 大小 `1253716372` 字节，校验和 `74e5fc1de1c6782c7e857dbbf94080582c9b1bc5a57bdb5b2ee61e9ee593cf05`。 |
+| 2026-10-20 | 完成阶段 4 第 8 项（电量与充电：定位并排除自定义测试脚本查询越界 `port=1` 导致 EC 复位的根因，打包并加载 `cros_usbpd-charger.ko` 注册 `CROS_USBPD_CHARGER0`，并在 `BatteryMonitor.cpp` 中完成 `current_avg` / `technology` `-5` 报错过滤与回退、USB-PD `usb_type` 映射 `AC powered: true`、`charge_now` 映射 `Charge counter` 与 `health` 状态修正）：实机在线验证 PD 5V/3A（15W）快充状态与电量增长稳定（88% -> 91%）、`dmesg` 零 `-5` 报错，合并第 7、8 项的新 `super.img` 大小 `1253716372` 字节，校验和 `5310e948452e703eeac8437dbbf453a75150606c99d686777aa836a5723f6961`。 |
+| 2026-10-20 | 完成阶段 4 第 9 项（睡眠与唤醒）：定位 `dw_wdt` 休眠 30 秒复位根因为 `gru-keep` 持有 `WDOG_ACTIVE=1` 导致用户空间冻结后 `virt_timeout` 到期，通过魔术字符 `'V'` + `WDIOS_DISABLECARD` + `close()` 将 `dw_wdt` 移交内核不可冻结实时线程 `[watchdogd]` 永久保活，并加载 `rtc-cros-ec.ko`、解封 `/sys/power/state`；实机拔除外部连接长时 S3 `deep` 休眠后按电源键成功唤醒（`boot_id` 不变，`suspend_stats/success=9`），同时定位并清理此前手动热重启 `zygote` 留下的 `netd` 孤儿 `netId 102` 占用 `wlan0` 导致的 Wi-Fi 感叹号（`EBUSY` / `ENONET`），恢复 `INTERNET & VALIDATED`，并固化至 `gru-keep.c`、`init.gru.rc`、`device.mk` 及新 `super.img`（`7fa1d151bf2c0872c9e33181d4a5e184c85d81032f9b86d8cb17c460a9fe9e90`）与 `ramdisk-wrapped.cpio`。 |
+| 2026-10-20 | 修复固化刷机后的两项回归并验证开机通过：（1）补回 `device/google/gru/cmdline.txt` 漏掉的 `drm_kms_helper.fbdev_emulation=0` 并重打 `kernel.kpart`（`eb3296d556ad537f485210fc9e56aacebfe4d9185df8c1d489e1faf372189b44`），消除开机 fbcon 控制台文字残留；（2）恢复因 `TARGET_RELEASE` 切换被 `installclean` 误删的 `vendor/etc/vintf/manifest/mapper.minigbm_upstream.xml` 与 `mapper.minigbm_upstream.so` 并重打 `super.img`（`dba0ae43ce310882c1e24adc20c9810ef6d4508fa0302549517d5e35e5a283ec`），实机刷入后正常进入桌面，阶段 4 原定 9 项完成。 |
+| 2026-10-20 | 完成阶段 4.5 第 1 项（系统 WebView 渲染黑屏与网页加载修复）：定位 `com.android.webview:sandboxed_process0`（`isolated_app`）渲染黑屏根因为 `system/core/libcutils/ashmem-dev.cpp` 的 `is_memfd_fd(int fd)` 先调用 `readlink("/proc/self/fd/%d")`，在 `isolated_app`（`dumpable=0` + Chromium seccomp 沙盒）下触发 `EPERM` 并回退 `/dev/ashmem`（`ENOENT`），导致 `ASharedMemory_getSize(fd)` 恒返回 `0`、Mojo 共享内存初始化死循环；改为直接通过 `fcntl(fd, F_GET_SEALS)` 校验 `memfd` 后，实机验证 Geekbench 6 详情页与 Jelly 浏览器网页立即正常渲染，并重新打包固化至 `super.img`（大小 `1253732756` 字节，sha256 `c4e8a01fea4dcfff8efe79e9e1efe0469d7901d790e0071a715790cab880f952`）。 |
+| 2026-10-20 | 修复 S3 睡眠唤醒后的三项体验问题并归档仓外补丁至 `patches/`：（1）打包并加载 `inet_diag.ko`、`tcp_diag.ko`、`udp_diag.ko`、`raw_diag.ko`，消除 `ConnectivityService` 因缺少 `NETLINK_SOCK_DIAG` 触发的 30 秒 `EAGAIN` 超时阻塞；（2）修复 `cros_ec_keyb.c` 在 S3 唤醒 ~250ms 窗口内短按电源键已松开（`val == 0`）被 `input` 子系统丢弃的问题，补发 `KEY_POWER` 按下事件，实机验证单击电源键立即唤醒亮屏；（3）定位并修复唤醒后 Wi-Fi 卡在「正在获取 IP 地址…」并循环报「IP 配置失败」的根因（`NetlinkMonitor.handleReadError()` 遇到 `NETLINK_ROUTE` 瞬态 `EINVAL` 时错误返回 `true` 导致 `FdEventsReader` 销毁监听套接字，使 `IpClient` 收不到 `RTM_NEWADDR` 而在 18 秒后超时），在 `NetlinkMonitor` 忽略 `EINVAL` 并在 `IpClientLinkObserver.setIfindex()` 中自愈重启 `mNetlinkMonitor`，同步重打 `ramdisk-wrapped.cpio` 与 `super.img`（`fa3f44ba8ec16b37f0fe2b4cd2205d3c65f63d63e9d335197beb0345f61fdf3d`）。 |
