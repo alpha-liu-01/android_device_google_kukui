@@ -58,6 +58,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/ath.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath.ko \
     $(LOCAL_PATH)/modules/ath10k_core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_core.ko \
     $(LOCAL_PATH)/modules/ath10k_sdio.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_sdio.ko \
+    $(LOCAL_PATH)/modules/sbs-battery.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/sbs-battery.ko \
+    $(LOCAL_PATH)/modules/cros_usbpd-charger.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_usbpd-charger.ko \
     $(LOCAL_PATH)/modules/modules.load:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.load \
     $(LOCAL_PATH)/modules/modules.dep:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.dep \
     $(LOCAL_PATH)/modules/modules.alias:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.alias \

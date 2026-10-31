@@ -5,3 +5,5 @@ mac80211.ko
 ath.ko
 ath10k_core.ko
 ath10k_sdio.ko
+sbs-battery.ko
+cros_usbpd-charger.ko

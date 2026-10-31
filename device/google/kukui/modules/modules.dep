@@ -5,3 +5,5 @@ mac80211.ko: cfg80211.ko libarc4.ko
 ath.ko: cfg80211.ko
 ath10k_core.ko: mac80211.ko cfg80211.ko ath.ko
 ath10k_sdio.ko: ath10k_core.ko
+sbs-battery.ko:
+cros_usbpd-charger.ko:

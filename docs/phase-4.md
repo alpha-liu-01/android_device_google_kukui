@@ -110,18 +110,50 @@ SDIO 卡在 0.98 秒起来：`mmc1: new UHS-I speed SDR104 SDIO card at address 
 
 Wi-Fi 可用。无线 adb 先配对 `10.0.0.104:41895`，再连上 `10.0.0.104:5555`。`wlan0` 是 up，地址 `28:cd:c4:70:77:b3`，IPv4 `10.0.0.104/24`，默认路由 `10.0.0.1`。IPv6 前缀 `2607:fea8:4f03:3700::/64`，默认路由是路由通告里的 `fe80::1e9e:ccff:fe5a:8543`。连的是 `"Not 6GHz"`，WPA2，802.11ac，5765 MHz，RSSI -38，发送 702 Mbps，接收 866 Mbps，分数 100，supplicant 状态 `COMPLETED`。`ping 1.1.1.1` 两包都回来，往返大约 24.4 ms。这次没有把 U 盘拔回来抄 kmsg，上面是正在运行的系统。
 
-USI 笔已经能画。节点是 `hid-over-i2c 27C6:0E30 Stylus`，`event6`，类型已经是 touchscreen，方向仍是 `Rotation0`。手指那路用的是另一个名字，所以笔没有读到 `ORIENTATION_270`。笔从右往左画时，系统里仍是从上往下。配置写成 `hid-over-i2c_27C6_0E30_Stylus.idc`，方向同样是 `ORIENTATION_270`。这份文件已经放在 userdata 的 `/data/system/devices/idc/`。下次 Ctrl+U 会读到它。super 分区还是上一份，U 盘还在平板上，新的 super 等 U 盘回到工作站再写。
+USI 笔已经能画。节点是 `hid-over-i2c 27C6:0E30 Stylus`，`event6`，类型已经是 touchscreen，方向仍是 `Rotation0`。手指那路用的是另一个名字，所以笔没有读到 `ORIENTATION_270`。笔从右往左画时，系统里仍是从上往下。配置写成 `hid-over-i2c_27C6_0E30_Stylus.idc`，方向同样是 `ORIENTATION_270`。userdata 里也有一份同内容的文件。内核映像没重链。
+
+内核分区没重写。新的 super 仍是 8,589,934,592 字节，读回 `sdb3` 的 sha256：
+
+```text
+f3a260c441cc5468f4403d2de7eed6f3859370fc4a9b871cf0d07cf76df2ba5f
+```
+
+写入时没有再核对 eMMC。
+
+## 第二十次启动失败，分区头已清零
+
+手写笔方向已经对，工作符合预期。
+
+电量和充电提前做。正在运行的系统里，模块没加载时电源类只有 Goodix 笔的 HID 电池，范围是设备，电量 0。Health 只在启动时扫一次电源，而且跳过设备范围的电池，所以界面停在 0%，跟电流表有没有电流无关。
+
+`sbs-battery.ko` 和 `cros_usbpd-charger.ko` 是这颗内核已经编好的模块，vermagic 仍是 `6.18.28-mt81-kukui2 SMP preempt mod_unload aarch64`。当场 `insmod` 之后，`sbs-12-000b` 报电量 93%，电压 4.344 V，电流大约 +1.0 A，状态 Charging，温度 28.3°C。EC 充电状态是交流在线，电池充电电压上限 4400 mV，充电电流上限 3500 mA，输入电流上限 3000 mA。化学成分读出来是 `<unkn>`，因为 EC 的 I2C 隧道没有 `I2C_FUNC_SMBUS_READ_BLOCK_DATA`，电量数字不受影响。这次启动里 Health 已经扫过，界面仍是 0%。下次 Ctrl+U 时 `dlkm_loader` 在 Health 之前加载这两个模块。
+
+5 V 和 9 V 是另一件事。EC 固件是 `krane_v2.0.2771-7a68c38973`，2022-11-24。EC 控制台里，开机后大约 4.2 秒请求了充电器的 PDO 2，`9000mV 3000mA`，充电限流到了 `v9000`。6.4 秒出现 `Handle sleep: 0`，随后改请求 PDO 1，`5000mV 3000mA`，并停在那里。充电器两种 PDO 都有。关机和进系统前的 9 V 就是 EC 自己谈成的；AP 起来之后 EC 自己把请求降到 5 V。
+
+这版固件的主机命令表里没有 `EC_CMD_EXTERNAL_POWER_LIMIT`（0x00A2）。v0 和 v1 都返回 `EC_RES_INVALID_COMMAND`。`EC_CMD_PD_EXCHANGE_STATUS` 和 `EC_CMD_TYPEC_STATUS` 也不在表里，所以进系统之后请求停在 5 V / 3 A。电池侧的上限是 4.4 V、3.5 A。充电器在谈 9 V 之前已经把 VBUS 限制设到 12850 mV，9 V 在这个范围里，但这版固件没有把抬高请求的命令交给主机。
+
+新的 super 把这两个模块放进 `vendor_dlkm` 的 `modules.load`，顺序在 ath10k 后面。内核映像没重链，时间仍是 2026-10-31 01:18:48。写入目标是读卡器 `Generic MassStorageClass` 序列号 `000000002959` 上的 119.1 GB SanDisk，不是 YMTC 那块盘。写之前这张卡是空的 exfat，卷标 `SandiskEX`。内核槽仍是原来的 FIT，类型是 ChromeOS kernel，属性是 priority 15、tries 15、successful。`pmOS_boot` 是新建的 ext4。super 是 8,589,934,592 字节，读回 `sdb3` 的 sha256：
+
+```text
+566a770c1bb4983973f7eb531fb105f183580efa35c5bbcee0ee63c95de36c21
+```
+
+写入时没有再核对 eMMC。
+
+两次 Ctrl+U 都在几秒内回到开发者屏幕。内核和第一阶段 init 都起来了，`pmOS_boot` 挂上了。metadata 和 userdata 的开头不是全 0 也不是全 0xff，是原来 exfat 留下的数据，所以 superblock 无效。Android 只在分区开头 4 KiB 全 0 或全 0xff 时才把 formattable 分区格式化。这两次都没有格式化。`/data` 仍是只读的 system erofs，`keystore2` 收到 SIGABRT，`init_user0` 失败。日志是 `work/phase4/kukui-phase4-sandisk-boot1.log` 和 `kukui-phase4-sandisk-boot2.log`。
+
+已经把 metadata、misc、userdata 各自的开头 1 MiB 写成 0。内核槽和 super 没动，上面的 sha256 仍然有效。下次 Ctrl+U 应能自己格式化这两个分区。
 
 ## 人工测试
 
-笔的配置已经在这块 U 盘的 userdata 上。不用先拿回工作站。
+分区头清零之后，卡从工作站卸载再做。平板里的旧 U 盘先留着。
 
-1. U 盘留在 Krane 上。外接鼠标仍接在 hub 上，键盘盖装上。
-2. 重启，开发者屏幕按 Ctrl+U。
-3. 用 USI 笔在玻璃上从上往下画，笔画应跟着往下走。若变成镜像，或方向仍不对，告诉我。
-4. Wi-Fi 这次已经连上 `"Not 6GHz"` 并能 ping 通。不用再为开关弹回做一次测试。
+1. 卸下新的 SanDisk，插到 Krane 的 hub 上。外接鼠标仍接在 hub 上，键盘盖装上。
+2. 重启，开发者屏幕按 Ctrl+U。这次应能过 metadata 和 userdata，不再几秒就回到开发者屏幕。
+3. 电量百分比不应再停在 0%。应接近这次读到的 93%，并显示正在充电。电流表在进系统之后仍会停在 5 V，这是 EC 固件的行为，不是电量计没装上。
+4. Wi-Fi 上次已经连上 `"Not 6GHz"` 并能 ping 通。不用再为开关弹回做一次测试。笔的方向已经对。
 5. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
-6. 把 U 盘插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。新的 super 等这时再写入。
+6. 把新卡插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。
 
 ## 顺序
 
@@ -130,12 +162,12 @@ USI 笔已经能画。节点是 `hid-over-i2c 27C6:0E30 Stylus`，`event6`，类
 1. `evdev.ko` 已加载。外接鼠标和键盘盖触控板能用。
 2. Panfrost。第十五次启动仍是 Mali-G72 GLES 3.1。
 3. Wi-Fi 和无线 adb。第十九次已连上 `"Not 6GHz"`，`10.0.0.104`，无线 adb 可用。
-4. 触摸、旋转、USI 笔。手指方向已经对。笔的 `ORIENTATION_270` 在 userdata 上，等下次 Ctrl+U。屏幕导航键已打开。
+4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
 7. 蓝牙。上面的 SIGABRT 留到这一项。
 8. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
-9. 电量和充电。
+9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
 10. zram。
 11. 休眠和唤醒。第十四次在没有输入时大约一分钟灭屏，挂起被拒绝。等输入和显示稳定后再做。不预先喂看门狗。
 
