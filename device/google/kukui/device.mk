@@ -18,6 +18,14 @@ TARGET_HAS_VIBRATOR := false
 TARGET_SUPPORTS_USB_ACCESSORY_MODE := false
 TARGET_USB_INIT_SCRIPT := none
 TARGET_HOSTAPD_AND_WPA_SUPPLICANT_FORM := legacy
+# Set before options.mk. default-aidl otherwise pulls the cuttlefish policy.
+TARGET_AUDIO_HAL := default-aidl
+TARGET_AUDIO_POLICY := kukui
+# Kukui edits to hardware/interfaces live in this repo's patches/.
+# Without them, lunch still builds, but the speaker opens card 0.
+ifeq ($(wildcard $(LOCAL_PATH)/../../../hardware/interfaces/audio/aidl/default/include/core-impl/KukuiMixer.h),)
+$(error Kukui audio patch is not applied. Run patches/apply-patches.sh on the LineageOS tree before building kukui.)
+endif
 include device/mainline/common/optional/options.mk
 SUPPORTS_INLINE_KERNEL_BUILDING := false
 
@@ -29,13 +37,12 @@ PRODUCT_USE_DYNAMIC_PARTITIONS := true
 PRODUCT_SHIPPING_API_LEVEL := 36
 PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
 PRODUCT_CHARACTERISTICS := tablet
-# The EC accelerometer subhal lives in the gru namespace. Only that library is packaged.
-PRODUCT_SOONG_NAMESPACES += device/google/gru
+# EC accelerometer subhal. Sources are hal/sensors in this tree.
 PRODUCT_PACKAGES += \
     kukui-keep \
     KukuiUsbSuspend \
     android.hardware.sensors-service.multihal \
-    android.hardware.sensors@2.1-gru-subhal
+    android.hardware.sensors@2.1-kukui-subhal
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/etc/permissions/android.software.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.xml \
@@ -84,6 +91,29 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/cros-ec-sensors-core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-sensors-core.ko \
     $(LOCAL_PATH)/modules/cros_ec_sensors.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_ec_sensors.ko \
     $(LOCAL_PATH)/modules/cros_ec_light_prox.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_ec_light_prox.ko \
+    $(LOCAL_PATH)/modules/mtk_wdt.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk_wdt.ko \
+    $(LOCAL_PATH)/modules/mc.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mc.ko \
+    $(LOCAL_PATH)/modules/snd-seq-device.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-seq-device.ko \
+    $(LOCAL_PATH)/modules/snd-rawmidi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-rawmidi.ko \
+    $(LOCAL_PATH)/modules/snd-ump.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-ump.ko \
+    $(LOCAL_PATH)/modules/snd-hwdep.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-hwdep.ko \
+    $(LOCAL_PATH)/modules/snd-usbmidi-lib.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-usbmidi-lib.ko \
+    $(LOCAL_PATH)/modules/snd-usb-audio.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-usb-audio.ko \
+    $(LOCAL_PATH)/modules/snd-soc-mtk-common.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-mtk-common.ko \
+    $(LOCAL_PATH)/modules/snd-soc-mt8183-afe.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-mt8183-afe.ko \
+    $(LOCAL_PATH)/modules/snd-soc-mt6358.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-mt6358.ko \
+    $(LOCAL_PATH)/modules/snd-soc-max98357a.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-max98357a.ko \
+    $(LOCAL_PATH)/modules/snd-soc-ts3a227e.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-ts3a227e.ko \
+    $(LOCAL_PATH)/modules/snd-soc-bt-sco.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-bt-sco.ko \
+    $(LOCAL_PATH)/modules/mt8183-mt6358-ts3a227-max98357.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mt8183-mt6358-ts3a227-max98357.ko \
+    $(LOCAL_PATH)/etc/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
+    frameworks/av/services/audiopolicy/config/bluetooth_audio_policy_configuration_7_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/bluetooth_audio_policy_configuration_7_0.xml \
+    frameworks/av/services/audiopolicy/config/audio_policy_volumes.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_volumes.xml \
+    frameworks/av/services/audiopolicy/config/default_volume_tables.xml:$(TARGET_COPY_OUT_VENDOR)/etc/default_volume_tables.xml \
+    frameworks/native/data/etc/android.hardware.audio.output.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.audio.output.xml \
+    $(LOCAL_PATH)/etc/permissions/android.hardware.microphone.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.microphone.xml \
     $(LOCAL_PATH)/etc/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf \
     $(LOCAL_PATH)/etc/sensors/sensor_hal_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/sensor_hal_configuration.xml \
     frameworks/native/data/etc/android.hardware.sensor.accelerometer.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.accelerometer.xml \
@@ -133,4 +163,6 @@ PRODUCT_VENDOR_PROPERTIES += \
     vendor.hwc.drm.device=/dev/dri/card0 \
     vendor.hwc.drm.internal_display_names=DSI-1 \
     vendor.usb.configfs=0 \
-    vendor.minigbm.device=/dev/dri/card0
+    vendor.minigbm.device=/dev/dri/card0 \
+    ro.vendor.audio.route=kukui \
+    ro.vendor.audio.tinyalsa.analog_device=0

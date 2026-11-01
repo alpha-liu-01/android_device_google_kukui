@@ -1,0 +1,312 @@
+diff -ruN a/audio/aidl/default/alsa/StreamAlsa.cpp b/audio/aidl/default/alsa/StreamAlsa.cpp
+--- a/audio/aidl/default/alsa/StreamAlsa.cpp	2026-11-01 00:33:42.533113731 -0400
++++ b/audio/aidl/default/alsa/StreamAlsa.cpp	2026-11-01 00:24:54.711381022 -0400
+@@ -27,6 +27,7 @@
+ #include <error/expected_utils.h>
+ #include <media/AidlConversionCppNdk.h>
+ 
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/StreamAlsa.h"
+ 
+ using aidl::android::hardware::audio::common::getChannelCount;
+@@ -139,7 +140,10 @@
+             return ::android::NO_INIT;
+         }
+         alsaDeviceProxies.push_back(std::move(proxy));
+-        if (!device.isExternal && !mIsInput) {
++        // A one-period non-blocking pipe drops the bursts that arrive together
++        // on the first start after a volume change. External devices and the
++        // kukui speaker write the PCM directly so the hardware clock paces them.
++        if (!device.isExternal && !mIsInput && !kukuiAudioRoute()) {
+             auto sink = makeSink(mIsInput);  // Do not block the writer when it is on our thread.
+             if (sink != nullptr) {
+                 sinks.push_back(sink);
+diff -ruN a/audio/aidl/default/bluetooth/DevicePortProxy.cpp b/audio/aidl/default/bluetooth/DevicePortProxy.cpp
+--- a/audio/aidl/default/bluetooth/DevicePortProxy.cpp	2026-11-01 00:33:42.508942057 -0400
++++ b/audio/aidl/default/bluetooth/DevicePortProxy.cpp	2026-10-31 22:09:54.784945767 -0400
+@@ -375,6 +375,12 @@
+         LOG(INFO) << __func__ << debugMessage() << ", " << previous_state << " -> " << mState;
+         return true;
+     }
++    // A second enable while the port is already ready must not fail the
++    // parameter update. Failing here returns before the stream is marked
++    // enabled, and transfer() then discards the PCM.
++    if (mState == BluetoothStreamState::STANDBY || mState == BluetoothStreamState::STARTED) {
++        return true;
++    }
+     return false;
+ }
+ 
+@@ -482,6 +488,8 @@
+         }
+         if (mState == BluetoothStreamState::STANDBY) {
+             retval = true;
++        } else if (mState == BluetoothStreamState::DISABLED) {
++            retval = true;
+         } else if (mState == BluetoothStreamState::STARTED) {
+             mState = BluetoothStreamState::SUSPENDING;
+             lock.unlock();
+diff -ruN a/audio/aidl/default/include/core-impl/KukuiMixer.h b/audio/aidl/default/include/core-impl/KukuiMixer.h
+--- a/audio/aidl/default/include/core-impl/KukuiMixer.h	1969-12-31 19:00:00.000000000 -0500
++++ b/audio/aidl/default/include/core-impl/KukuiMixer.h	2026-11-01 00:24:54.688381333 -0400
+@@ -0,0 +1,128 @@
++#pragma once
++
++extern "C" {
++#include <tinyalsa/asoundlib.h>
++}
++
++#include <cstdio>
++#include <fstream>
++#include <string>
++
++#include <android-base/logging.h>
++#include <android-base/properties.h>
++
++namespace aidl::android::hardware::audio::core {
++
++// Krane uses the MT6358 + MAX98357A card. Gru's DA7219 controls are absent.
++inline bool kukuiAudioRoute() {
++    static const bool enabled =
++            ::android::base::GetProperty("ro.vendor.audio.route", "") == "kukui";
++    return enabled;
++}
++
++// snd-usb-audio registers first when a DAC is already plugged in, so the
++// MT8183 card is not always card 0. The policy address stays CARD_0_DEV_*.
++inline int kukuiAlsaCard() {
++    static int cached = -1;
++    if (cached >= 0) return cached;
++    std::ifstream cards("/proc/asound/cards");
++    std::string line;
++    while (std::getline(cards, line)) {
++        if (line.find("mt8183mt6358") == std::string::npos &&
++            line.find("mt8183_mt6358") == std::string::npos) {
++            continue;
++        }
++        int card = -1;
++        if (sscanf(line.c_str(), " %d", &card) == 1 && card >= 0) {
++            cached = card;
++            LOG(INFO) << "kukui ALSA card " << card;
++            return card;
++        }
++    }
++    LOG(ERROR) << "kukui ALSA card not found";
++    return 0;
++}
++
++// Sequences match alsa-ucm-conf MediaTek/mt8183/mt8183_mt6358_ts3a227_max98357.
++// Speaker and the built-in mic are the Krane paths. The headphone and headset
++// mic sequences are the non-krane UCM block. This unit has no 3.5 mm jack, so
++// those two sequences are present for other kukui boards and are unverified.
++inline void configureKukuiOutput(bool headphone) {
++    struct mixer* mixer = mixer_open(kukuiAlsaCard());
++    if (mixer == nullptr) {
++        LOG(ERROR) << __func__ << ": mixer_open failed";
++        return;
++    }
++    auto setValues = [mixer](const char* name, int val) {
++        struct mixer_ctl* ctl = mixer_get_ctl_by_name(mixer, name);
++        if (ctl == nullptr) {
++            LOG(ERROR) << __func__ << ": missing " << name;
++            return;
++        }
++        const unsigned count = mixer_ctl_get_num_values(ctl);
++        for (unsigned i = 0; i < count; ++i) {
++            if (mixer_ctl_set_value(ctl, i, val) != 0) {
++                LOG(ERROR) << __func__ << ": set " << name << " failed";
++                return;
++            }
++        }
++    };
++    if (headphone) {
++        setValues("I2S3_CH1 DL1_CH1", 0);
++        setValues("I2S3_CH2 DL1_CH2", 0);
++        setValues("ADDA_DL_CH1 DL1_CH1", 1);
++        setValues("ADDA_DL_CH2 DL1_CH2", 1);
++        setValues("HPL Mux", 2);
++        setValues("HPR Mux", 2);
++    } else {
++        setValues("ADDA_DL_CH1 DL1_CH1", 0);
++        setValues("ADDA_DL_CH2 DL1_CH2", 0);
++        setValues("HPL Mux", 0);
++        setValues("HPR Mux", 0);
++        setValues("I2S3_CH1 DL1_CH1", 1);
++        setValues("I2S3_CH2 DL1_CH2", 1);
++    }
++    mixer_close(mixer);
++}
++
++inline void configureKukuiInput(bool headsetMic) {
++    struct mixer* mixer = mixer_open(kukuiAlsaCard());
++    if (mixer == nullptr) {
++        LOG(ERROR) << __func__ << ": mixer_open failed";
++        return;
++    }
++    auto setValues = [mixer](const char* name, int val) {
++        struct mixer_ctl* ctl = mixer_get_ctl_by_name(mixer, name);
++        if (ctl == nullptr) {
++            LOG(ERROR) << __func__ << ": missing " << name;
++            return;
++        }
++        const unsigned count = mixer_ctl_get_num_values(ctl);
++        for (unsigned i = 0; i < count; ++i) {
++            if (mixer_ctl_set_value(ctl, i, val) != 0) {
++                LOG(ERROR) << __func__ << ": set " << name << " failed";
++                return;
++            }
++        }
++    };
++    if (headsetMic) {
++        setValues("MTKAIF_DMIC", 0);
++        setValues("UL3_CH2 ADDA_UL_CH2", 0);
++        setValues("PGA L Mux", 2);
++        setValues("ADC L Mux", 2);
++        setValues("Mic Type Mux", 1);
++        setValues("PGA Volume", 4);
++        setValues("UL3_CH1 ADDA_UL_CH1", 1);
++    } else {
++        setValues("PGA L Mux", 0);
++        setValues("ADC L Mux", 0);
++        setValues("PGA Volume", 0);
++        setValues("MTKAIF_DMIC", 1);
++        setValues("Mic Type Mux", 2);
++        setValues("UL3_CH1 ADDA_UL_CH1", 1);
++        setValues("UL3_CH2 ADDA_UL_CH2", 1);
++    }
++    mixer_close(mixer);
++}
++
++}  // namespace aidl::android::hardware::audio::core
+diff -ruN a/audio/aidl/default/include/core-impl/StreamUsb.h b/audio/aidl/default/include/core-impl/StreamUsb.h
+--- a/audio/aidl/default/include/core-impl/StreamUsb.h	2026-11-01 00:33:42.533403755 -0400
++++ b/audio/aidl/default/include/core-impl/StreamUsb.h	2026-11-01 00:24:54.724380845 -0400
+@@ -38,6 +38,11 @@
+     ndk::ScopedAStatus setConnectedDevices(const ConnectedDevices& devices) override;
+ 
+   protected:
++    // A USB isochronous stream takes longer to start than a touch click. Closing
++    // the PCM on standby drops that click unless some other stream is already
++    // running. Holding the playback PCM open lets the click join the running
++    // stream. Capture stays closed so the headset mic is not left running.
++    bool keepPcmOpenOnStandby() const override { return !mIsInput; }
+     std::vector<alsa::DeviceProfile> getDeviceProfiles() override;
+ 
+     mutable std::mutex mLock;
+diff -ruN a/audio/aidl/default/ModulePrimary.cpp b/audio/aidl/default/ModulePrimary.cpp
+--- a/audio/aidl/default/ModulePrimary.cpp	2026-11-01 00:33:42.533351251 -0400
++++ b/audio/aidl/default/ModulePrimary.cpp	2026-10-31 22:09:51.773985605 -0400
+@@ -21,6 +21,7 @@
+ #include <android-base/logging.h>
+ 
+ #include "core-impl/GruAnalogMixer.h"
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/ModulePrimary.h"
+ #include "core-impl/StreamMmapStub.h"
+ #include "core-impl/StreamOffloadStub.h"
+@@ -158,6 +159,15 @@
+     const bool isInput = description.type == AudioDeviceType::IN_HEADSET;
+     const bool isOutput = description.type == AudioDeviceType::OUT_HEADPHONE ||
+                           description.type == AudioDeviceType::OUT_HEADSET;
++    if (kukuiAudioRoute()) {
++        if (isOutput) {
++            configureKukuiOutput(connected);
++        }
++        if (isInput) {
++            configureKukuiInput(connected);
++        }
++        return;
++    }
+     if (isOutput) {
+         configureGruAnalogOutput(connected);
+     }
+diff -ruN a/audio/aidl/default/primary/StreamPrimary.cpp b/audio/aidl/default/primary/StreamPrimary.cpp
+--- a/audio/aidl/default/primary/StreamPrimary.cpp	2026-11-01 00:33:42.533263567 -0400
++++ b/audio/aidl/default/primary/StreamPrimary.cpp	2026-11-01 00:24:54.699381184 -0400
+@@ -28,6 +28,7 @@
+ #include <error/expected_utils.h>
+ 
+ #include "core-impl/GruAnalogMixer.h"
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/StreamPrimary.h"
+ 
+ using aidl::android::hardware::audio::common::SinkMetadata;
+@@ -131,6 +132,14 @@
+         }
+         return status;
+     }
++    // The emulator clock below drops a whole burst once it falls behind. On this
++    // card that happens for the entire first playback after a volume change:
++    // start() runs, the route and the volume command delay the first buffer,
++    // and every later burst is skipped. The replay starts on time and stays
++    // clean. Kukui playback is paced by blocking ALSA writes instead.
++    if (kukuiAudioRoute()) {
++        return StreamAlsa::transfer(buffer, frameCount, actualFrameCount, latencyMs);
++    }
+     if (!mSkipNextTransfer) {
+         RETURN_STATUS_IF_ERROR(
+                 StreamAlsa::transfer(buffer, frameCount, actualFrameCount, latencyMs));
+@@ -188,7 +197,13 @@
+     if (!devices.empty()) {
+         const bool isAnalog =
+                 devices[0].type.connection == AudioDeviceDescription::CONNECTION_ANALOG;
+-        if (mIsInput) {
++        if (kukuiAudioRoute()) {
++            if (mIsInput) {
++                configureKukuiInput(isAnalog);
++            } else {
++                configureKukuiOutput(isAnalog);
++            }
++        } else if (mIsInput) {
+             configureGruAnalogInput(isAnalog);
+         } else {
+             configureGruAnalogOutput(isAnalog);
+@@ -216,8 +231,12 @@
+ // static
+ StreamPrimary::AlsaDeviceId StreamPrimary::getCardAndDeviceId(
+         const std::vector<AudioDevice>& devices) {
++    const auto useKukuiCard = [](AlsaDeviceId id) {
++        if (kukuiAudioRoute() && id.first >= 0) id.first = kukuiAlsaCard();
++        return id;
++    };
+     if (devices.empty()) {
+-        return kDefaultCardAndDeviceId;
++        return useKukuiCard(kDefaultCardAndDeviceId);
+     }
+     /* DP Alt Mode is pcmC0D3p. The framework connects HDMI with an empty
+      * address, so CARD_N_DEV_M is not present on this device.
+@@ -226,11 +245,11 @@
+         int hdmiDev = ::android::base::GetIntProperty(
+                 "ro.vendor.audio.hdmi.alsa_device", 3);
+         if (hdmiDev >= 0) {
+-            return {kDefaultCardAndDeviceId.first, hdmiDev};
++            return useKukuiCard({kDefaultCardAndDeviceId.first, hdmiDev});
+         }
+     }
+     if (devices[0].address.getTag() != AudioDeviceAddress::id) {
+-        return kDefaultCardAndDeviceId;
++        return useKukuiCard(kDefaultCardAndDeviceId);
+     }
+     std::string deviceAddress = devices[0].address.get<AudioDeviceAddress::id>();
+     AlsaDeviceId cardAndDeviceId;
+@@ -240,17 +259,17 @@
+                &cardAndDeviceId.second) == 2) {
+         LOG(DEBUG) << __func__ << ": parsed with card id " << cardAndDeviceId.first
+                    << ", device id " << cardAndDeviceId.second;
+-        return cardAndDeviceId;
++        return useKukuiCard(cardAndDeviceId);
+     }
+     if (devices[0].type.connection == AudioDeviceDescription::CONNECTION_ANALOG) {
+         int analogDev = ::android::base::GetIntProperty(
+                 "ro.vendor.audio.tinyalsa.analog_device", 2);
+         if (analogDev >= 0) {
+             LOG(DEBUG) << __func__ << ": using analog device id " << analogDev;
+-            return {kDefaultCardAndDeviceId.first, analogDev};
++            return useKukuiCard({kDefaultCardAndDeviceId.first, analogDev});
+         }
+     }
+-    return kDefaultCardAndDeviceId;
++    return useKukuiCard(kDefaultCardAndDeviceId);
+ }
+ 
+ // static

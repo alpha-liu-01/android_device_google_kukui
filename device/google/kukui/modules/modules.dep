@@ -22,3 +22,18 @@ industrialio-triggered-buffer.ko: kfifo_buf.ko
 cros-ec-sensors-core.ko: kfifo_buf.ko industrialio-triggered-buffer.ko
 cros_ec_sensors.ko: cros-ec-sensors-core.ko
 cros_ec_light_prox.ko: cros-ec-sensors-core.ko
+mtk_wdt.ko:
+mc.ko:
+snd-seq-device.ko:
+snd-rawmidi.ko: snd-seq-device.ko
+snd-ump.ko: snd-rawmidi.ko snd-seq-device.ko
+snd-hwdep.ko:
+snd-usbmidi-lib.ko: snd-rawmidi.ko
+snd-usb-audio.ko: snd-usbmidi-lib.ko snd-hwdep.ko snd-ump.ko mc.ko
+snd-soc-mtk-common.ko:
+snd-soc-mt8183-afe.ko: snd-soc-mtk-common.ko
+snd-soc-mt6358.ko:
+snd-soc-max98357a.ko:
+snd-soc-ts3a227e.ko:
+snd-soc-bt-sco.ko:
+mt8183-mt6358-ts3a227-max98357.ko: snd-soc-mt8183-afe.ko snd-soc-ts3a227e.ko

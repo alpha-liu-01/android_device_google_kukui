@@ -216,9 +216,37 @@ postmarketOS 在 Krane 上要把屏幕旋转从差 90 度拉正，udev 矩阵是
 
 读数慢是另一件事。加速度计本身大约 25 Hz。陀螺仪关掉之后 ODR 仍停在 200 Hz，`hwfifo_timeout` 是 0。EC 的 FIFO 是共用的，超时为 0 时要等队列满了才往上送，所以加速度计一次攒几百毫秒。这个节点是 `0644 root`，HAL 写不进去。把陀螺仪 ODR 写成 0、超时写成 0.01 秒之后，加速度计按大约 40 毫秒一笔送到 `sensorservice`。
 
-下一份 super 用单位矩阵。`hwfifo_timeout` 交给 `system`。关掉传感器时把 ODR 写成 0，打开时把超时写成不超过 0.01 秒。2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。方向和刷新要等这次 Ctrl+U 再确认。
+下一份 super 用单位矩阵。`hwfifo_timeout` 交给 `system`。关掉传感器时把 ODR 写成 0，打开时把超时写成不超过 0.01 秒。2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。
 
-HAL 用的是 Gru 那份 ChromeOS EC 的 IIO subhal，`android.hardware.sensors@2.1-gru-subhal`，外面是 `android.hardware.sensors-service.multihal`。它只认加速度计和陀螺仪。光感模块会加载，不进 HAL。`settings` 里 `accelerometer_rotation` 原来是 0，这次开机已经写成 1。
+同日这次 Ctrl+U 之后，正放是横屏。`dumpsys window` 是 `ROTATION_0`，分辨率 1920×1200。vendor 里的矩阵是单位矩阵，没有 bind。加速度计大约是 x=1.16、y=7.82、z=6.11，合起来约 1 g，上方在 +Y。`sensorservice` 收到的间隔大约 40 毫秒，不再一次攒几百毫秒。加速度计 ODR 是 25 Hz，缓冲区开着，`hwfifo_timeout` 是 0.010 秒，节点是 `0660 system`。陀螺仪缓冲区关着，ODR 是 0，超时也是 0.010 秒。HAL 进程没有退出。内核日志里没有 EC FIFO 丢样。`WindowOrientationListener` 的缓存是 0。
+
+SELinux 仍是 permissive。`hal_sensors_default` 读 IIO sysfs 有 AVC，后面标着 `permissive=1`，这次没有拦住读写。enforcing 时要给这条 sysfs 补规则，留到那一项。
+
+2026-10-31 那次开机用的是当时编进镜像的 `android.hardware.sensors@2.1-gru-subhal`，外面是 `android.hardware.sensors-service.multihal`。它只认加速度计和陀螺仪。光感模块会加载，不进 HAL。`settings` 里 `accelerometer_rotation` 原来是 0，这次开机已经写成 1。2026-11-01 起源码在 `device/google/kukui/hal/sensors`，模块名是 `android.hardware.sensors@2.1-kukui-subhal`。单位矩阵和 FIFO 超时没有改。`device.mk` 不再把 `device/google/gru` 加进 Soong。卡上的 super 还是改名之前编的那一份。
+
+## 音频
+
+这台 Krane sku176 的声卡是 `mt8183_mt6358_ts3a227_max98357`。`krane.dtsi` 只包含 `mt8183-kukui-audio-max98357a.dtsi`，没有 `ts3a227e` 节点，也没有 `mediatek,headset-codec`。上游 UCM 写明 Krane 没有耳机孔：compatible 里有 `google,krane` 时不启用 Headphones 和 Headset。这台机器没有 3.5 mm 插孔，这一项测不了。
+
+同一份设备树里，带 TS3A227E 的板才有插孔检测：kodama，以及 jacuzzi 的 burnet、cozmo、juniper-sku16、kappa、kenzo、pico、pico6、willow-sku1、fennel-sku7、fennel14-sku2、makomo-sku1。它们和 Krane 用同一类 MT6358 声卡，耳机和耳麦的混音器按 UCM 写进 HAL，策略里对应端口不挂成常驻设备。这份 FIT 只有 `mt8183-kukui-krane-sku176.dtb`，那些板开不了这张卡。没有实机，不把耳机孔记成可用。
+
+DA7219 的板是另一颗 codec：damu、fennel sku1/sku6、fennel14、makomo-sku0、willow-sku0、kakadu、katsu-sku32。MT6358 的混音器对它们不适用。这份镜像不覆盖它们。kakadu-sku22 和 katsu-sku38 的设备树只接了 rt1015p，没有耳机 codec，也不当成有插孔。
+
+扬声器和耳机播放都是 `hw:0,0`。内置麦和耳麦都是 `hw:0,5`。扬声器打开 `I2S3_CH1 DL1_CH1` 和 `I2S3_CH2 DL1_CH2`。内置麦打开 `MTKAIF_DMIC`、`Mic Type Mux=2`，以及 UL3 的两路 ADDA。`ro.vendor.audio.route=kukui` 时走这条路径。没设这个属性时仍走 Gru 的 DA7219。
+
+音频相关驱动是模块。AFE 要 `audiosys` 复位，复位控制器在 `mtk_wdt` 里。加载这个模块是为了复位，不是为了喂看门狗。驱动注册时会打印 `Watchdog enabled`。这次开机 `WDT_MODE_EN` 没有置位，没有新的喂狗进程。已有的 `[watchdogd]` 是内核锁死检测。不要打开 `/dev/watchdog`。USB 声卡还要 `mc.ko`，`snd-usb-audio` 才能解析 `media_*`。这台只有一个 USB 2.0 口，启动盘就在上面。USB 耳机要经 hub 接，不能把 SanDisk 拔掉。
+
+正在跑的 HAL 是 `android.hardware.audio.service-aidl.example`，策略原来指向 Cuttlefish，不认这张卡。A2DP 上次能连上但没声音：`standby()` 只在 `DISABLED` 时成功，第二次参数更新失败之后 `transfer()` 把 PCM 丢掉。已经改成端口已在 `STANDBY` 或 `STARTED` 时也算成功。还没在耳机上听过。
+
+2026-10-31 只把第一份音频 super 写进 SanDisk（序列号 `000000002959`）。读回 sha256 `8540e0a73a11cc2526552afa4713b98f297a641ba14598963325e05e3c58c4b7`。同日这次 Ctrl+U 之后，声卡 0 和 USB 声卡都在，扬声器策略也指向 `CARD_0_DEV_0`。压缩音频没有声音：`c2.android.vorbis.decoder` 在 `MediaCodec.start` 报 `NO_MEMORY`。`/dev/ion` 不存在，`/dev/dma_heap/system` 也不存在，codec2 要的 system heap 没编进内核。同一段 PCM WAV 能写进 HAL，`DL1`、`I2S3` 和 MAX98357A 的 `HiFi Playback` 都会变成 On。USB 声卡被策略看见之后，`servicemanager` 拒绝注册 `IModule/usb`，因为 APEX 清单里这一项是注释掉的。蓝牙 A2DP 能打开流，但 AudioFlinger 写出的帧数是 0，和压缩解码没产出 PCM 一致。
+
+同一段 440 Hz WAV 能从扬声器出来，但调节音量之后的第一次播放整段都是毛刺，立刻再播同一段就干净。内置扬声器仍走模拟器那条软件时钟：`start()` 之后音量命令和路由把第一块缓冲推迟了，时钟一旦落后就把后面每个 burst 整段丢掉。第二次播放开始得及时，就不再丢。这和 Gru 上 USB 声卡的非阻塞 `MonoPipe` 丢帧是同一类问题，只是扬声器当时被软件 `usleep` 盖住了。Kukui 的播放改成直接阻塞写 ALSA，由 MT8183 的时钟节流，不再走这条丢帧路径。
+
+下一份内核打开 `CONFIG_DMABUF_HEAPS_SYSTEM`。版本字符串仍是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2 SMP PREEMPT Sat Oct 31 19:57:12 EDT 2026`。2026-10-31 把这份 FIT 和 super 写入 SanDisk（序列号 `000000002959`）。内核槽读回 sha256 `6f94de3cb39f0537aaedb2d1beac7669c49f36da4881345b21bd1ffe98bee55f`。super 读回 sha256 `bab6e5bf3f432350757f5da8f9ba5af82d3ee9c17dfe97f9e81318daa097b3d7`，大小 `8589934592`。pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。
+
+这次 Ctrl+U：蓝牙耳机正常。USB 耳机连续播放、提示音和耳麦录音正常。触摸反馈音经常播不出来，前面已经有别的声音在播时就能跟上。USB 播放在 standby 时把 PCM 关掉，下一次打开等时传输比一声触摸音更慢，整段点击在声卡出声前就结束了。USB 播放改为 standby 时保持 PCM 打开，用静音把传输留着。内置扬声器和麦克风完全没有声音。`snd-usb-audio` 比平台声卡先注册，内置卡是 card 1，策略仍打开 `CARD_0`。日志是 `parsed with card id 0, device id 5`，然后 `configureKukuiInput: mixer_open failed`，流停在 ERROR。上次调试时内置卡是 card 0，所以同一段 WAV 能出声。HAL 改为按 `mt8183_mt6358` 找卡号，模块也改成先加载平台声卡。这次开机把新 HAL 挂到正在跑的进程上之后，`pcmC1D0p` 处于 RUNNING，`DL1`、`I2S3`、`HiFi Playback` 和 `SD_MODE` 都是 On。内置麦 `hw:1,5` 录到 1 秒，峰值 3277。还没有听感确认。2026-10-31 把上一份 super 写入 SanDisk（序列号 `000000002959`），读回 sha256 `e3ae223c436bc18ab31ea2469883e8d3ebc04b763fbc401d5d8a1d2e44ef5e58`。2026-11-01 按当时的源码又编了一份并写入，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`，大小 `8589934592`。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。还没有这次 Ctrl+U 的结果。写入时共享树里的 Kukui 音频补丁还在；写完之后已经用 `--reverse` 拿掉。
+
+2026-11-01：编译 Kukui 不再检出 `device/google/gru`。传感器 HAL 在本仓库。`local_manifests/kukui.xml` 只列出 LineageOS 的 mainline、mesa、minigbm 这些上游仓库，不拉 Gru 的设备树。这台机器的 `.repo/local_manifests/gru.xml` 已经列了同一批路径，两份一起放会让 `repo sync` 报重复，所以脚本看到 `gru.xml` 就不再拷 `kukui.xml`。`patches/apply-patches.sh` 把 `device/google/kukui` 逐个文件链进 Lineage 树，并打上本仓库的补丁。干净的 `hardware/interfaces` 用 `hardware_interfaces_audio_kukui_standalone.patch`：USB 阻塞读写、麦增益、按卡名找 MT8183、扬声器阻塞写、USB 播放在 standby 时保持打开、A2DP standby。这份不引用 DA7219。这台机器的共享树已经打过 Gru 的音频补丁，脚本会改用 `hardware_interfaces_audio_kukui.patch`；属性不是 `kukui` 时仍走 DA7219。编 Gru 之前如果这份补丁还在，用 `--reverse` 拿掉。另外四份是开机要用、和机型无关的修改：memfd、codec2 在 `IConfigurable` 失败时返回而不是 `CHECK`、mesa 25 的 `board.mk`、v4l2 seccomp 的 `fcntl` 和 `uname`。没有把 Gru 的 rockchip、DA7219、摄像头和 sepolicy 补丁搬过来。`device.mk` 在 `KukuiMixer.h` 不存在时会停掉 Kukui 的编译。共享树现在仍是拿掉 Kukui 音频补丁的状态，下一份编译之前先跑 `patches/apply-patches.sh`。
 
 ## 顺序
 
@@ -227,11 +255,11 @@ HAL 用的是 Gru 那份 ChromeOS EC 的 IIO subhal，`android.hardware.sensors@
 1. `evdev.ko` 已加载。外接鼠标和键盘盖触控板能用。
 2. Panfrost。第十五次启动仍是 Mali-G72 GLES 3.1。
 3. Wi-Fi 和无线 adb。第十九次已连上 `"Not 6GHz"`，`10.0.0.104`，无线 adb 可用。
-4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。加速度计已进 super。postmarketOS 那组矩阵叠在 `ORIENTATION_270` 上多转了 90 度，正放时画面是竖屏。单位矩阵在这次开机里把画面拉回 1920×1200。读数慢是因为关掉的陀螺仪仍以 200 Hz 占着 EC 的 FIFO。修正已写入 super，读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。这次 Ctrl+U 还没确认。
+4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。加速度计已进 super。postmarketOS 那组矩阵叠在 `ORIENTATION_270` 上多转了 90 度，正放时画面是竖屏。单位矩阵在这次开机里把画面拉回 1920×1200。读数慢是因为关掉的陀螺仪仍以 200 Hz 占着 EC 的 FIFO。2026-10-31 这次 Ctrl+U 已确认：正放是 1920×1200，加速度计大约每 40 毫秒一笔，陀螺仪 ODR 在不用时是 0。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
-7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，崩溃次数是 0，蓝牙鼠标能用。A2DP 能连上并完成 AAC 协商，但示例音频 HAL 没有把数据送出去，耳机没有声音。这一项到此。蓝牙音频留到下一项。
-8. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
+7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，崩溃次数是 0，蓝牙鼠标能用。A2DP 在带上 system heap 的这次启动里耳机播放正常。
+8. 扬声器播放，然后是内置麦。Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的板有插孔，混音器按 UCM 写了，没在实机上听过。2026-10-31 这次 Ctrl+U：蓝牙耳机正常，USB 连续播放和耳麦录音正常，触摸音在没有别的声音垫着时经常错过。内置扬声器和麦打不开，因为 USB 声卡占了 card 0。HAL 改为按声卡名找 MT8183，USB 播放在 standby 时保持打开。正在跑的进程已换上这份 HAL，`pcmC1D0p` 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。还没有这次 Ctrl+U 的结果。共享树里的 Kukui 音频补丁在写入后已拿掉。下一份编译用 `patches/apply-patches.sh`，不再需要 `device/google/gru`。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
 10. zram。
 11. 休眠和唤醒。开关为关时走 `s2idle`，USB 保持供电。2026-10-31 这次 Ctrl+U 已确认：读卡器灯常亮，`suspend_stats` `success=3`，日志有 `PM: suspend entry (s2idle)`，唤醒后仍是同一次启动。每次停留大约 1 秒，EC 计到的睡眠切换是 0。不预先喂看门狗。

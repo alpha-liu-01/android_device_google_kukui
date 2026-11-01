@@ -8,7 +8,7 @@
 -->
 <sensorHalConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
     <modules>
-        <module halName="android.hardware.sensors@2.1-gru-subhal" halVersion="2.1">
+        <module halName="android.hardware.sensors@2.1-kukui-subhal" halVersion="2.1">
             <sensors>
                 <sensor name="cros-ec-accel" type="1">
                     <configuration>

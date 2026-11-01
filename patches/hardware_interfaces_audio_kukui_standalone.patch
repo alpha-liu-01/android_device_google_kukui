@@ -1,0 +1,712 @@
+diff --git a/audio/aidl/default/ModulePrimary.cpp b/audio/aidl/default/ModulePrimary.cpp
+index 6648068..85cafb3 100644
+--- a/audio/aidl/default/ModulePrimary.cpp
++++ b/audio/aidl/default/ModulePrimary.cpp
+@@ -20,6 +20,7 @@
+ #include <Utils.h>
+ #include <android-base/logging.h>
+ 
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/ModulePrimary.h"
+ #include "core-impl/StreamMmapStub.h"
+ #include "core-impl/StreamOffloadStub.h"
+@@ -35,6 +36,8 @@ using aidl::android::media::audio::common::AudioInputFlags;
+ using aidl::android::media::audio::common::AudioIoFlags;
+ using aidl::android::media::audio::common::AudioOffloadInfo;
+ using aidl::android::media::audio::common::AudioOutputFlags;
++using aidl::android::media::audio::common::AudioDeviceDescription;
++using aidl::android::media::audio::common::AudioDeviceType;
+ using aidl::android::media::audio::common::AudioPort;
+ using aidl::android::media::audio::common::AudioPortConfig;
+ using aidl::android::media::audio::common::AudioPortExt;
+@@ -129,4 +132,39 @@ int32_t ModulePrimary::getNominalLatencyMs(const AudioPortConfig& portConfig) {
+     return hasMmapFlag(portConfig.flags.value()) ? kLowLatencyMs : kStandardLatencyMs;
+ }
+ 
++ndk::ScopedAStatus ModulePrimary::populateConnectedDevicePort(AudioPort* audioPort, int32_t) {
++    // HDMI and the analog headset are declared with static profiles. The base
++    // implementation rejects every external device, so the DP jack never becomes
++    // an available output.
++    if (audioPort->ext.getTag() == AudioPortExt::device && !audioPort->profiles.empty()) {
++        LOG(DEBUG) << __func__ << ": keeping declared profiles for "
++                   << audioPort->ext.get<AudioPortExt::device>().device.toString();
++        return ndk::ScopedAStatus::ok();
++    }
++    return Module::populateConnectedDevicePort(audioPort, 0);
++}
++
++void ModulePrimary::onExternalDeviceConnectionChanged(const AudioPort& audioPort, bool connected) {
++    // The base callback does nothing. setConnectedDevices() only runs when a
++    // stream is reconfigured, so plugging the jack left Headphones Switch off
++    // and the codec stayed silent after the speaker path muted.
++    if (audioPort.ext.getTag() != AudioPortExt::device) {
++        return;
++    }
++    const auto& description = audioPort.ext.get<AudioPortExt::device>().device.type;
++    if (description.connection != AudioDeviceDescription::CONNECTION_ANALOG) {
++        return;
++    }
++    const bool isInput = description.type == AudioDeviceType::IN_HEADSET;
++    const bool isOutput = description.type == AudioDeviceType::OUT_HEADPHONE ||
++                          description.type == AudioDeviceType::OUT_HEADSET;
++    if (!kukuiAudioRoute()) return;
++    if (isOutput) {
++        configureKukuiOutput(connected);
++    }
++    if (isInput) {
++        configureKukuiInput(connected);
++    }
++}
++
+ }  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/XsdcConversion.cpp b/audio/aidl/default/XsdcConversion.cpp
+index 1a5f7f3..8666191 100644
+--- a/audio/aidl/default/XsdcConversion.cpp
++++ b/audio/aidl/default/XsdcConversion.cpp
+@@ -236,11 +236,14 @@ ConversionResult<AudioDevice> createAudioDevice(
+                                ? AudioDeviceAddress::make<AudioDeviceAddress::Tag::id>(
+                                          xDevicePort.getAddress())
+                                : AudioDeviceAddress{}};
+-    if (device.type.type == AudioDeviceType::IN_MICROPHONE && device.type.connection.empty()) {
+-        device.address = "bottom";
+-    } else if (device.type.type == AudioDeviceType::IN_MICROPHONE_BACK &&
+-               device.type.connection.empty()) {
+-        device.address = "back";
++    if (!xDevicePort.hasAddress() || xDevicePort.getAddress().empty()) {
++        if (device.type.type == AudioDeviceType::IN_MICROPHONE &&
++            device.type.connection.empty()) {
++            device.address = "bottom";
++        } else if (device.type.type == AudioDeviceType::IN_MICROPHONE_BACK &&
++                   device.type.connection.empty()) {
++            device.address = "back";
++        }
+     }
+     return device;
+ }
+diff --git a/audio/aidl/default/alsa/StreamAlsa.cpp b/audio/aidl/default/alsa/StreamAlsa.cpp
+index 7a44cc7..1509322 100644
+--- a/audio/aidl/default/alsa/StreamAlsa.cpp
++++ b/audio/aidl/default/alsa/StreamAlsa.cpp
+@@ -15,7 +15,9 @@
+  */
+ 
+ #include <cmath>
++#include <cstdint>
+ #include <limits>
++#include <vector>
+ 
+ #define LOG_TAG "AHAL_StreamAlsa"
+ #include <android-base/logging.h>
+@@ -25,6 +27,7 @@
+ #include <error/expected_utils.h>
+ #include <media/AidlConversionCppNdk.h>
+ 
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/StreamAlsa.h"
+ 
+ using aidl::android::hardware::audio::common::getChannelCount;
+@@ -41,6 +44,7 @@ StreamAlsa::StreamAlsa(StreamContext* context, const Metadata& metadata, int rea
+       mReadWriteRetries(readWriteRetries) {}
+ 
+ StreamAlsa::~StreamAlsa() {
++    stopSilence();
+     cleanupWorker();
+ }
+ 
+@@ -95,11 +99,19 @@ StreamAlsa::~StreamAlsa() {
+ }
+ 
+ ::android::status_t StreamAlsa::standby() {
++    if (keepPcmOpenOnStandby() && !mAlsaDeviceProxies.empty()) {
++        if (!mSilenceRunning.exchange(true)) {
++            LOG(INFO) << __func__ << ": holding PCM open";
++            mSilenceThread = std::thread(&StreamAlsa::silenceThread, this);
++        }
++        return ::android::OK;
++    }
+     teardownIo();
+     return ::android::OK;
+ }
+ 
+ ::android::status_t StreamAlsa::start() {
++    stopSilence();
+     if (!mAlsaDeviceProxies.empty()) {
+         // This is a resume after a pause.
+         return ::android::OK;
+@@ -128,16 +140,21 @@ StreamAlsa::~StreamAlsa() {
+             return ::android::NO_INIT;
+         }
+         alsaDeviceProxies.push_back(std::move(proxy));
+-        auto sink = makeSink(mIsInput);  // Do not block the writer when it is on our thread.
+-        if (sink != nullptr) {
+-            sinks.push_back(sink);
+-        } else {
+-            return ::android::NO_INIT;
+-        }
+-        if (auto source = makeSource(sink.get()); source != nullptr) {
+-            sources.push_back(source);
+-        } else {
+-            return ::android::NO_INIT;
++        // A one-period non-blocking pipe drops the bursts that arrive together
++        // on the first start after a volume change. External devices and the
++        // kukui speaker write the PCM directly so the hardware clock paces them.
++        if (!device.isExternal && !mIsInput && !kukuiAudioRoute()) {
++            auto sink = makeSink(mIsInput);  // Do not block the writer when it is on our thread.
++            if (sink != nullptr) {
++                sinks.push_back(sink);
++            } else {
++                return ::android::NO_INIT;
++            }
++            if (auto source = makeSource(sink.get()); source != nullptr) {
++                sources.push_back(source);
++            } else {
++                return ::android::NO_INIT;
++            }
+         }
+     }
+     if (alsaDeviceProxies.empty()) {
+@@ -146,10 +163,12 @@ StreamAlsa::~StreamAlsa() {
+     mAlsaDeviceProxies = std::move(alsaDeviceProxies);
+     mSources = std::move(sources);
+     mSinks = std::move(sinks);
+-    mIoThreadIsRunning = true;
+-    for (size_t i = 0; i < mAlsaDeviceProxies.size(); ++i) {
+-        mIoThreads.emplace_back(mIsInput ? &StreamAlsa::inputIoThread : &StreamAlsa::outputIoThread,
+-                                this, i);
++    if (!mSinks.empty()) {
++        mIoThreadIsRunning = true;
++        for (size_t i = 0; i < mAlsaDeviceProxies.size(); ++i) {
++            mIoThreads.emplace_back(
++                    mIsInput ? &StreamAlsa::inputIoThread : &StreamAlsa::outputIoThread, this, i);
++        }
+     }
+     return ::android::OK;
+ }
+@@ -164,27 +183,52 @@ StreamAlsa::~StreamAlsa() {
+     unsigned maxLatency = 0;
+     if (mIsInput) {
+         const size_t i = 0;  // For the input case, only support a single device.
+-        LOG(VERBOSE) << __func__ << ": reading from sink " << i;
+-        ssize_t framesRead = mSources[i]->read(buffer, frameCount);
+-        LOG_IF(FATAL, framesRead < 0) << "Error reading from the pipe: " << framesRead;
+-        if (ssize_t framesMissing = static_cast<ssize_t>(frameCount) - framesRead;
+-            framesMissing > 0) {
+-            LOG(WARNING) << __func__ << ": incomplete data received, inserting " << framesMissing
+-                         << " frames of silence";
+-            memset(static_cast<char*>(buffer) + framesRead * mFrameSizeBytes, 0,
+-                   framesMissing * mFrameSizeBytes);
++        if (mSources.empty()) {
++            if (int ret = proxy_read_with_retries(mAlsaDeviceProxies[i].get(), buffer,
++                                                  bytesToTransfer, mReadWriteRetries);
++                ret != 0) {
++                LOG(WARNING) << __func__ << "[" << i << "]: Error reading from ALSA: " << ret;
++                memset(buffer, 0, bytesToTransfer);
++                static constexpr float kMicrosPerSecond = MICROS_PER_SECOND;
++                const size_t delayUs = static_cast<size_t>(
++                        std::roundf(frameCount * kMicrosPerSecond / mSampleRate));
++                usleep(delayUs);
++            }
++        } else {
++            LOG(VERBOSE) << __func__ << ": reading from sink " << i;
++            ssize_t framesRead = mSources[i]->read(buffer, frameCount);
++            LOG_IF(FATAL, framesRead < 0) << "Error reading from the pipe: " << framesRead;
++            if (ssize_t framesMissing = static_cast<ssize_t>(frameCount) - framesRead;
++                framesMissing > 0) {
++                LOG(WARNING) << __func__ << ": incomplete data received, inserting "
++                             << framesMissing << " frames of silence";
++                memset(static_cast<char*>(buffer) + framesRead * mFrameSizeBytes, 0,
++                       framesMissing * mFrameSizeBytes);
++            }
+         }
+         maxLatency = proxy_get_latency(mAlsaDeviceProxies[i].get());
+     } else {
+         alsa::applyGain(buffer, mGain, bytesToTransfer, mConfig.value().format, mConfig->channels);
+         for (size_t i = 0; i < mAlsaDeviceProxies.size(); ++i) {
+-            LOG(VERBOSE) << __func__ << ": writing into sink " << i;
+-            ssize_t framesWritten = mSinks[i]->write(buffer, frameCount);
+-            LOG_IF(FATAL, framesWritten < 0) << "Error writing into the pipe: " << framesWritten;
+-            if (ssize_t framesLost = static_cast<ssize_t>(frameCount) - framesWritten;
+-                framesLost > 0) {
+-                LOG(WARNING) << __func__ << ": sink " << i << " incomplete data sent, dropping "
+-                             << framesLost << " frames";
++            if (mSinks.empty()) {
++                if (int ret = proxy_write_with_retries(mAlsaDeviceProxies[i].get(), buffer,
++                                                       bytesToTransfer, mReadWriteRetries);
++                    ret != 0) {
++                    LOG(WARNING) << __func__ << "[" << i << "]: Error writing into ALSA: " << ret;
++                    static constexpr float kMicrosPerSecond = MICROS_PER_SECOND;
++                    const size_t delayUs = static_cast<size_t>(
++                            std::roundf(frameCount * kMicrosPerSecond / mSampleRate));
++                    usleep(delayUs);
++                }
++            } else {
++                LOG(VERBOSE) << __func__ << ": writing into sink " << i;
++                ssize_t framesWritten = mSinks[i]->write(buffer, frameCount);
++                LOG_IF(FATAL, framesWritten < 0) << "Error writing into the pipe: " << framesWritten;
++                if (ssize_t framesLost = static_cast<ssize_t>(frameCount) - framesWritten;
++                    framesLost > 0) {
++                    LOG(WARNING) << __func__ << ": sink " << i << " incomplete data sent, dropping "
++                                 << framesLost << " frames";
++                }
+             }
+             maxLatency = std::max(maxLatency, proxy_get_latency(mAlsaDeviceProxies[i].get()));
+         }
+@@ -300,7 +344,30 @@ void StreamAlsa::outputIoThread(size_t idx) {
+     }
+ }
+ 
++void StreamAlsa::stopSilence() {
++    mSilenceRunning = false;
++    if (mSilenceThread.joinable()) mSilenceThread.join();
++}
++
++void StreamAlsa::silenceThread() {
++    const size_t frames = mBufferSizeFrames > 480 ? 480 : mBufferSizeFrames;
++    if (frames == 0 || mFrameSizeBytes == 0) return;
++    std::vector<uint8_t> silence(frames * mFrameSizeBytes, 0);
++    while (mSilenceRunning) {
++        bool wrote = false;
++        for (const auto& proxy : mAlsaDeviceProxies) {
++            if (!mSilenceRunning) return;
++            if (proxy_write_with_retries(proxy.get(), silence.data(), silence.size(),
++                                         mReadWriteRetries) == 0) {
++                wrote = true;
++            }
++        }
++        if (!wrote && mSilenceRunning) usleep(10000);
++    }
++}
++
+ void StreamAlsa::teardownIo() {
++    stopSilence();
+     mIoThreadIsRunning = false;
+     if (mIsInput) {
+         LOG(DEBUG) << __func__ << ": shutting down pipes";
+diff --git a/audio/aidl/default/alsa/Utils.cpp b/audio/aidl/default/alsa/Utils.cpp
+index 77e4f65..0701a06 100644
+--- a/audio/aidl/default/alsa/Utils.cpp
++++ b/audio/aidl/default/alsa/Utils.cpp
+@@ -415,6 +415,9 @@ DeviceProxy readAlsaDeviceInfo(const DeviceProfile& deviceProfile) {
+         LOG(ERROR) << __func__ << ": unable to read device info, device address=" << deviceProfile;
+         return DeviceProxy();
+     }
++    if (proxy.getProfile()->default_config.period_count < DEFAULT_PERIOD_COUNT) {
++        proxy.getProfile()->default_config.period_count = DEFAULT_PERIOD_COUNT;
++    }
+     return proxy;
+ }
+ 
+diff --git a/audio/aidl/default/bluetooth/DevicePortProxy.cpp b/audio/aidl/default/bluetooth/DevicePortProxy.cpp
+index 1496efe..dfd62e3 100644
+--- a/audio/aidl/default/bluetooth/DevicePortProxy.cpp
++++ b/audio/aidl/default/bluetooth/DevicePortProxy.cpp
+@@ -375,6 +375,12 @@ bool BluetoothAudioPortAidl::standby() {
+         LOG(INFO) << __func__ << debugMessage() << ", " << previous_state << " -> " << mState;
+         return true;
+     }
++    // A second enable while the port is already ready must not fail the
++    // parameter update. Failing here returns before the stream is marked
++    // enabled, and transfer() then discards the PCM.
++    if (mState == BluetoothStreamState::STANDBY || mState == BluetoothStreamState::STARTED) {
++        return true;
++    }
+     return false;
+ }
+ 
+@@ -482,6 +488,8 @@ bool BluetoothAudioPortAidl::suspend() {
+         }
+         if (mState == BluetoothStreamState::STANDBY) {
+             retval = true;
++        } else if (mState == BluetoothStreamState::DISABLED) {
++            retval = true;
+         } else if (mState == BluetoothStreamState::STARTED) {
+             mState = BluetoothStreamState::SUSPENDING;
+             lock.unlock();
+diff --git a/audio/aidl/default/include/core-impl/KukuiMixer.h b/audio/aidl/default/include/core-impl/KukuiMixer.h
+new file mode 100644
+index 0000000..96786f1
+--- /dev/null
++++ b/audio/aidl/default/include/core-impl/KukuiMixer.h
+@@ -0,0 +1,128 @@
++#pragma once
++
++extern "C" {
++#include <tinyalsa/asoundlib.h>
++}
++
++#include <cstdio>
++#include <fstream>
++#include <string>
++
++#include <android-base/logging.h>
++#include <android-base/properties.h>
++
++namespace aidl::android::hardware::audio::core {
++
++// Krane uses the MT6358 + MAX98357A card. Gru's DA7219 controls are absent.
++inline bool kukuiAudioRoute() {
++    static const bool enabled =
++            ::android::base::GetProperty("ro.vendor.audio.route", "") == "kukui";
++    return enabled;
++}
++
++// snd-usb-audio registers first when a DAC is already plugged in, so the
++// MT8183 card is not always card 0. The policy address stays CARD_0_DEV_*.
++inline int kukuiAlsaCard() {
++    static int cached = -1;
++    if (cached >= 0) return cached;
++    std::ifstream cards("/proc/asound/cards");
++    std::string line;
++    while (std::getline(cards, line)) {
++        if (line.find("mt8183mt6358") == std::string::npos &&
++            line.find("mt8183_mt6358") == std::string::npos) {
++            continue;
++        }
++        int card = -1;
++        if (sscanf(line.c_str(), " %d", &card) == 1 && card >= 0) {
++            cached = card;
++            LOG(INFO) << "kukui ALSA card " << card;
++            return card;
++        }
++    }
++    LOG(ERROR) << "kukui ALSA card not found";
++    return 0;
++}
++
++// Sequences match alsa-ucm-conf MediaTek/mt8183/mt8183_mt6358_ts3a227_max98357.
++// Speaker and the built-in mic are the Krane paths. The headphone and headset
++// mic sequences are the non-krane UCM block. This unit has no 3.5 mm jack, so
++// those two sequences are present for other kukui boards and are unverified.
++inline void configureKukuiOutput(bool headphone) {
++    struct mixer* mixer = mixer_open(kukuiAlsaCard());
++    if (mixer == nullptr) {
++        LOG(ERROR) << __func__ << ": mixer_open failed";
++        return;
++    }
++    auto setValues = [mixer](const char* name, int val) {
++        struct mixer_ctl* ctl = mixer_get_ctl_by_name(mixer, name);
++        if (ctl == nullptr) {
++            LOG(ERROR) << __func__ << ": missing " << name;
++            return;
++        }
++        const unsigned count = mixer_ctl_get_num_values(ctl);
++        for (unsigned i = 0; i < count; ++i) {
++            if (mixer_ctl_set_value(ctl, i, val) != 0) {
++                LOG(ERROR) << __func__ << ": set " << name << " failed";
++                return;
++            }
++        }
++    };
++    if (headphone) {
++        setValues("I2S3_CH1 DL1_CH1", 0);
++        setValues("I2S3_CH2 DL1_CH2", 0);
++        setValues("ADDA_DL_CH1 DL1_CH1", 1);
++        setValues("ADDA_DL_CH2 DL1_CH2", 1);
++        setValues("HPL Mux", 2);
++        setValues("HPR Mux", 2);
++    } else {
++        setValues("ADDA_DL_CH1 DL1_CH1", 0);
++        setValues("ADDA_DL_CH2 DL1_CH2", 0);
++        setValues("HPL Mux", 0);
++        setValues("HPR Mux", 0);
++        setValues("I2S3_CH1 DL1_CH1", 1);
++        setValues("I2S3_CH2 DL1_CH2", 1);
++    }
++    mixer_close(mixer);
++}
++
++inline void configureKukuiInput(bool headsetMic) {
++    struct mixer* mixer = mixer_open(kukuiAlsaCard());
++    if (mixer == nullptr) {
++        LOG(ERROR) << __func__ << ": mixer_open failed";
++        return;
++    }
++    auto setValues = [mixer](const char* name, int val) {
++        struct mixer_ctl* ctl = mixer_get_ctl_by_name(mixer, name);
++        if (ctl == nullptr) {
++            LOG(ERROR) << __func__ << ": missing " << name;
++            return;
++        }
++        const unsigned count = mixer_ctl_get_num_values(ctl);
++        for (unsigned i = 0; i < count; ++i) {
++            if (mixer_ctl_set_value(ctl, i, val) != 0) {
++                LOG(ERROR) << __func__ << ": set " << name << " failed";
++                return;
++            }
++        }
++    };
++    if (headsetMic) {
++        setValues("MTKAIF_DMIC", 0);
++        setValues("UL3_CH2 ADDA_UL_CH2", 0);
++        setValues("PGA L Mux", 2);
++        setValues("ADC L Mux", 2);
++        setValues("Mic Type Mux", 1);
++        setValues("PGA Volume", 4);
++        setValues("UL3_CH1 ADDA_UL_CH1", 1);
++    } else {
++        setValues("PGA L Mux", 0);
++        setValues("ADC L Mux", 0);
++        setValues("PGA Volume", 0);
++        setValues("MTKAIF_DMIC", 1);
++        setValues("Mic Type Mux", 2);
++        setValues("UL3_CH1 ADDA_UL_CH1", 1);
++        setValues("UL3_CH2 ADDA_UL_CH2", 1);
++    }
++    mixer_close(mixer);
++}
++
++}  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/include/core-impl/ModulePrimary.h b/audio/aidl/default/include/core-impl/ModulePrimary.h
+index c93deed..8102e47 100644
+--- a/audio/aidl/default/include/core-impl/ModulePrimary.h
++++ b/audio/aidl/default/include/core-impl/ModulePrimary.h
+@@ -27,6 +27,12 @@ class ModulePrimary final : public Module {
+ 
+   protected:
+     ndk::ScopedAStatus getTelephony(std::shared_ptr<ITelephony>* _aidl_return) override;
++    ndk::ScopedAStatus populateConnectedDevicePort(
++            ::aidl::android::media::audio::common::AudioPort* audioPort,
++            int32_t nextPortId) override;
++    void onExternalDeviceConnectionChanged(
++            const ::aidl::android::media::audio::common::AudioPort& audioPort,
++            bool connected) override;
+ 
+     ndk::ScopedAStatus calculateBufferSizeFrames(
+             const ::aidl::android::media::audio::common::AudioFormatDescription& format,
+diff --git a/audio/aidl/default/include/core-impl/StreamAlsa.h b/audio/aidl/default/include/core-impl/StreamAlsa.h
+index c0dcb63..08b998d 100644
+--- a/audio/aidl/default/include/core-impl/StreamAlsa.h
++++ b/audio/aidl/default/include/core-impl/StreamAlsa.h
+@@ -17,6 +17,8 @@
+ #pragma once
+ 
+ #include <atomic>
++#include <condition_variable>
++#include <mutex>
+ #include <optional>
+ #include <thread>
+ #include <vector>
+@@ -55,6 +57,9 @@ class StreamAlsa : public StreamCommonImpl {
+   protected:
+     // Called from 'start' to initialize 'mAlsaDeviceProxies', the vector must be non-empty.
+     virtual std::vector<alsa::DeviceProfile> getDeviceProfiles() = 0;
++    // DP Alt Mode resets its audio packetizer on PCM close. The sink then
++    // takes about a second to lock, so short sounds never come out.
++    virtual bool keepPcmOpenOnStandby() const { return false; }
+ 
+     const size_t mBufferSizeFrames;
+     const size_t mFrameSizeBytes;
+@@ -69,6 +74,8 @@ class StreamAlsa : public StreamCommonImpl {
+     ::android::sp<::android::MonoPipeReader> makeSource(::android::MonoPipe* pipe);
+     void inputIoThread(size_t idx);
+     void outputIoThread(size_t idx);
++    void silenceThread();
++    void stopSilence();
+     void teardownIo();
+ 
+     std::atomic<float> mGain = 1.0;
+@@ -80,6 +87,9 @@ class StreamAlsa : public StreamCommonImpl {
+     std::vector<::android::sp<::android::MonoPipeReader>> mSources;
+     std::vector<std::thread> mIoThreads;
+     std::atomic<bool> mIoThreadIsRunning = false;  // used by all threads
++    // Writes zeros so the HDMI PCM stays running across standby.
++    std::thread mSilenceThread;
++    std::atomic<bool> mSilenceRunning = false;
+ };
+ 
+ }  // namespace aidl::android::hardware::audio::core
+diff --git a/audio/aidl/default/include/core-impl/StreamPrimary.h b/audio/aidl/default/include/core-impl/StreamPrimary.h
+index 06f8bc3..117e930 100644
+--- a/audio/aidl/default/include/core-impl/StreamPrimary.h
++++ b/audio/aidl/default/include/core-impl/StreamPrimary.h
+@@ -67,6 +67,7 @@ class StreamPrimary : public StreamAlsa {
+             const std::vector<::aidl::android::media::audio::common::AudioDevice>& devices);
+     static bool useStubStream(bool isInput,
+                               const ::aidl::android::media::audio::common::AudioDevice& device);
++    bool keepPcmOpenOnStandby() const override;
+ 
+     bool isStubStreamOnWorker() const { return mCurrAlsaDeviceId == kStubDeviceId; }
+ 
+diff --git a/audio/aidl/default/include/core-impl/StreamUsb.h b/audio/aidl/default/include/core-impl/StreamUsb.h
+index 694fccf..037ce37 100644
+--- a/audio/aidl/default/include/core-impl/StreamUsb.h
++++ b/audio/aidl/default/include/core-impl/StreamUsb.h
+@@ -38,6 +38,11 @@ class StreamUsb : public StreamAlsa {
+     ndk::ScopedAStatus setConnectedDevices(const ConnectedDevices& devices) override;
+ 
+   protected:
++    // A USB isochronous stream takes longer to start than a touch click. Closing
++    // the PCM on standby drops that click unless some other stream is already
++    // running. Holding the playback PCM open lets the click join the running
++    // stream. Capture stays closed so the headset mic is not left running.
++    bool keepPcmOpenOnStandby() const override { return !mIsInput; }
+     std::vector<alsa::DeviceProfile> getDeviceProfiles() override;
+ 
+     mutable std::mutex mLock;
+diff --git a/audio/aidl/default/primary/StreamPrimary.cpp b/audio/aidl/default/primary/StreamPrimary.cpp
+index 8455680..279c376 100644
+--- a/audio/aidl/default/primary/StreamPrimary.cpp
++++ b/audio/aidl/default/primary/StreamPrimary.cpp
+@@ -16,6 +16,8 @@
+ 
+ #define LOG_TAG "AHAL_StreamPrimary"
+ 
++#include <algorithm>
++#include <cstdint>
+ #include <cstdio>
+ 
+ #include <android-base/logging.h>
+@@ -25,6 +27,7 @@
+ #include <error/Result.h>
+ #include <error/expected_utils.h>
+ 
++#include "core-impl/KukuiMixer.h"
+ #include "core-impl/StreamPrimary.h"
+ 
+ using aidl::android::hardware::audio::common::SinkMetadata;
+@@ -35,10 +38,22 @@ using aidl::android::media::audio::common::AudioDeviceDescription;
+ using aidl::android::media::audio::common::AudioDeviceType;
+ using aidl::android::media::audio::common::AudioOffloadInfo;
+ using aidl::android::media::audio::common::MicrophoneInfo;
++using aidl::android::media::audio::common::AudioFormatType;
++using aidl::android::media::audio::common::PcmType;
+ using android::base::GetBoolProperty;
+ 
+ namespace aidl::android::hardware::audio::core {
+ 
++// The built-in DMIC has no codec gain. Speech peaks far below full scale,
++// so a recording is inaudible until playback is at maximum. 16x is +24 dB.
++void amplifyPcm16(void* buffer, size_t samples) {
++    auto* pcm = static_cast<int16_t*>(buffer);
++    for (size_t i = 0; i < samples; ++i) {
++        const int32_t scaled = static_cast<int32_t>(pcm[i]) * 16;
++        pcm[i] = static_cast<int16_t>(std::clamp(scaled, int32_t{-32768}, int32_t{32767}));
++    }
++}
++
+ StreamPrimary::StreamPrimary(StreamContext* context, const Metadata& metadata)
+     : StreamAlsa(context, metadata, 3 /*readWriteRetries*/),
+       mIsAsynchronous(!!getContext().getAsyncCallback()),
+@@ -69,6 +84,12 @@ StreamPrimary::StreamPrimary(StreamContext* context, const Metadata& metadata)
+     return isStubStreamOnWorker() ? mStubDriver.standby() : StreamAlsa::standby();
+ }
+ 
++bool StreamPrimary::keepPcmOpenOnStandby() const {
++    const int hdmiDev = ::android::base::GetIntProperty("ro.vendor.audio.hdmi.alsa_device", 3);
++    return !mIsInput && hdmiDev >= 0 && mCurrAlsaDeviceId.first >= 0 &&
++           mCurrAlsaDeviceId.second == hdmiDev;
++}
++
+ ::android::status_t StreamPrimary::start() {
+     bool isStub = true, shutdownAlsaStream = false;
+     {
+@@ -98,6 +119,26 @@ StreamPrimary::StreamPrimary(StreamContext* context, const Metadata& metadata)
+     }
+     // This is a workaround for the emulator implementation which has a host-side buffer
+     // and is not being able to achieve real-time behavior similar to ADSPs (b/302587331).
++    // For input streams, StreamAlsa::transfer() directly calls blocking proxy_read_with_retries()
++    // which is already hardware-clocked by ALSA DMA, so do not skip transfers or sleep again.
++    if (mIsInput) {
++        const ::android::status_t status =
++                StreamAlsa::transfer(buffer, frameCount, actualFrameCount, latencyMs);
++        const auto format = getContext().getFormat();
++        if (status == ::android::OK && actualFrameCount != nullptr && *actualFrameCount > 0 &&
++            format.type == AudioFormatType::PCM && format.pcm == PcmType::INT_16_BIT) {
++            amplifyPcm16(buffer, *actualFrameCount * (mFrameSizeBytes / sizeof(int16_t)));
++        }
++        return status;
++    }
++    // The emulator clock below drops a whole burst once it falls behind. On this
++    // card that happens for the entire first playback after a volume change:
++    // start() runs, the route and the volume command delay the first buffer,
++    // and every later burst is skipped. The replay starts on time and stays
++    // clean. Kukui playback is paced by blocking ALSA writes instead.
++    if (kukuiAudioRoute()) {
++        return StreamAlsa::transfer(buffer, frameCount, actualFrameCount, latencyMs);
++    }
+     if (!mSkipNextTransfer) {
+         RETURN_STATUS_IF_ERROR(
+                 StreamAlsa::transfer(buffer, frameCount, actualFrameCount, latencyMs));
+@@ -153,6 +194,15 @@ ndk::ScopedAStatus StreamPrimary::setConnectedDevices(const ConnectedDevices& de
+         mAlsaDeviceId = useStubDriver ? kStubDeviceId : getCardAndDeviceId(devices);
+     }
+     if (!devices.empty()) {
++        const bool isAnalog =
++                devices[0].type.connection == AudioDeviceDescription::CONNECTION_ANALOG;
++        if (kukuiAudioRoute()) {
++            if (mIsInput) {
++                configureKukuiInput(isAnalog);
++            } else {
++                configureKukuiOutput(isAnalog);
++            }
++        }
+         auto streamDataProcessor = getContext().getStreamDataProcessor().lock();
+         if (streamDataProcessor != nullptr) {
+             streamDataProcessor->setAudioDevice(devices[0]);
+@@ -176,20 +226,45 @@ bool StreamPrimary::isStubStream() {
+ // static
+ StreamPrimary::AlsaDeviceId StreamPrimary::getCardAndDeviceId(
+         const std::vector<AudioDevice>& devices) {
+-    if (devices.empty() || devices[0].address.getTag() != AudioDeviceAddress::id) {
+-        return kDefaultCardAndDeviceId;
++    const auto useKukuiCard = [](AlsaDeviceId id) {
++        if (kukuiAudioRoute() && id.first >= 0) id.first = kukuiAlsaCard();
++        return id;
++    };
++    if (devices.empty()) {
++        return useKukuiCard(kDefaultCardAndDeviceId);
++    }
++    /* DP Alt Mode is pcmC0D3p. The framework connects HDMI with an empty
++     * address, so CARD_N_DEV_M is not present on this device.
++     */
++    if (devices[0].type.connection == AudioDeviceDescription::CONNECTION_HDMI) {
++        int hdmiDev = ::android::base::GetIntProperty(
++                "ro.vendor.audio.hdmi.alsa_device", 3);
++        if (hdmiDev >= 0) {
++            return useKukuiCard({kDefaultCardAndDeviceId.first, hdmiDev});
++        }
++    }
++    if (devices[0].address.getTag() != AudioDeviceAddress::id) {
++        return useKukuiCard(kDefaultCardAndDeviceId);
+     }
+     std::string deviceAddress = devices[0].address.get<AudioDeviceAddress::id>();
+     AlsaDeviceId cardAndDeviceId;
+     if (const size_t suffixPos = deviceAddress.rfind("CARD_");
+-        suffixPos == std::string::npos ||
++        suffixPos != std::string::npos &&
+         sscanf(deviceAddress.c_str() + suffixPos, "CARD_%d_DEV_%d", &cardAndDeviceId.first,
+-               &cardAndDeviceId.second) != 2) {
+-        return kDefaultCardAndDeviceId;
++               &cardAndDeviceId.second) == 2) {
++        LOG(DEBUG) << __func__ << ": parsed with card id " << cardAndDeviceId.first
++                   << ", device id " << cardAndDeviceId.second;
++        return useKukuiCard(cardAndDeviceId);
++    }
++    if (devices[0].type.connection == AudioDeviceDescription::CONNECTION_ANALOG) {
++        int analogDev = ::android::base::GetIntProperty(
++                "ro.vendor.audio.tinyalsa.analog_device", 2);
++        if (analogDev >= 0) {
++            LOG(DEBUG) << __func__ << ": using analog device id " << analogDev;
++            return useKukuiCard({kDefaultCardAndDeviceId.first, analogDev});
++        }
+     }
+-    LOG(DEBUG) << __func__ << ": parsed with card id " << cardAndDeviceId.first << ", device id "
+-               << cardAndDeviceId.second;
+-    return cardAndDeviceId;
++    return useKukuiCard(kDefaultCardAndDeviceId);
+ }
+ 
+ // static
+diff --git a/audio/aidl/default/usb/StreamUsb.cpp b/audio/aidl/default/usb/StreamUsb.cpp
+index 9b10432..b542f2e 100644
+--- a/audio/aidl/default/usb/StreamUsb.cpp
++++ b/audio/aidl/default/usb/StreamUsb.cpp
+@@ -33,7 +33,7 @@ using aidl::android::media::audio::common::MicrophoneInfo;
+ namespace aidl::android::hardware::audio::core {
+ 
+ StreamUsb::StreamUsb(StreamContext* context, const Metadata& metadata)
+-    : StreamAlsa(context, metadata, 1 /*readWriteRetries*/) {}
++    : StreamAlsa(context, metadata, 3 /*readWriteRetries*/) {}
+ 
+ ndk::ScopedAStatus StreamUsb::setConnectedDevices(
+         const std::vector<AudioDevice>& connectedDevices) {
