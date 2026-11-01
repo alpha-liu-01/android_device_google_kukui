@@ -7,4 +7,12 @@
     <!-- Krane has no fixed nav keys. The keyboard cover is optional, so the
          on-screen bar stays available and Settings can switch it to gestures. -->
     <bool name="config_showNavigationBar">true</bool>
+
+    <!-- The dock is a full keyboard plus a touchpad. Android 16 already
+         switches the internal display between desktop-first and touch-first
+         when both are present. These gates are what make that path run
+         on the internal panel. -->
+    <bool name="config_isDesktopModeSupported">true</bool>
+    <bool name="config_canInternalDisplayHostDesktops">true</bool>
+    <bool name="config_enterDesktopByDefaultOnFreeformDisplay">true</bool>
 </resources>

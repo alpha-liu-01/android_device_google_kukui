@@ -70,7 +70,7 @@ Gru 上已经证明、和芯片无关、第一份镜像就要带上的用户空�
 - `system/core` 里用 `F_GET_SEALS` 判断 memfd，不再对沙箱进程做 `readlink("/proc/self/fd")`。Gru 上不改的话，WebView 和浏览器是黑的。
 - 打开 `CONFIG_CPUSETS_V1`。6.12 以后 cgroup v1 的 cpuset 是单独开关，缺了会在亮屏前重启。
 - 刷新率先写成 60。阶段 0 量到的模式是整数 `60.00` Hz。阶段 4 如果滑动被锁到 30 fps，再把 `config_defaultRefreshRate` 调高。
-- 不打开「内置屏承载桌面」。Gru 上这项会在每次开机的最近任务里留下两张「桌面设备」。这台机器的外接屏还没做，先不设。
+- 内置屏可以承载桌面，但只在底座的键盘和触控板都在时进入。Gru 上无条件打开这项，最近任务里会多出桌面卡片。这里用 Android 16 自己的键盘加触控板切换，拔下底座回到全屏。
 
 ### 必须按 Krane 重做
 
@@ -181,7 +181,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 1. Panfrost 加速。第十四次启动已经是 Mali-G72 GLES 3.1，镜像里没有 SwiftShader。这一项只确认后面的改动没有把它换掉。
 2. Wi-Fi，然后是无线 adb。第十九次已经连上，无线 adb 可用。
 3. 触摸、旋转、USI 笔。手指和笔已经对。加速度计已写入过一版，postmarketOS 矩阵在这台的 `ORIENTATION_270` 上多转了 90 度。单位矩阵和 FIFO 超时已写入 super。2026-10-31 这次 Ctrl+U 已确认：正放是横屏 1920×1200，加速度计大约每 40 毫秒一笔。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。
-4. 底座键盘、触控板，以及拆下底座后的平板模式。
+4. 底座键盘、触控板，以及拆下底座后的平板模式。热插拔已能用。插上底座应进桌面模式，拔下回到平板。Android 16 在完整键盘和触控板同时存在时切换内置屏，这两个条件就是 Hammer 的两个接口。资源里打开了内置桌面。顶行按键帽映射成返回、前进、刷新、全屏、最近任务、亮度、静音和音量，不再是 F1–F10。2026-11-01 只把 super 写入 SanDisk（序列号 `000000002959`），读回 sha256 `517c8f02bc51cb72850873c8992f9c184d453103139db2c9f9632d55667da213`。内核槽没动。还没有这次 Ctrl+U。
 5. 背光。`backlight_lcd0` 最大 1023，light HAL 能找到它，但 `brightness` 是 `root:root`，滑块写不进去，停在默认 576。`init.kukui.rc` 把这个节点交给 `system`。2026-11-01 在正在跑的系统上 chown 之后，0.25 写成 260、0.9 写成 922。同日只把 super 写入 SanDisk（序列号 `000000002959`），读回 sha256 `a456b6c03b4a42614f360342e23c59d5ecc3c032b64a89e8a11a7c7c54d0ec1b`。内核槽没动。还没有这次 Ctrl+U。
 6. 蓝牙。UART 上的 QCA6174。2026-10-31 这次 Ctrl+U 后自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到下一项的音频 HAL。
 7. 扬声器播放，然后是内置麦。这台 Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的 kukui 板有插孔，混音器按 UCM 写了，没在实机上听过。DA7219 的板是另一颗 codec，不在这份镜像里。2026-10-31 这次 Ctrl+U：蓝牙耳机正常。USB 连续播放、提示音和耳麦录音正常，触摸反馈音在没有别的声音垫底时经常播不出。内置扬声器和麦完全没有声音，因为 USB 声卡先注册成 card 0。HAL 改为按名字找 MT8183 卡，USB 播放在 standby 时保持 PCM 打开。正在跑的 HAL 已换成这份，扬声器 PCM 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。Kukui 对共享音频 HAL 的改动在 `patches/`。干净的 Lineage 树打 `hardware_interfaces_audio_kukui_standalone.patch`，已经打过 Gru 音频补丁的树打 `hardware_interfaces_audio_kukui.patch`。`patches/apply-patches.sh` 自己选。编 Gru 之前把后一份拿掉。编译不需要 `device/google/gru`。
