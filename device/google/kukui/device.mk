@@ -52,6 +52,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \
     $(LOCAL_PATH)/firmware/ath10k/QCA6174/hw3.0/board-2.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/ath10k/QCA6174/hw3.0/board-2.bin \
     $(LOCAL_PATH)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin \
+    $(LOCAL_PATH)/firmware/qca/nvm_00440302_i2s_eu.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/nvm_00440302_i2s_eu.bin \
+    $(LOCAL_PATH)/firmware/qca/rampatch_00440302.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/rampatch_00440302.bin \
     $(LOCAL_PATH)/modules/rfkill.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfkill.ko \
     $(LOCAL_PATH)/modules/cfg80211.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cfg80211.ko \
     $(LOCAL_PATH)/modules/libarc4.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/libarc4.ko \
@@ -61,6 +63,16 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/ath10k_sdio.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ath10k_sdio.ko \
     $(LOCAL_PATH)/modules/sbs-battery.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/sbs-battery.ko \
     $(LOCAL_PATH)/modules/cros_usbpd-charger.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_usbpd-charger.ko \
+    $(LOCAL_PATH)/modules/ecc.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ecc.ko \
+    $(LOCAL_PATH)/modules/ecdh_generic.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ecdh_generic.ko \
+    $(LOCAL_PATH)/modules/bluetooth.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/bluetooth.ko \
+    $(LOCAL_PATH)/modules/btqca.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/btqca.ko \
+    $(LOCAL_PATH)/modules/btbcm.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/btbcm.ko \
+    $(LOCAL_PATH)/modules/btrtl.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/btrtl.ko \
+    $(LOCAL_PATH)/modules/hci_uart.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/hci_uart.ko \
+    $(LOCAL_PATH)/modules/hidp.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/hidp.ko \
+    $(LOCAL_PATH)/modules/rfcomm.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfcomm.ko \
+    $(LOCAL_PATH)/modules/uhid.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/uhid.ko \
     $(LOCAL_PATH)/modules/modules.load:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.load \
     $(LOCAL_PATH)/modules/modules.dep:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.dep \
     $(LOCAL_PATH)/modules/modules.alias:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.alias \
@@ -77,7 +89,30 @@ PRODUCT_PRODUCT_PROPERTIES += \
     service.adb.tcp.port=5555 \
     debug.renderengine.backend=skiaglthreaded \
     debug.hwui.renderer=skiagl \
-    ro.opengles.version=196609
+    ro.opengles.version=196609 \
+    bluetooth.device.class_of_device=90,2,12 \
+    bluetooth.le.disable_apcf_extended_features=1 \
+    persist.bluetooth.a2dp_aac.vbr_supported=true \
+    bluetooth.profile.asha.central.enabled=true \
+    bluetooth.profile.a2dp.source.enabled=true \
+    bluetooth.profile.avrcp.target.enabled=true \
+    bluetooth.profile.gatt.enabled=true \
+    bluetooth.profile.hfp.ag.enabled=true \
+    bluetooth.profile.hid.device.enabled=true \
+    bluetooth.profile.hid.host.enabled=true \
+    bluetooth.profile.map.server.enabled=true \
+    bluetooth.profile.opp.enabled=true \
+    bluetooth.profile.pan.nap.enabled=true \
+    bluetooth.profile.pan.panu.enabled=true \
+    bluetooth.profile.pbap.server.enabled=true \
+    bluetooth.profile.sap.server.enabled=true \
+    bluetooth.profile.bap.broadcast.assist.enabled=false \
+    bluetooth.profile.bap.unicast.client.enabled=false \
+    bluetooth.profile.bas.client.enabled=false \
+    bluetooth.profile.ccp.server.enabled=false \
+    bluetooth.profile.csip.set_coordinator.enabled=false \
+    bluetooth.profile.hap.client.enabled=false \
+    bluetooth.profile.vcp.controller.enabled=false
 
 PRODUCT_VENDOR_PROPERTIES += \
     vendor.hwc.drm.device=/dev/dri/card0 \

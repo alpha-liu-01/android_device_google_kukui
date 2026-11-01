@@ -1,3 +1,5 @@
 /dev/dri/*                                                                  0666   root       graphics
 /dev/input/*                                                                0660   system     input
 /dev/hidraw*                                                                0660   system     input
+/dev/rfkill                                                                 0660   bluetooth  bluetooth
+/dev/uhid                                                                   0660   uhid       uhid

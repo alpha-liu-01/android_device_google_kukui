@@ -6,7 +6,7 @@
 
 zygote 在内核时间 24.06 秒启动，开机动画在 28.85 秒起来，`sys.boot_completed=1` 在 55.48 秒。SurfaceFlinger 报 Mali-G72 (Panfrost)、OpenGL ES 3.1 Mesa 25.3.3。路线图里「第一帧先用软件渲染，确认加速后再拿掉 SwiftShader」这一步不做：这台机器从阶段 3 起就是 Panfrost，镜像里没有 SwiftShader。
 
-蓝牙 HAL 仍在崩溃。`vendor.bluetooth-default` 在 48.63 秒收到 SIGABRT，`initializationComplete` 的状态不是成功。这台镜像里没有可用的 QCA UART。阶段 3 已经把 `persist.sys.disable_rescue=true` 放进系统属性，这次没有恢复出厂。蓝牙排在输入和 Wi-Fi 后面，现在不修。
+蓝牙 HAL 在那次启动里崩溃。`vendor.bluetooth-default` 在 48.63 秒收到 SIGABRT，`initializationComplete` 的状态不是成功。当时镜像里没有 QCA UART 模块和固件。阶段 3 已经把 `persist.sys.disable_rescue=true` 放进系统属性，那次没有恢复出厂。后来的结果写在休眠一节之后。
 
 117.08 秒 SurfaceFlinger 把显示设成 power mode 0。随后用户空间冻结被拒绝，先是 300 个任务，再是 308 个，任务恢复。日志写到 122.00 秒。这是没有输入时的灭屏，不是崩溃重启。休眠是这一段的最后一项，现在不改。
 
@@ -185,6 +185,23 @@ f3a260c441cc5468f4403d2de7eed6f3859370fc4a9b871cf0d07cf76df2ba5f
 
 所以内核确实进过 s2idle，而且 USB 没有掉电，唤醒后还是同一次启动。它没有在灭屏期间一直停在 s2idle 里，EC 也没有计到一次完整的睡眠切换。
 
+## 蓝牙
+
+这颗芯片的蓝牙是 UART 上的 `qcom,qca6174-bt`，挂在 `11003000.serial`。设备树里的 NVM 文件名是 `nvm_00440302_i2s_eu.bin`。内核配置里 `bluetooth`、`hci_uart` 和 `btqca` 都是模块，镜像里原先没有这些 `.ko`，也没有 `/vendor/firmware/qca`。所以 HAL 打开 HCI 失败，`initializationComplete` 不是成功，接着在 `FD_SET` 里用了 -1。
+
+2026-10-31 这次开机没有换内核。从内置盘只读拷出固件并解压，再加载和当前内核版本匹配的模块。内核日志：
+
+```text
+Bluetooth: hci0: QCA controller version 0x00440302
+Bluetooth: hci0: QCA Downloading qca/rampatch_00440302.bin
+Bluetooth: hci0: QCA Downloading qca/nvm_00440302_i2s_eu.bin
+Bluetooth: hci0: QCA setup on UART is completed
+```
+
+下载过程中有两次 `Frame reassembly failed (-84)`，设置仍然完成。`/dev/rfkill` 原来是 `0600 root`，HAL 的 uid 和 gid 都是 `bluetooth`，打不开。改成 `bluetooth:bluetooth` `0660` 之后重新打开蓝牙。`dumpsys bluetooth_manager` 是 `enabled: true`，`state: ON`，名字是 Lenovo IdeaPad Duet。`com.android.bluetooth` 保持运行，崩溃日志没有新增。
+
+2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。里面有这两份固件、蓝牙模块，以及 `bluetooth.le.disable_apcf_extended_features=1`。Rome 3.2 不支持那条扩展查询。大小 `8589934592`。读回 sha256 `1c2511c8ff7920cc834719c993b9875517e183988a9dc5cfb56be100a805ab78`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。还没有这次 Ctrl+U，不能当作开机后蓝牙自己会起来。
+
 ## 顺序
 
 前一项能用再做下一项。
@@ -195,7 +212,7 @@ f3a260c441cc5468f4403d2de7eed6f3859370fc4a9b871cf0d07cf76df2ba5f
 4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
-7. 蓝牙。上面的 SIGABRT 留到这一项。
+7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次开机手动加载模块后，内核下载了 `qca/rampatch_00440302.bin` 和 `qca/nvm_00440302_i2s_eu.bin`，日志是 `QCA setup on UART is completed`。`dumpsys bluetooth_manager` 为 `state: ON`，名字是 Lenovo IdeaPad Duet，打开后超过 7 分钟没有新的崩溃。模块、固件和 `/dev/rfkill` 权限已写入 SanDisk 的 super，读回 sha256 `1c2511c8ff7920cc834719c993b9875517e183988a9dc5cfb56be100a805ab78`。内核槽没换。还没有这次 Ctrl+U。
 8. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
 10. zram。

@@ -7,3 +7,13 @@ ath10k_core.ko: mac80211.ko cfg80211.ko ath.ko
 ath10k_sdio.ko: ath10k_core.ko
 sbs-battery.ko:
 cros_usbpd-charger.ko:
+ecc.ko:
+ecdh_generic.ko: ecc.ko
+bluetooth.ko: rfkill.ko ecdh_generic.ko
+btqca.ko: bluetooth.ko
+btbcm.ko: bluetooth.ko
+btrtl.ko: bluetooth.ko
+hci_uart.ko: bluetooth.ko btbcm.ko btrtl.ko btqca.ko
+hidp.ko: bluetooth.ko
+rfcomm.ko: bluetooth.ko
+uhid.ko:

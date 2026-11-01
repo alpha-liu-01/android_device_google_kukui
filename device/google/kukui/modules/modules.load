@@ -7,3 +7,13 @@ ath10k_core.ko
 ath10k_sdio.ko
 sbs-battery.ko
 cros_usbpd-charger.ko
+ecc.ko
+ecdh_generic.ko
+bluetooth.ko
+btqca.ko
+btbcm.ko
+btrtl.ko
+hci_uart.ko
+hidp.ko
+rfcomm.ko
+uhid.ko

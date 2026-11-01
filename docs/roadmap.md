@@ -183,7 +183,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 3. 触摸、旋转、USI 笔。
 4. 底座键盘、触控板，以及拆下底座后的平板模式。
 5. 背光。
-6. 蓝牙。
+6. 蓝牙。UART 上的 QCA6174。2026-10-31 这次开机已经打开，名字是 Lenovo IdeaPad Duet。模块和固件已写入 SanDisk 的 super，读回见 [阶段 4](phase-4.md)。内核槽没换。还没做这次 Ctrl+U。
 7. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
 8. 电量和充电。
 9. zram。
@@ -235,4 +235,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi、无线 adb 和 USI 笔方向已确认。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次开机蓝牙已打开。带模块和固件的 super 已写入 SanDisk，还没做这次 Ctrl+U。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
