@@ -155,6 +155,36 @@ f3a260c441cc5468f4403d2de7eed6f3859370fc4a9b871cf0d07cf76df2ba5f
 5. 再重启，不要按 Ctrl+U。应回到 eMMC 上的 postmarketOS v26.06。
 6. 把新卡插回工作站。日志在 `pmOS_boot` 的 `kukui-phase3.log`。
 
+## USB 睡眠断电
+
+可以在从 U 盘启动时保留睡眠，不必先装进 eMMC。
+
+`s2idle` 和 `deep` 都会进 `xhci_mtk_suspend` 和父设备 `mtu3` 的 suspend。两边都会把 USB 端口设成掉电，再关掉 PHY 和时钟。3.3 V 的 `vusb` 是 `regulator-always-on`，读卡器灯灭是端口和 PHY 掉电，不是这路 LDO。启动盘、super 和 `/data` 都在这颗控制器上，总线一掉电，同一次启动就结束。写一次 `mem` 之后机器以 `reboot` 重新起来，运行时间回到大约一分钟，睡眠计数是 0。
+
+`CONFIG_USB_XHCI_MTK` 和 `CONFIG_USB_MTU3` 都是 `=y`。运行时的 `power/control` 挡不住系统睡眠。两个驱动现在看同一个 `suspend_power_off`：`0` 时睡眠不给这颗控制器掉电，`1` 时保持原来的掉电。内存里的默认值是 `0`。节点是 `/sys/devices/platform/soc/11201000.usb/suspend_power_off`。
+
+设置里增加了「USB 睡眠供电」。开关打开就是睡眠时断电。选择写在 `/data/system/kukui_usb_suspend_power_off`，下次启动由 `kukui-usb-suspend.sh` 写回节点。系统盘如果还在这个 USB 口上，打开开关会再次出现灯灭、唤醒后回到开机动画。
+
+新的 `Image.gz` 用 clang-21 编过，版本字符串是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2 SMP PREEMPT Sat Oct 31 19:07:02 EDT 2026`。设置应用 `KukuiUsbSuspend` 在 `system_ext/priv-app`。2026-10-31 只把新的 FIT 和 super 写进 SanDisk（序列号 `000000002959`）的内核槽和 super。metadata、misc、userdata 和 `pmOS_boot` 没动，分区头的校验和写前写后相同。卡已卸载。还没有这次 Ctrl+U，不能当作已经能睡眠。
+
+内核槽读回 sha256 `75c6397799f1e1402083d222f71d669ca24dad67fb318a642c434a41dd884c99`。super 读回 sha256 `766466a22301fb2854610ad922b987f3316b380d5af95fd6fe3f8634c0acde24`。
+
+默认是睡眠时不断电。设置里的「USB 睡眠供电」关掉就是这个默认。系统盘还在这张卡上时不要打开它，打开会再次把读卡器掉电。电流表在进系统之后仍会停在 5 V。
+
+2026-10-31 这次 Ctrl+U 用的是上面那对镜像。节点存在且值为 0，应用也装上了。页面看起来是空的，是因为 `Theme.DeviceDefault.Settings` 把内容画在标题栏下面，开关和说明都被盖住。开关实际是关的。睡眠仍然把读卡器掉电，唤醒后回到开机动画：`xhci_mtk_suspend` 虽然跳过了端口掉电，`xhci_bus_suspend` 仍会把端口设成 U3。
+
+随后的内核在标志为 0 时也跳过 `xhci_bus_suspend` 和对应的 resume。版本字符串是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2 SMP PREEMPT Sat Oct 31 19:34:51 EDT 2026`。设置页改成没有标题栏遮挡。2026-10-31 把这两份写进 SanDisk。开关能看见，并且是关的，睡眠仍然把读卡器掉电，唤醒后卡在开机动画。这次日志停在 `Freezing user space processes aborted`，设备挂起还没开始，所以只跳过 `xhci_bus_suspend` 不够。读卡器仍会因为 USB 自动挂起或 `deep` 睡眠掉电。
+
+下一版内核在标志为 0 时做三件事：禁止这条 USB 总线上的自动挂起和远程唤醒，系统睡眠只用 `s2idle`，并且继续跳过端口掉电。版本字符串是 `#1-kukui-phase2 SMP PREEMPT Sat Oct 31 19:57:12 EDT 2026`。命令行增加 `mem_sleep_default=s2idle`。2026-10-31 只重写了内核槽。super 仍是上一版，设置页不用换。metadata、misc、userdata、`pmOS_boot` 和 super 的开头 1 MiB 校验和写前写后相同。
+
+内核槽读回 sha256 `2154be92f68851d32dfc2842f98c26ee8f3e899508cd60ac3b06526f0ca90e24`。super 仍是 `b50c6a6274acd6d1033c8165b9bb044123e58ee532cdafa1c5178ceeea295d5e`。
+
+2026-10-31 这次 Ctrl+U 之后，锁屏时读卡器灯保持常亮，唤醒后仍是同一次启动。无线 adb 还在 `10.0.0.104:5555`。运行时间超过 500 秒，没有回到开机动画。`suspend_power_off` 是 0，`/sys/power/mem_sleep` 是 `[s2idle] deep`。`suspend_stats` 是 `success=3`、`fail=1`，失败的那次停在 `freeze`，`last_failed_errno=-16`。
+
+日志里 0.885 秒和 22.999 秒都有 `suspend_power_off=0, mem_sleep=s2idle`。72.988 秒冻结被打断，72.993 秒 `PM: suspend exit`。随后三次进了设备挂起：73.226 秒、88.566 秒、113.473 秒都打印了 `USB bus stays in U0` 和 `leave USB powered`。113.343 秒有 `PM: suspend entry (s2idle)`。每次从冻结到 `Restarting tasks` 大约 1 秒。73.363 秒 EC 报 `EC detected sleep transition timeout. Total sleep transitions: 0`，这次警告只打一次。114 秒之后到至少 517 秒，`success` 仍是 3，没有新的 `suspend entry`。118.9 秒 SurfaceFlinger 把屏幕电源模式设成 0，那是灭屏，不是又一次 s2idle。睡眠过程中 Wi-Fi 断开，119.3 秒重新关联。
+
+所以内核确实进过 s2idle，而且 USB 没有掉电，唤醒后还是同一次启动。它没有在灭屏期间一直停在 s2idle 里，EC 也没有计到一次完整的睡眠切换。
+
 ## 顺序
 
 前一项能用再做下一项。
@@ -169,7 +199,7 @@ f3a260c441cc5468f4403d2de7eed6f3859370fc4a9b871cf0d07cf76df2ba5f
 8. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
 10. zram。
-11. 休眠和唤醒。第十四次在没有输入时大约一分钟灭屏，挂起被拒绝。等输入和显示稳定后再做。不预先喂看门狗。
+11. 休眠和唤醒。开关为关时走 `s2idle`，USB 保持供电。2026-10-31 这次 Ctrl+U 已确认：读卡器灯常亮，`suspend_stats` `success=3`，日志有 `PM: suspend entry (s2idle)`，唤醒后仍是同一次启动。每次停留大约 1 秒，EC 计到的睡眠切换是 0。不预先喂看门狗。
 
 ## 完成标准
 

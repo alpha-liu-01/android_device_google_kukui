@@ -44,9 +44,16 @@ on post-fs-data
     mkdir /data/tombstones 0775 system system
     mkdir /data/anr 0775 system system
     start kukui-logcat
+    start kukui-usb-suspend
 
 service kukui-logcat /system/bin/sh /vendor/bin/kukui-logcat.sh
     disabled
     user root
     group root system log readproc
+    oneshot
+
+service kukui-usb-suspend /system/bin/sh /vendor/bin/kukui-usb-suspend.sh
+    disabled
+    user root
+    group root system
     oneshot

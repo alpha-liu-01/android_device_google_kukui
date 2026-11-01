@@ -29,7 +29,7 @@ PRODUCT_USE_DYNAMIC_PARTITIONS := true
 PRODUCT_SHIPPING_API_LEVEL := 36
 PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
 PRODUCT_CHARACTERISTICS := tablet
-PRODUCT_PACKAGES += kukui-keep
+PRODUCT_PACKAGES += kukui-keep KukuiUsbSuspend
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/etc/permissions/android.software.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.xml \
@@ -46,6 +46,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.kukui \
     $(LOCAL_PATH)/init.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.kukui.rc \
     $(LOCAL_PATH)/kukui-logcat.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-logcat.sh \
+    $(LOCAL_PATH)/kukui-usb-suspend.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-usb-suspend.sh \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_RAMDISK)/ueventd.kukui.rc \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc \
     $(LOCAL_PATH)/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \

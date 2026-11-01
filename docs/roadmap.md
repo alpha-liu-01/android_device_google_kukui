@@ -187,7 +187,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 7. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
 8. 电量和充电。
 9. zram。
-10. 休眠和唤醒。阶段 0 里失败停在 Panfrost 的 `-EBUSY`，机器仍回到同一次启动。这一项不预先喂看门狗。
+10. 休眠和唤醒。从 U 盘启动时，开关为关走 `s2idle`，USB 保持供电。2026-10-31 已确认读卡器灯常亮，内核进入过 s2idle，唤醒后仍是同一次启动。每次大约 1 秒，EC 没有计到完整的睡眠切换。这一项不预先喂看门狗。
 
 完成标准：在 4 GB 内存上完成一次「开机、联网、打开网页、安装应用、睡眠、唤醒」。唤醒后仍是同一次启动。网页不是黑的。
 
@@ -235,4 +235,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi、无线 adb 和 USI 笔方向已确认。SanDisk 上两次 Ctrl+U 都因 metadata 和 userdata 开头不是全 0 而没有格式化，已经把这两个分区和 misc 的开头 1 MiB 清零。super 没重写。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi、无线 adb 和 USI 笔方向已确认。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
