@@ -126,7 +126,10 @@ PRODUCT_COPY_FILES += \
 
 PRODUCT_SYSTEM_PROPERTIES += \
     sys.use_memfd=true \
-    persist.sys.disable_rescue=true
+    persist.sys.disable_rescue=true \
+    mmd.zram.enabled=true \
+    mmd.zram.comp_algorithm=zstd \
+    mmd.zram.size=50%
 
 PRODUCT_PRODUCT_PROPERTIES += \
     ro.adb.secure=0 \

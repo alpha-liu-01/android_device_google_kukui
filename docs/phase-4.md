@@ -260,12 +260,12 @@ DA7219 的板是另一颗 codec：damu、fennel sku1/sku6、fennel14、makomo-sk
 
 顶行按键帽上的图标映射，不留成 F1–F10。从左到右是返回、前进、刷新、全屏、最近任务、亮度减、亮度加、静音、音量减、音量加。亮度键和音量键没有第二套实体键。布局文件一旦匹配 `18d1:503c` 就整份替换 `Generic.kl`，所以其余键仍按通用键盘。搜索键仍是 Meta。布局做不到「搜索键加顶行等于 F 键」。2026-11-01 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `517c8f02bc51cb72850873c8992f9c184d453103139db2c9f9632d55667da213`。内核槽开头仍是 `6f94de3cb39f0537aaedb2d1beac7669c49f36da4881345b21bd1ffe98bee55f`。卡未挂载。这次 Ctrl+U 已确认：顶行按键和随键盘盖切换的桌面模式都正常。
 
-桌面模式里只要有窗口，整屏大约 30 fps。刷新率仍是 60.000263 Hz，没有切到 30 Hz。窗口阴影迫使 SurfaceFlinger 用 GPU 合成整帧，Mali-G72 上这一帧大约 24 ms，赶不上下一个垂直同步，于是所有内容都隔帧显示。`persist.wm.debug.desktop_use_window_shadows=false` 之后，设置滑动的合成时间是 4.5 ms，平均 60.9 fps，丢帧是 0。这次开机已经设上这个属性。`init.kukui.rc` 里也写了，下一份镜像会带上。
+桌面模式里只要有窗口，整屏大约 30 fps。刷新率仍是 60.000263 Hz，没有切到 30 Hz。窗口阴影迫使 SurfaceFlinger 用 GPU 合成整帧，Mali-G72 上这一帧大约 24 ms，赶不上下一个垂直同步，于是所有内容都隔帧显示。`persist.wm.debug.desktop_use_window_shadows=false` 之后，设置滑动的合成时间是 4.5 ms，平均 60.9 fps，丢帧是 0。这次开机已经设上这个属性。`init.kukui.rc` 里也写了，并随第 10 项那份 super 写入。
 6. 背光。滑块改的是框架里的亮度，light HAL 也找到了 `backlight_lcd0`（最大 1023）。节点权限是 `root:root` `0644`，HAL 以 `system` 运行，写不进去，所以 sysfs 一直停在设备树默认的 576。`init.kukui.rc` 在 `early-boot` 和 `boot` 时把 `brightness` 交给 `system`。这次开机先 chown 过：0.25 写成 260，0.9 写成 922，然后放回 577。内核那张表是 `0` 到 `1023` 线性插值，不是 Gru 的三次方曲线，没有关 Android 的 gamma。2026-11-01 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `a456b6c03b4a42614f360342e23c59d5ecc3c032b64a89e8a11a7c7c54d0ec1b`。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。卡已卸载。还没有这次 Ctrl+U。
 7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，崩溃次数是 0，蓝牙鼠标能用。A2DP 在带上 system heap 的这次启动里耳机播放正常。
 8. 扬声器播放，然后是内置麦。Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的板有插孔，混音器按 UCM 写了，没在实机上听过。2026-10-31 这次 Ctrl+U：蓝牙耳机正常，USB 连续播放和耳麦录音正常，触摸音在没有别的声音垫着时经常错过。内置扬声器和麦打不开，因为 USB 声卡占了 card 0。HAL 改为按声卡名找 MT8183，USB 播放在 standby 时保持打开。正在跑的进程已换上这份 HAL，`pcmC1D0p` 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。还没有这次 Ctrl+U 的结果。共享树里的 Kukui 音频补丁在写入后已拿掉。下一份编译用 `patches/apply-patches.sh`，不再需要 `device/google/gru`。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
-10. zram。
+10. zram。内核里已经有 `zram0`，算法可以选 zstd，但这台机器上交换区是 0。`fstab` 写了 `zramsize=50%`，`swapon_all` 仍会去打开 `/sys/block/zram0/max_comp_streams`。6.18 没有这个文件，所以在写入 `disksize` 之前就失败了。Android 16 改由 `mmd` 在开机完成时设置。`mmd.zram.enabled=true`，压缩算法 zstd，大小是内存的 50%。这次开机已经执行 `mmd --setup-zram`。fstab 里的 zram 行已去掉。2026-11-01 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `5446e0dc0fd2dcf64b404044a59fec9e8344e739b21419b2bc0bb44b577d7b34`。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。卡未挂载。还没有这次 Ctrl+U。
 11. 休眠和唤醒。开关为关时走 `s2idle`，USB 保持供电。2026-10-31 这次 Ctrl+U 已确认：读卡器灯常亮，`suspend_stats` `success=3`，日志有 `PM: suspend entry (s2idle)`，唤醒后仍是同一次启动。每次停留大约 1 秒，EC 计到的睡眠切换是 0。不预先喂看门狗。
 
 ## 完成标准

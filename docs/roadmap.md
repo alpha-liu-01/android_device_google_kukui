@@ -186,7 +186,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 6. 蓝牙。UART 上的 QCA6174。2026-10-31 这次 Ctrl+U 后自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到下一项的音频 HAL。
 7. 扬声器播放，然后是内置麦。这台 Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的 kukui 板有插孔，混音器按 UCM 写了，没在实机上听过。DA7219 的板是另一颗 codec，不在这份镜像里。2026-10-31 这次 Ctrl+U：蓝牙耳机正常。USB 连续播放、提示音和耳麦录音正常，触摸反馈音在没有别的声音垫底时经常播不出。内置扬声器和麦完全没有声音，因为 USB 声卡先注册成 card 0。HAL 改为按名字找 MT8183 卡，USB 播放在 standby 时保持 PCM 打开。正在跑的 HAL 已换成这份，扬声器 PCM 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。Kukui 对共享音频 HAL 的改动在 `patches/`。干净的 Lineage 树打 `hardware_interfaces_audio_kukui_standalone.patch`，已经打过 Gru 音频补丁的树打 `hardware_interfaces_audio_kukui.patch`。`patches/apply-patches.sh` 自己选。编 Gru 之前把后一份拿掉。编译不需要 `device/google/gru`。
 8. 电量和充电。
-9. zram。
+9. zram。`swapon_all` 会写 `max_comp_streams`，6.18 没有这个文件，交换区一直是 0。改由 `mmd` 打开，zstd，大小是内存的 50%。2026-11-01 只把 super 写入 SanDisk（序列号 `000000002959`），读回 sha256 `5446e0dc0fd2dcf64b404044a59fec9e8344e739b21419b2bc0bb44b577d7b34`。内核槽开头 1 MiB 没变。卡未挂载。还没有这次 Ctrl+U。
 10. 休眠和唤醒。从 U 盘启动时，开关为关走 `s2idle`，USB 保持供电。2026-10-31 已确认读卡器灯常亮，内核进入过 s2idle，唤醒后仍是同一次启动。每次大约 1 秒，EC 没有计到完整的睡眠切换。这一项不预先喂看门狗。
 
 完成标准：在 4 GB 内存上完成一次「开机、联网、打开网页、安装应用、睡眠、唤醒」。唤醒后仍是同一次启动。网页不是黑的。
