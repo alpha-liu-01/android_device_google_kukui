@@ -176,7 +176,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 ### 4 平板日常
 
-已开始，记录在 [阶段 4](phase-4.md)。Panfrost 仍是 Mali-G72。外接鼠标、键盘盖触控板和触摸屏都能用，触摸方向已对齐。Launcher3 已停住。屏幕导航键已打开。Wi-Fi 已连上，无线 adb 可用。USI 笔方向已经对。电量计模块已放进 super，9 V 合同受 EC 固件限制。前一项能用再做下一项。镜像保持 vanilla。
+已结束，记录在 [阶段 4](phase-4.md)。Panfrost 仍是 Mali-G72。外接鼠标、键盘盖触控板和触摸屏都能用，触摸方向已对齐。Launcher3 已停住。屏幕导航键已打开。Wi-Fi 已连上，无线 adb 可用。USI 笔方向已经对。电量计模块已放进 super，9 V 合同受 EC 固件限制。前一项能用再做下一项。镜像保持 vanilla。
 
 1. Panfrost 加速。第十四次启动已经是 Mali-G72 GLES 3.1，镜像里没有 SwiftShader。这一项只确认后面的改动没有把它换掉。
 2. Wi-Fi，然后是无线 adb。第十九次已经连上，无线 adb 可用。
@@ -196,7 +196,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 日常路径通了之后，按实机现象处理，不把 Gru 的芯片补丁提前打进来。
 
 - SELinux 改成 enforcing。Gru 上这一步暴露过的、需要在这台机器上重新写路径的有：`vendor_init` 加载模块、surfaceflinger 读显示 uevent、devtmpfs 上内核创建节点、memfd 在改标签之前被音频和蓝牙映射。genfs 按这台的 sysfs 路径写。
-- 视频解码。解码器是 `mtk-vcodec-dec`，并且已经加载 `v4l2_h264` 和 `v4l2_vp9`。按这条无状态接口接 codec2，不搬 rkvdec 的补丁。
+- 视频解码。调查在 [video-decode.md](video-decode.md)。解码器是无状态的 `mtk-vcodec-dec`，输出是 `MM21` 不是 NV12，固件在 SCP。这次 Android 开机里模块没装，节点不存在。按 cros-codecs 接 codec2，不搬 rkvdec 的补丁。还没改镜像。
 - 摄像头。这颗设备树没有传感器节点，这一段不造一个。
 - IT6505 外接显示器。运行中的设备树没有这个节点。内置屏的旋转和合成先稳定，确认节点出现之后再做。
 - 刷新率、开机动画、自动熄屏这类产品细节，按实机显示结果改。
@@ -235,4 +235,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 3 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md) 和 [阶段 3](phase-3.md)。阶段 4 已开始。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到音频 HAL。加速度计的单位矩阵和 FIFO 超时已在 2026-10-31 这次 Ctrl+U 确认：正放是横屏，读数大约每 40 毫秒一笔。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 4 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md)、[阶段 3](phase-3.md) 和 [阶段 4](phase-4.md)。音视频编解码的调查在 [video-decode.md](video-decode.md)，还没改镜像。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到音频 HAL。加速度计的单位矩阵和 FIFO 超时已在 2026-10-31 这次 Ctrl+U 确认：正放是横屏，读数大约每 40 毫秒一笔。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。

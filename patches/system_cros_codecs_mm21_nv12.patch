@@ -1,0 +1,386 @@
+--- a/ffi/src/lib.rs
++++ b/ffi/src/lib.rs
+@@ -4,7 +4,6 @@
+ 
+ //! C interface to the cros-codecs V4L2 stateless decoders. See `include/cros_codecs_ffi.h`.
+ 
+-use std::cell::Cell;
+ use std::ffi::c_void;
+ use std::fmt;
+ use std::fs::File;
+@@ -26,7 +25,11 @@
+ use cros_codecs::decoder::DecoderEvent;
+ use cros_codecs::decoder::DynDecodedHandle;
+ use cros_codecs::decoder::ReadyFrame;
++use cros_codecs::decoder::StreamInfo;
++use cros_codecs::image_processing::convert_video_frame;
+ use cros_codecs::video_frame::generic_dma_video_frame::GenericDmaVideoFrame;
++use cros_codecs::video_frame::v4l2_mmap_video_frame::V4l2MmapVideoFrame;
++use cros_codecs::DecodedFormat;
+ use cros_codecs::Fourcc;
+ use cros_codecs::FrameLayout;
+ use cros_codecs::PlaneLayout;
+@@ -38,6 +41,7 @@
+ const CC_CODEC_VP9: u32 = 2;
+ 
+ const CC_STATUS_OK: i32 = 0;
++#[allow(dead_code)]
+ const CC_STATUS_NEED_FRAMES: i32 = 1;
+ const CC_STATUS_CHECK_EVENTS: i32 = 2;
+ const CC_STATUS_OUT_OF_SLOTS: i32 = 3;
+@@ -46,6 +50,9 @@
+ const CC_EVENT_FRAME: u32 = 1;
+ const CC_EVENT_FORMAT_CHANGED: u32 = 2;
+ const CC_EVENT_CSD: u32 = 3;
++// A decoded frame is waiting for a client buffer. The caller must fetch one and call next_event
++// again. The frame stays queued here.
++const CC_EVENT_NEED_OUTPUT: u32 = 4;
+ 
+ const CC_MAX_PLANES: usize = 4;
+ 
+@@ -107,18 +114,34 @@
+     }
+ }
+ 
+-type Frame = GenericDmaVideoFrame<FrameToken>;
+-type Backend = V4l2StatelessDecoderBackend<Frame>;
++impl FrameToken {
++    fn id(&self) -> u64 {
++        self.0.id
++    }
++}
++
++// The decoder writes into driver-owned mmap buffers. MT8183's capture format is MM21, two
++// planes, and the stateless driver programs each plane from that plane's own dma-buf address.
++// It does not add data_offset, so one gralloc fd cannot be both the Y and the UV plane.
++type HwFrame = V4l2MmapVideoFrame;
++type Backend = V4l2StatelessDecoderBackend<HwFrame>;
++type ClientFrame = GenericDmaVideoFrame<FrameToken>;
+ 
+ /// Decoder instance behind the opaque `CrosCodecsDecoder` C type.
+ pub struct CrosCodecsDecoder {
+-    decoder: DynStatelessVideoDecoder<Frame>,
++    decoder: DynStatelessVideoDecoder<HwFrame>,
+     ctx: usize,
+     alloc_cb: CcAllocFrameCb,
+     release_cb: CcReleaseFrameCb,
+-    // Handles returned by the last next_event() calls. The client must see the frame event before
+-    // the decoder can release the frame, so they are only dropped on the next call.
+-    emitted: Vec<DynDecodedHandle<Frame>>,
++    // Client buffers filled by the last next_event() calls. Dropping one releases it back to
++    // the client, so they stay here until the next decode() call.
++    emitted: Vec<ClientFrame>,
++    // A decoded frame that could not be copied yet because the client had no free buffer.
++    // Dropping it would discard the picture, so it stays until a buffer arrives or flush().
++    pending: Option<DynDecodedHandle<HwFrame>>,
++    // Set around flush. Pictures already in the decoder belong to the abandoned works and are
++    // dropped here, without the MM21 copy.
++    discard: bool,
+ }
+ 
+ fn set_rect(event: &mut CcEvent, rect: Rect) {
+@@ -137,7 +160,7 @@
+         release_cb: CcReleaseFrameCb,
+     ) -> Result<Self, String> {
+         let mode = BlockingMode::Blocking;
+-        let decoder: DynStatelessVideoDecoder<Frame> = match codec {
++        let decoder: DynStatelessVideoDecoder<HwFrame> = match codec {
+             CC_CODEC_H264 => StatelessDecoder::<H264, Backend>::new_v4l2(mode)
+                 .map_err(|e| e.to_string())?
+                 .into_trait_object(),
+@@ -149,7 +172,15 @@
+                 .into_trait_object(),
+             _ => return Err(format!("unsupported codec {codec}")),
+         };
+-        Ok(Self { decoder, ctx, alloc_cb, release_cb, emitted: Vec::new() })
++        Ok(Self {
++            decoder,
++            ctx,
++            alloc_cb,
++            release_cb,
++            emitted: Vec::new(),
++            pending: None,
++            discard: false,
++        })
+     }
+ 
+     fn decode(
+@@ -162,41 +193,10 @@
+     ) -> i32 {
+         self.emitted.clear();
+ 
+-        let ctx = self.ctx;
+-        let alloc_cb = self.alloc_cb;
+-        let release_cb = self.release_cb;
+-        let starved = Cell::new(false);
+-        let invalid_frame = Cell::new(false);
+-        let mut alloc = || -> Option<Frame> {
+-            let mut desc = CcFrameDesc { fd: -1, ..Default::default() };
+-            if !alloc_cb(ctx as *mut c_void, &mut desc) {
+-                starved.set(true);
+-                return None;
+-            }
+-            // SAFETY: the client transfers ownership of a valid dma-buf fd.
+-            let file = unsafe { File::from_raw_fd(desc.fd) };
+-            let token = FrameToken(Arc::new(TokenInner { id: desc.token, ctx, release_cb }));
+-            let num_planes = (desc.num_planes as usize).min(CC_MAX_PLANES);
+-            let layout = FrameLayout {
+-                format: (Fourcc::from(desc.fourcc), 0),
+-                size: Resolution { width: desc.width, height: desc.height },
+-                planes: (0..num_planes)
+-                    .map(|i| PlaneLayout {
+-                        buffer_index: 0,
+-                        offset: desc.offsets[i] as usize,
+-                        stride: desc.strides[i] as usize,
+-                    })
+-                    .collect(),
+-            };
+-            let rect = Rect { x: 0, y: 0, width: desc.width, height: desc.height };
+-            match GenericDmaVideoFrame::new(token, vec![file], layout, rect) {
+-                Ok(frame) => Some(frame),
+-                Err(e) => {
+-                    log::error!("Invalid output buffer {}: {}", desc.token, e);
+-                    invalid_frame.set(true);
+-                    None
+-                }
+-            }
++        let picture = self.decoder.stream_info().cloned();
++        let mut alloc = || -> Option<HwFrame> {
++            let info = picture.as_ref()?;
++            Some(V4l2MmapVideoFrame::new(Fourcc::from(info.format), visible_size(info)))
+         };
+ 
+         let result = self.decoder.decode(
+@@ -213,8 +213,6 @@
+                 *consumed = bytes;
+                 CC_STATUS_OK
+             }
+-            Err(_) if invalid_frame.get() => CC_STATUS_ERROR,
+-            Err(DecodeError::NotEnoughOutputBuffers(_)) if starved.get() => CC_STATUS_NEED_FRAMES,
+             Err(DecodeError::NotEnoughOutputBuffers(_)) => CC_STATUS_OUT_OF_SLOTS,
+             Err(DecodeError::CheckEvents) => CC_STATUS_CHECK_EVENTS,
+             Err(e) => {
+@@ -224,8 +222,32 @@
+         }
+     }
+ 
++    fn drop_pending(&mut self) {
++        self.pending = None;
++    }
++
++    fn set_discard(&mut self, discard: bool) {
++        self.discard = discard;
++        if discard {
++            self.pending = None;
++        }
++    }
++
++    // Drops every picture the decoder has already queued. Used while flushing, so a 1080p
++    // detile does not run for frames the client is about to abandon.
++    fn discard_queued(&mut self) {
++        self.pending = None;
++        while let Some(event) = self.decoder.next_event() {
++            match event {
++                DecoderEvent::FrameReady(ReadyFrame::Frame(handle)) => drop(handle),
++                DecoderEvent::FrameReady(ReadyFrame::CSD(_)) | DecoderEvent::FormatChanged => {}
++            }
++        }
++    }
++
+     fn flush(&mut self) -> i32 {
+         self.emitted.clear();
++        self.pending = None;
+         match self.decoder.flush() {
+             Ok(()) => CC_STATUS_OK,
+             Err(e) => {
+@@ -235,21 +257,47 @@
+         }
+     }
+ 
++    // Copies |handle| into a client buffer. If none is free, keeps |handle| and asks the
++    // caller to fetch one. Returning without the handle would drop the picture.
++    fn emit_frame(&mut self, handle: DynDecodedHandle<HwFrame>, event: &mut CcEvent) -> bool {
++        if let Err(e) = handle.sync() {
++            log::error!("Failed to sync decoded frame: {e:?}");
++        }
++        let hw = handle.video_frame();
++        let mut client = match self.take_client_frame() {
++            Some(frame) => frame,
++            None => {
++                self.pending = Some(handle);
++                event.type_ = CC_EVENT_NEED_OUTPUT;
++                return true;
++            }
++        };
++        if let Err(e) = convert_video_frame(hw.as_ref(), &mut client) {
++            log::error!("Failed to convert decoded frame to NV12: {e}");
++            return false;
++        }
++        event.type_ = CC_EVENT_FRAME;
++        // V4L2 backends store `timestamp << 1` and use the LSB to tell apart the frames
++        // of a VP9 superframe.
++        event.timestamp = handle.timestamp() >> 1;
++        event.token = client.token.id();
++        set_rect(event, handle.display_rect());
++        self.emitted.push(client);
++        true
++    }
++
+     fn next_event(&mut self, event: &mut CcEvent) -> bool {
+         *event = CcEvent::default();
++        if self.discard {
++            self.discard_queued();
++            return false;
++        }
++        if let Some(handle) = self.pending.take() {
++            return self.emit_frame(handle, event);
++        }
+         match self.decoder.next_event() {
+             Some(DecoderEvent::FrameReady(ReadyFrame::Frame(handle))) => {
+-                if let Err(e) = handle.sync() {
+-                    log::error!("Failed to sync decoded frame: {e:?}");
+-                }
+-                event.type_ = CC_EVENT_FRAME;
+-                // V4L2 backends store `timestamp << 1` and use the LSB to tell apart the frames
+-                // of a VP9 superframe.
+-                event.timestamp = handle.timestamp() >> 1;
+-                event.token = handle.video_frame().token.0.id;
+-                set_rect(event, handle.display_rect());
+-                self.emitted.push(handle);
+-                true
++                self.emit_frame(handle, event)
+             }
+             Some(DecoderEvent::FrameReady(ReadyFrame::CSD(timestamp))) => {
+                 event.type_ = CC_EVENT_CSD;
+@@ -262,7 +310,13 @@
+                     event.coded_width = info.coded_resolution.width;
+                     event.coded_height = info.coded_resolution.height;
+                     event.min_num_frames = info.min_num_frames as u32;
+-                    event.fourcc = u32::from(Fourcc::from(info.format));
++                    // The client buffer is linear NV12. MM21 is detiled in next_event before
++                    // the frame is handed over.
++                    let presented = match info.format {
++                        DecodedFormat::MM21 | DecodedFormat::NV12 => DecodedFormat::NV12,
++                        other => other,
++                    };
++                    event.fourcc = u32::from(Fourcc::from(presented));
+                     set_rect(event, info.display_rect);
+                 }
+                 true
+@@ -270,6 +324,55 @@
+             None => false,
+         }
+     }
++
++    fn take_client_frame(&self) -> Option<ClientFrame> {
++        let mut desc = CcFrameDesc { fd: -1, ..Default::default() };
++        if !(self.alloc_cb)(self.ctx as *mut c_void, &mut desc) {
++            return None;
++        }
++        // SAFETY: the client transfers ownership of a valid dma-buf fd.
++        let file = unsafe { File::from_raw_fd(desc.fd) };
++        let token = FrameToken(Arc::new(TokenInner {
++            id: desc.token,
++            ctx: self.ctx,
++            release_cb: self.release_cb,
++        }));
++        let num_planes = (desc.num_planes as usize).min(CC_MAX_PLANES);
++        let layout = FrameLayout {
++            format: (Fourcc::from(desc.fourcc), 0),
++            size: Resolution { width: desc.width, height: desc.height },
++            planes: (0..num_planes)
++                .map(|i| PlaneLayout {
++                    buffer_index: 0,
++                    offset: desc.offsets[i] as usize,
++                    stride: desc.strides[i] as usize,
++                })
++                .collect(),
++        };
++        let rect = Rect { x: 0, y: 0, width: desc.width, height: desc.height };
++        match GenericDmaVideoFrame::new(token, vec![file], layout, rect) {
++            Ok(frame) => Some(frame),
++            Err(e) => {
++                log::error!("Invalid output buffer {}: {}", desc.token, e);
++                None
++            }
++        }
++    }
++}
++
++fn visible_size(info: &StreamInfo) -> Rect {
++    if info.display_rect.width > info.display_rect.x
++        && info.display_rect.height > info.display_rect.y
++    {
++        Rect {
++            x: 0,
++            y: 0,
++            width: info.display_rect.width - info.display_rect.x,
++            height: info.display_rect.height - info.display_rect.y,
++        }
++    } else {
++        Rect::from(info.coded_resolution)
++    }
+ }
+ 
+ fn guard<T>(default: T, f: impl FnOnce() -> T) -> T {
+@@ -356,6 +459,35 @@
+ }
+ 
+ /// # Safety
++///
++/// `decoder` must be valid.
++#[no_mangle]
++pub unsafe extern "C" fn cros_codecs_decoder_set_discard(
++    decoder: *mut CrosCodecsDecoder,
++    discard: bool,
++) {
++    if decoder.is_null() {
++        return;
++    }
++    // SAFETY: the caller guarantees `decoder` is valid.
++    let decoder = unsafe { &mut *decoder };
++    guard((), || decoder.set_discard(discard));
++}
++
++/// # Safety
++///
++/// `decoder` must be valid.
++#[no_mangle]
++pub unsafe extern "C" fn cros_codecs_decoder_drop_pending(decoder: *mut CrosCodecsDecoder) {
++    if decoder.is_null() {
++        return;
++    }
++    // SAFETY: the caller guarantees `decoder` is valid.
++    let decoder = unsafe { &mut *decoder };
++    guard((), || decoder.drop_pending());
++}
++
++/// # Safety
+ ///
+ /// `decoder` must be valid and `event` must be writable.
+ #[no_mangle]
+--- a/ffi/include/cros_codecs_ffi.h
++++ b/ffi/include/cros_codecs_ffi.h
+@@ -42,6 +42,9 @@
+     CC_EVENT_FRAME = 1,
+     CC_EVENT_FORMAT_CHANGED = 2,
+     CC_EVENT_CSD = 3,
++    // A decoded frame is held until the alloc callback can supply a buffer.
++    // Fetch one and call cros_codecs_decoder_next_event() again.
++    CC_EVENT_NEED_OUTPUT = 4,
+ };
+ 
+ #define CC_MAX_PLANES 4
+@@ -95,6 +98,12 @@
+ // Outputs all pending frames. Decoding resumes at the next key frame.
+ int32_t cros_codecs_decoder_flush(CrosCodecsDecoder* decoder);
+ 
++// Drops a decoded frame that is waiting for a client buffer. The picture is discarded.
++void cros_codecs_decoder_drop_pending(CrosCodecsDecoder* decoder);
++
++// While set, queued pictures are dropped instead of copied. Used for flush.
++void cros_codecs_decoder_set_discard(CrosCodecsDecoder* decoder, bool discard);
++
+ // Returns true and fills |event| if an event is pending.
+ bool cros_codecs_decoder_next_event(CrosCodecsDecoder* decoder, CcEvent* event);
+ 

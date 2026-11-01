@@ -1,0 +1,88 @@
+diff --git a/lib/src/device/queue.rs b/lib/src/device/queue.rs
+index 2cc15ec..4079180 100644
+--- a/lib/src/device/queue.rs
++++ b/lib/src/device/queue.rs
+@@ -251,9 +251,30 @@ impl<D: Direction> Queue<D, QueueInit> {
+         self,
+         memory_type: P::SupportedMemoryType,
+         count: u32,
++    ) -> Result<Queue<D, BuffersAllocated<P>>, RequestBuffersError> {
++        self.request_buffers_generic_flags(memory_type, count, 0)
++    }
++
++    /// Like [`Self::request_buffers_generic`], but passes `flags` to `VIDIOC_REQBUFS`.
++    /// `V4L2_MEMORY_FLAG_NON_COHERENT` allocates CPU-cached MMAP buffers.
++    pub fn request_buffers_generic_flags<P: BufferHandles>(
++        self,
++        memory_type: P::SupportedMemoryType,
++        count: u32,
++        flags: u8,
+     ) -> Result<Queue<D, BuffersAllocated<P>>, RequestBuffersError> {
+         let type_ = self.inner.type_;
+-        let num_buffers: usize = ioctl::reqbufs(&self.inner, type_, memory_type.into(), count)?;
++        let allocated: ioctl::RequestBuffers =
++            ioctl::reqbufs_flags(&self.inner, type_, memory_type.into(), count, flags)?;
++        if flags != 0 && allocated.flags & flags != flags {
++            log::warn!(
++                "VIDIOC_REQBUFS on {} kept flags {:#x}, requested {:#x}",
++                type_,
++                allocated.flags,
++                flags
++            );
++        }
++        let num_buffers: usize = allocated.count as usize;
+ 
+         debug!(
+             "Requested {} buffers on {} queue, obtained {}",
+diff --git a/lib/src/ioctl/reqbufs.rs b/lib/src/ioctl/reqbufs.rs
+index f0b9c7d..794670a 100644
+--- a/lib/src/ioctl/reqbufs.rs
++++ b/lib/src/ioctl/reqbufs.rs
+@@ -47,6 +47,7 @@ impl From<v4l2_requestbuffers> for BufferCapabilities {
+ pub struct RequestBuffers {
+     pub count: u32,
+     pub capabilities: BufferCapabilities,
++    pub flags: u8,
+ }
+ 
+ impl From<v4l2_requestbuffers> for RequestBuffers {
+@@ -54,10 +55,15 @@ impl From<v4l2_requestbuffers> for RequestBuffers {
+         RequestBuffers {
+             count: reqbufs.count,
+             capabilities: BufferCapabilities::from_bits_truncate(reqbufs.capabilities),
++            flags: reqbufs.flags,
+         }
+     }
+ }
+ 
++/// Ask vb2 for CPU-cached MMAP buffers. The queue must advertise cache hints.
++/// DQBUF invalidates the cache before userspace reads a device-written buffer.
++pub const V4L2_MEMORY_FLAG_NON_COHERENT: u8 = 1;
++
+ #[doc(hidden)]
+ mod ioctl {
+     use crate::bindings::v4l2_create_buffers;
+@@ -90,11 +96,23 @@ pub fn reqbufs<O: From<v4l2_requestbuffers>>(
+     queue: QueueType,
+     memory: MemoryType,
+     count: u32,
++) -> Result<O, ReqbufsError> {
++    reqbufs_flags(fd, queue, memory, count, 0)
++}
++
++/// Same as [`reqbufs`], with `v4l2_requestbuffers.flags` set.
++pub fn reqbufs_flags<O: From<v4l2_requestbuffers>>(
++    fd: &impl AsRawFd,
++    queue: QueueType,
++    memory: MemoryType,
++    count: u32,
++    flags: u8,
+ ) -> Result<O, ReqbufsError> {
+     let mut reqbufs = v4l2_requestbuffers {
+         count,
+         type_: queue as u32,
+         memory: memory as u32,
++        flags,
+         ..Default::default()
+     };
+ 

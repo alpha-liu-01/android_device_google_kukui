@@ -30,6 +30,22 @@ snd-ump.ko: snd-rawmidi.ko snd-seq-device.ko
 snd-hwdep.ko:
 snd-usbmidi-lib.ko: snd-rawmidi.ko
 snd-usb-audio.ko: snd-usbmidi-lib.ko snd-hwdep.ko snd-ump.ko mc.ko
+mtk_scp_ipi.ko:
+mtk_rpmsg.ko:
+mtk_scp.ko: mtk_scp_ipi.ko mtk_rpmsg.ko
+mtk-vpu.ko:
+videobuf2-common.ko: mc.ko
+videobuf2-memops.ko: videobuf2-common.ko
+videobuf2-dma-contig.ko: videobuf2-memops.ko videobuf2-common.ko
+videodev.ko: mc.ko
+videobuf2-v4l2.ko: videobuf2-common.ko mc.ko videodev.ko
+v4l2-mem2mem.ko: videobuf2-common.ko videobuf2-v4l2.ko videodev.ko mc.ko
+v4l2-h264.ko:
+v4l2-vp9.ko:
+mtk-vcodec-common.ko: mtk-vpu.ko mtk_scp.ko mtk_scp_ipi.ko
+mtk-vcodec-dbgfs.ko: mtk-vcodec-common.ko
+mtk-vcodec-dec.ko: mtk-vcodec-common.ko v4l2-mem2mem.ko videodev.ko videobuf2-v4l2.ko videobuf2-common.ko v4l2-vp9.ko v4l2-h264.ko mc.ko mtk-vcodec-dbgfs.ko videobuf2-dma-contig.ko
+mtk-vcodec-enc.ko: mtk-vcodec-common.ko v4l2-mem2mem.ko videobuf2-common.ko videodev.ko videobuf2-dma-contig.ko videobuf2-v4l2.ko mtk-vcodec-dbgfs.ko
 snd-soc-mtk-common.ko:
 snd-soc-mt8183-afe.ko: snd-soc-mtk-common.ko
 snd-soc-mt6358.ko:

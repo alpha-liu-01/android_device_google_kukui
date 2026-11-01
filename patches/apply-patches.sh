@@ -22,6 +22,21 @@
 #   memfd, codec2 IConfigurable, mesa 25 board.mk, v4l2 seccomp
 #     machine-independent fixes this product boots with. --reverse leaves
 #     them in place.
+#   system_cros_codecs_mm21_nv12.patch
+#     the stateless decoder writes MM21 into its own buffers, then copies
+#     linear NV12 into the caller's buffer. A decoded frame stays queued
+#     until that buffer exists. Flush drops the queued picture instead of
+#     copying it. --reverse removes it so a Gru build keeps the zero-copy path.
+#   system_cros_codecs_v4l2_flush_reset.patch
+#     a same-format seek streams the V4L2 queues off and the next SPS starts
+#     a new sequence. VAAPI keeps the old flush path. --reverse removes it.
+#   external_v4l2r_cached_capture.patch
+#   system_cros_codecs_v4l2_cached_capture.patch
+#     the decoder capture queue asks for cached MMAP buffers. DQBUF still
+#     invalidates them. --reverse removes both.
+#   system_cros_codecs_v4l2_poll_wait.patch
+#     wait for a capture or output buffer with poll instead of a doubling
+#     sleep. --reverse removes it.
 #
 # A Kukui build refuses to start while KukuiMixer.h is absent.
 set -euo pipefail
@@ -165,6 +180,46 @@ install_manifest() {
 
 if [[ $REVERSE -eq 1 ]]; then
     reverse_audio
+    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
+        < "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" >/dev/null 2>&1; then
+        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
+            < "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" >/dev/null
+        echo "[OK]    removed MM21 to NV12 decoder copy"
+    else
+        echo "[SKIP]  MM21 to NV12 decoder copy is not applied"
+    fi
+    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
+        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" >/dev/null 2>&1; then
+        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
+            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" >/dev/null
+        echo "[OK]    removed V4L2 flush reset"
+    else
+        echo "[SKIP]  V4L2 flush reset is not applied"
+    fi
+    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
+        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" >/dev/null 2>&1; then
+        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
+            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" >/dev/null
+        echo "[OK]    removed cached capture buffers"
+    else
+        echo "[SKIP]  cached capture buffers are not applied"
+    fi
+    if patch -d "${LINEAGE_ROOT}/external/rust/crates/v4l2r" -p1 -R --dry-run -s \
+        < "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" >/dev/null 2>&1; then
+        patch -d "${LINEAGE_ROOT}/external/rust/crates/v4l2r" -p1 -R \
+            < "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" >/dev/null
+        echo "[OK]    removed v4l2r cached capture request"
+    else
+        echo "[SKIP]  v4l2r cached capture request is not applied"
+    fi
+    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
+        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" >/dev/null 2>&1; then
+        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
+            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" >/dev/null
+        echo "[OK]    removed V4L2 poll wait"
+    else
+        echo "[SKIP]  V4L2 poll wait is not applied"
+    fi
     exit 0
 fi
 
@@ -183,3 +238,18 @@ apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_v4l2_codec2_seccomp.patch" \
     "v4l2 codec2 seccomp"
+apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+    "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" \
+    "MM21 to NV12 decoder copy"
+apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" \
+    "V4L2 flush reset"
+apply_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
+    "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" \
+    "v4l2r cached capture request"
+apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" \
+    "cached capture buffers"
+apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" \
+    "V4L2 poll wait"

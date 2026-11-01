@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<MediaCodecs>
+    <Encoders>
+        <!-- 244800 blocks/s is 1920x1088@30 and 1280x720@60. -->
+        <MediaCodec name="c2.v4l2.avc.encoder" type="video/avc">
+            <Limit name="size" min="64x64" max="1920x1088" />
+            <Limit name="alignment" value="16x16" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="blocks-per-second" range="1-244800" />
+            <Limit name="bitrate" range="64000-20000000" />
+            <Limit name="concurrent-instances" max="1" />
+            <Limit name="performance-point-1920x1080" range="30-30" />
+            <Limit name="performance-point-1280x720" range="60-60" />
+        </MediaCodec>
+    </Encoders>
+
+    <Decoders>
+        <!-- MediaCodecList rejects sizes that are not a multiple of alignment, so 16x16 drops 1080p. -->
+        <!-- 489600 blocks/s is 1920x1080@60. A 30 fps point hides that from players. -->
+        <!-- 62.5 Mbit/s is the High profile level 4.2 cap. -->
+        <!-- A Feature with neither required nor optional is parsed as unsupported. -->
+        <MediaCodec name="c2.v4l2.avc.decoder" type="video/avc">
+            <Limit name="size" min="64x64" max="2048x1088" />
+            <Limit name="alignment" value="2x2" />
+            <Limit name="block-size" value="16x16" />
+            <Limit name="blocks-per-second" min="1" max="489600" />
+            <Limit name="bitrate" range="1-62500000" />
+            <Limit name="concurrent-instances" max="1" />
+            <Limit name="performance-point-1920x1080" range="60-60" />
+            <Feature name="adaptive-playback" required="false" />
+        </MediaCodec>
+    </Decoders>
+</MediaCodecs>

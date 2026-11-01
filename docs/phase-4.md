@@ -1,6 +1,6 @@
 # 阶段 4：平板日常
 
-2026-10-31 开始。路线图在 [roadmap.md](roadmap.md)。阶段 3 的第十四次 Ctrl+U 已经进入桌面，记录在 [阶段 3](phase-3.md)。这一段仍用内核 `6.18.28-mt81-kukui2`，`#1-kukui-phase2`。不重链内核映像，不改版本字符串，不写 eMMC，不启用 USB gadget，不喂看门狗。镜像保持 vanilla。
+2026-10-31 开始，2026-11-01 收口。路线图在 [roadmap.md](roadmap.md)。音视频编解码另记在 [video-decode.md](video-decode.md)。阶段 3 的第十四次 Ctrl+U 已经进入桌面，记录在 [阶段 3](phase-3.md)。这一段仍用内核 `6.18.28-mt81-kukui2`，`#1-kukui-phase2`。不重链内核映像，不改版本字符串，不写 eMMC，不启用 USB gadget，不喂看门狗。镜像保持 vanilla。
 
 ## 第十四次启动已经有的
 

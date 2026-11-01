@@ -11,6 +11,11 @@ DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay
 AB_OTA_UPDATER := false
 TARGET_GRAPHICS := mesa
 TARGET_GRAPHICS_VULKAN := none
+# Before mainline_common.mk, which pulls in optional/v4l2_codec2/product.mk.
+# The example configuration advertises VP8, VP9 and secure decoders this chip
+# does not enumerate. Kukui ships its own media_codecs_c2.xml.
+TARGET_MEDIA_C2_HAL := v4l2_codec2
+TARGET_V4L2_CODEC2_USE_EXAMPLE_CONFIGURATION := false
 TARGET_GRAPHICS_ALLOCATOR_HAL := minigbm-upstream
 TARGET_MINIGBM_PLATFORM := generic
 TARGET_DRM_HWCOMPOSER_VARIANT := aosp
@@ -68,6 +73,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin \
     $(LOCAL_PATH)/firmware/qca/nvm_00440302_i2s_eu.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/nvm_00440302_i2s_eu.bin \
     $(LOCAL_PATH)/firmware/qca/rampatch_00440302.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/rampatch_00440302.bin \
+    $(LOCAL_PATH)/firmware/mediatek/mt8183/scp.img:$(TARGET_COPY_OUT_VENDOR)/firmware/mediatek/mt8183/scp.img \
+    $(LOCAL_PATH)/etc/media_codecs_c2.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_c2.xml \
     $(LOCAL_PATH)/modules/rfkill.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfkill.ko \
     $(LOCAL_PATH)/modules/cfg80211.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cfg80211.ko \
     $(LOCAL_PATH)/modules/libarc4.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/libarc4.ko \
@@ -94,6 +101,22 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/cros_ec_light_prox.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_ec_light_prox.ko \
     $(LOCAL_PATH)/modules/mtk_wdt.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk_wdt.ko \
     $(LOCAL_PATH)/modules/mc.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mc.ko \
+    $(LOCAL_PATH)/modules/mtk_scp_ipi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk_scp_ipi.ko \
+    $(LOCAL_PATH)/modules/mtk_rpmsg.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk_rpmsg.ko \
+    $(LOCAL_PATH)/modules/mtk_scp.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk_scp.ko \
+    $(LOCAL_PATH)/modules/mtk-vpu.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vpu.ko \
+    $(LOCAL_PATH)/modules/videobuf2-common.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-common.ko \
+    $(LOCAL_PATH)/modules/videobuf2-memops.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-memops.ko \
+    $(LOCAL_PATH)/modules/videobuf2-dma-contig.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-dma-contig.ko \
+    $(LOCAL_PATH)/modules/videodev.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videodev.ko \
+    $(LOCAL_PATH)/modules/videobuf2-v4l2.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-v4l2.ko \
+    $(LOCAL_PATH)/modules/v4l2-mem2mem.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-mem2mem.ko \
+    $(LOCAL_PATH)/modules/v4l2-h264.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-h264.ko \
+    $(LOCAL_PATH)/modules/v4l2-vp9.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-vp9.ko \
+    $(LOCAL_PATH)/modules/mtk-vcodec-common.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-common.ko \
+    $(LOCAL_PATH)/modules/mtk-vcodec-dbgfs.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-dbgfs.ko \
+    $(LOCAL_PATH)/modules/mtk-vcodec-dec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-dec.ko \
+    $(LOCAL_PATH)/modules/mtk-vcodec-enc.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-enc.ko \
     $(LOCAL_PATH)/modules/snd-seq-device.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-seq-device.ko \
     $(LOCAL_PATH)/modules/snd-rawmidi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-rawmidi.ko \
     $(LOCAL_PATH)/modules/snd-ump.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-ump.ko \
@@ -169,4 +192,16 @@ PRODUCT_VENDOR_PROPERTIES += \
     vendor.usb.configfs=0 \
     vendor.minigbm.device=/dev/dri/card0 \
     ro.vendor.audio.route=kukui \
-    ro.vendor.audio.tinyalsa.analog_device=0
+    ro.vendor.audio.tinyalsa.analog_device=0 \
+    ro.vendor.v4l2_codec2.decoder.supported.h264=true \
+    ro.vendor.v4l2_codec2.decoder.supported.vp8=false \
+    ro.vendor.v4l2_codec2.decoder.supported.vp9=false \
+    ro.vendor.v4l2_codec2.decoder.supported.hevc=false \
+    ro.vendor.v4l2_codec2.decoder.supported.av1=false \
+    ro.vendor.v4l2_codec2.decoder.supported.h264.secure=false \
+    ro.vendor.v4l2_codec2.encoder.supported.h264=true \
+    ro.vendor.v4l2_codec2.encoder.supported.vp8=false \
+    ro.vendor.v4l2_codec2.encoder.supported.vp9=false \
+    ro.vendor.v4l2_codec2.decode_concurrent_instances=1 \
+    ro.vendor.v4l2_codec2.encode_concurrent_instances=1 \
+    debug.stagefright.c2-poolmask=0xf50000
