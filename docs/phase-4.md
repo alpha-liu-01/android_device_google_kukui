@@ -257,7 +257,7 @@ DA7219 的板是另一颗 codec：damu、fennel sku1/sku6、fennel14、makomo-sk
 3. Wi-Fi 和无线 adb。第十九次已连上 `"Not 6GHz"`，`10.0.0.104`，无线 adb 可用。
 4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。加速度计已进 super。postmarketOS 那组矩阵叠在 `ORIENTATION_270` 上多转了 90 度，正放时画面是竖屏。单位矩阵在这次开机里把画面拉回 1920×1200。读数慢是因为关掉的陀螺仪仍以 200 Hz 占着 EC 的 FIFO。2026-10-31 这次 Ctrl+U 已确认：正放是 1920×1200，加速度计大约每 40 毫秒一笔，陀螺仪 ODR 在不用时是 0。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
-6. 背光。
+6. 背光。滑块改的是框架里的亮度，light HAL 也找到了 `backlight_lcd0`（最大 1023）。节点权限是 `root:root` `0644`，HAL 以 `system` 运行，写不进去，所以 sysfs 一直停在设备树默认的 576。`init.kukui.rc` 在 `early-boot` 和 `boot` 时把 `brightness` 交给 `system`。这次开机先 chown 过：0.25 写成 260，0.9 写成 922，然后放回 577。内核那张表是 `0` 到 `1023` 线性插值，不是 Gru 的三次方曲线，没有关 Android 的 gamma。2026-11-01 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `a456b6c03b4a42614f360342e23c59d5ecc3c032b64a89e8a11a7c7c54d0ec1b`。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。卡已卸载。还没有这次 Ctrl+U。
 7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，崩溃次数是 0，蓝牙鼠标能用。A2DP 在带上 system heap 的这次启动里耳机播放正常。
 8. 扬声器播放，然后是内置麦。Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的板有插孔，混音器按 UCM 写了，没在实机上听过。2026-10-31 这次 Ctrl+U：蓝牙耳机正常，USB 连续播放和耳麦录音正常，触摸音在没有别的声音垫着时经常错过。内置扬声器和麦打不开，因为 USB 声卡占了 card 0。HAL 改为按声卡名找 MT8183，USB 播放在 standby 时保持打开。正在跑的进程已换上这份 HAL，`pcmC1D0p` 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。还没有这次 Ctrl+U 的结果。共享树里的 Kukui 音频补丁在写入后已拿掉。下一份编译用 `patches/apply-patches.sh`，不再需要 `device/google/gru`。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。

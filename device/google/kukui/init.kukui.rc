@@ -1,5 +1,15 @@
 import /vendor/etc/init/hw/init.mainline.rc
 
+on early-boot
+    # The lineage light HAL runs as system and writes this node. The stock
+    # rc only chowns backlight and panel0-backlight. This panel is
+    # backlight_lcd0, so the node stayed root:root and the slider never
+    # landed. Repeated on boot in case the platform device appears later.
+    chown system system /sys/class/backlight/backlight_lcd0/brightness
+
+on boot
+    chown system system /sys/class/backlight/backlight_lcd0/brightness
+
 on early-init
     write /sys/module/firmware_class/parameters/path /vendor/firmware
     setprop vendor.usb.configfs 0

@@ -182,7 +182,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 2. Wi-Fi，然后是无线 adb。第十九次已经连上，无线 adb 可用。
 3. 触摸、旋转、USI 笔。手指和笔已经对。加速度计已写入过一版，postmarketOS 矩阵在这台的 `ORIENTATION_270` 上多转了 90 度。单位矩阵和 FIFO 超时已写入 super。2026-10-31 这次 Ctrl+U 已确认：正放是横屏 1920×1200，加速度计大约每 40 毫秒一笔。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。
 4. 底座键盘、触控板，以及拆下底座后的平板模式。
-5. 背光。
+5. 背光。`backlight_lcd0` 最大 1023，light HAL 能找到它，但 `brightness` 是 `root:root`，滑块写不进去，停在默认 576。`init.kukui.rc` 把这个节点交给 `system`。2026-11-01 在正在跑的系统上 chown 之后，0.25 写成 260、0.9 写成 922。同日只把 super 写入 SanDisk（序列号 `000000002959`），读回 sha256 `a456b6c03b4a42614f360342e23c59d5ecc3c032b64a89e8a11a7c7c54d0ec1b`。内核槽没动。还没有这次 Ctrl+U。
 6. 蓝牙。UART 上的 QCA6174。2026-10-31 这次 Ctrl+U 后自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到下一项的音频 HAL。
 7. 扬声器播放，然后是内置麦。这台 Krane sku176 没有 3.5 mm 耳机孔。其它带 TS3A227E 的 kukui 板有插孔，混音器按 UCM 写了，没在实机上听过。DA7219 的板是另一颗 codec，不在这份镜像里。2026-10-31 这次 Ctrl+U：蓝牙耳机正常。USB 连续播放、提示音和耳麦录音正常，触摸反馈音在没有别的声音垫底时经常播不出。内置扬声器和麦完全没有声音，因为 USB 声卡先注册成 card 0。HAL 改为按名字找 MT8183 卡，USB 播放在 standby 时保持 PCM 打开。正在跑的 HAL 已换成这份，扬声器 PCM 能进 RUNNING。2026-11-01 再次编译并写入 super，读回 sha256 `1325988136bdcb71b82fcff4b8b8534f89c19193f649fd06ad7cb14c16bff965`。内核槽没动。Kukui 对共享音频 HAL 的改动在 `patches/`。干净的 Lineage 树打 `hardware_interfaces_audio_kukui_standalone.patch`，已经打过 Gru 音频补丁的树打 `hardware_interfaces_audio_kukui.patch`。`patches/apply-patches.sh` 自己选。编 Gru 之前把后一份拿掉。编译不需要 `device/google/gru`。
 8. 电量和充电。
