@@ -200,7 +200,25 @@ Bluetooth: hci0: QCA setup on UART is completed
 
 下载过程中有两次 `Frame reassembly failed (-84)`，设置仍然完成。`/dev/rfkill` 原来是 `0600 root`，HAL 的 uid 和 gid 都是 `bluetooth`，打不开。改成 `bluetooth:bluetooth` `0660` 之后重新打开蓝牙。`dumpsys bluetooth_manager` 是 `enabled: true`，`state: ON`，名字是 Lenovo IdeaPad Duet。`com.android.bluetooth` 保持运行，崩溃日志没有新增。
 
-2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。里面有这两份固件、蓝牙模块，以及 `bluetooth.le.disable_apcf_extended_features=1`。Rome 3.2 不支持那条扩展查询。大小 `8589934592`。读回 sha256 `1c2511c8ff7920cc834719c993b9875517e183988a9dc5cfb56be100a805ab78`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。还没有这次 Ctrl+U，不能当作开机后蓝牙自己会起来。
+2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。里面有这两份固件、蓝牙模块，以及 `bluetooth.le.disable_apcf_extended_features=1`。Rome 3.2 不支持那条扩展查询。大小 `8589934592`。读回 sha256 `1c2511c8ff7920cc834719c993b9875517e183988a9dc5cfb56be100a805ab78`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。
+
+同日这次 Ctrl+U 之后，蓝牙在开机时自己打开，崩溃次数是 0。蓝牙鼠标能用。蓝牙耳机的 A2DP 已连接，编码是 AAC、44100 Hz、立体声，媒体策略也选中了这只耳机，音量不是 0。`A2dpOffloadEnabled` 是 false，声音要走软件编码。正在跑的音频 HAL 仍是 `android.hardware.audio.service-aidl.example`。耳机连上时 `AHAL_StreamBluetooth` 打了 `applyParam failed`，A2DP 状态停在 Connected，没有进入 Started。播放器报过 `PLAYING`，进度停在 0，耳机没有声音。扬声器、麦克风和耳机孔还没接上这颗声卡，蓝牙音频留到那一项，不在这份示例 HAL 上单独修。
+
+## 传感器
+
+触摸和 USI 笔已经能用。AIDA64 读的是 Android 传感器接口。这次开机里 `sensorservice` 报 `No Sensors on the device`。EC 上的加速度计、陀螺仪和光感是 `cros-ec-accel`、`cros-ec-gyro`、`cros-ec-light`，驱动是模块，镜像里没有。也没有传感器 HAL。平台设备在 `cros-ec-sensorhub` 下面，模块没加载时不会出现在 IIO 里。
+
+同一张正在跑的内核上加载了这几个模块。加速度计是 `iio:device4`，名字 `cros-ec-accel`，标签 `accel-display`。一次采样 raw 是 x=1015、y=6616、z=4990，`scale` 是 `0.001197100`，合起来大约 1 g。陀螺仪是 `iio:device5`。光感是 `iio:device6`，有 `in_illuminance_input`。内核没有 `in_mount_matrix`。
+
+postmarketOS 在 Krane 上要把屏幕旋转从差 90 度拉正，udev 矩阵是 `0, 1, 0; -1, 0, 0; 0, 0, -1`。合成器已经用 `ORIENTATION_270` 把 1200×1920 的扫描转成横屏，那组矩阵是给「桌面自己再转一次屏」用的。叠在 `ORIENTATION_270` 上会再转 90 度。
+
+2026-10-31 这次 Ctrl+U 之后，正放时画面是竖屏，显示内容的上方在物理屏幕的右侧。`dumpsys window` 是 `ROTATION_90`，分辨率 1200×1920。加速度计读数大约是 x=7.88、y=-1.10、z=-6.02，矩阵确实生效了，横屏的上方被报到了 +X。同一姿势改成单位矩阵之后，读数是 x=1.11、y=7.87、z=6.05，旋转回到 `ROTATION_0`，分辨率 1920×1200。这次是运行中改的配置，重启会丢。
+
+读数慢是另一件事。加速度计本身大约 25 Hz。陀螺仪关掉之后 ODR 仍停在 200 Hz，`hwfifo_timeout` 是 0。EC 的 FIFO 是共用的，超时为 0 时要等队列满了才往上送，所以加速度计一次攒几百毫秒。这个节点是 `0644 root`，HAL 写不进去。把陀螺仪 ODR 写成 0、超时写成 0.01 秒之后，加速度计按大约 40 毫秒一笔送到 `sensorservice`。
+
+下一份 super 用单位矩阵。`hwfifo_timeout` 交给 `system`。关掉传感器时把 ODR 写成 0，打开时把超时写成不超过 0.01 秒。2026-10-31 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。内核槽、`pmOS_boot`、metadata、misc 和 userdata 的开头 1 MiB 校验和写前写后相同。卡已卸载。方向和刷新要等这次 Ctrl+U 再确认。
+
+HAL 用的是 Gru 那份 ChromeOS EC 的 IIO subhal，`android.hardware.sensors@2.1-gru-subhal`，外面是 `android.hardware.sensors-service.multihal`。它只认加速度计和陀螺仪。光感模块会加载，不进 HAL。`settings` 里 `accelerometer_rotation` 原来是 0，这次开机已经写成 1。
 
 ## 顺序
 
@@ -209,10 +227,10 @@ Bluetooth: hci0: QCA setup on UART is completed
 1. `evdev.ko` 已加载。外接鼠标和键盘盖触控板能用。
 2. Panfrost。第十五次启动仍是 Mali-G72 GLES 3.1。
 3. Wi-Fi 和无线 adb。第十九次已连上 `"Not 6GHz"`，`10.0.0.104`，无线 adb 可用。
-4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。
+4. 触摸、旋转、USI 笔。手指和笔的方向都已经对。屏幕导航键已打开。加速度计已进 super。postmarketOS 那组矩阵叠在 `ORIENTATION_270` 上多转了 90 度，正放时画面是竖屏。单位矩阵在这次开机里把画面拉回 1920×1200。读数慢是因为关掉的陀螺仪仍以 200 Hz 占着 EC 的 FIFO。修正已写入 super，读回 sha256 `44e7b35f059e05ee4fd0fe8bf9e8cba52bff0bbb144eb729527183e0d10d2e90`。这次 Ctrl+U 还没确认。
 5. 底座键盘、触控板，以及拆下底座后的平板模式。Hammer 已经在 `input3`。Whiskers 的 Tablet Mode Switch 在 `input0`，`cros_ec_buttons` 在 `input1`，都在 1 秒内注册。
 6. 背光。
-7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次开机手动加载模块后，内核下载了 `qca/rampatch_00440302.bin` 和 `qca/nvm_00440302_i2s_eu.bin`，日志是 `QCA setup on UART is completed`。`dumpsys bluetooth_manager` 为 `state: ON`，名字是 Lenovo IdeaPad Duet，打开后超过 7 分钟没有新的崩溃。模块、固件和 `/dev/rfkill` 权限已写入 SanDisk 的 super，读回 sha256 `1c2511c8ff7920cc834719c993b9875517e183988a9dc5cfb56be100a805ab78`。内核槽没换。还没有这次 Ctrl+U。
+7. 蓝牙。QCA6174 走 UART `qca6174-bt`。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，崩溃次数是 0，蓝牙鼠标能用。A2DP 能连上并完成 AAC 协商，但示例音频 HAL 没有把数据送出去，耳机没有声音。这一项到此。蓝牙音频留到下一项。
 8. 扬声器播放，然后是内置麦和 3.5 mm 耳机孔。
 9. 电量和充电。电量计模块已放进 super。9 V 请求要等 EC 固件有对应的主机命令，这一版 `krane_v2.0.2771` 没有。
 10. zram。

@@ -17,3 +17,8 @@ hci_uart.ko
 hidp.ko
 rfcomm.ko
 uhid.ko
+kfifo_buf.ko
+industrialio-triggered-buffer.ko
+cros-ec-sensors-core.ko
+cros_ec_sensors.ko
+cros_ec_light_prox.ko

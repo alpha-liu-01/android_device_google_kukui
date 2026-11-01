@@ -17,3 +17,8 @@ hci_uart.ko: bluetooth.ko btbcm.ko btrtl.ko btqca.ko
 hidp.ko: bluetooth.ko
 rfcomm.ko: bluetooth.ko
 uhid.ko:
+kfifo_buf.ko:
+industrialio-triggered-buffer.ko: kfifo_buf.ko
+cros-ec-sensors-core.ko: kfifo_buf.ko industrialio-triggered-buffer.ko
+cros_ec_sensors.ko: cros-ec-sensors-core.ko
+cros_ec_light_prox.ko: cros-ec-sensors-core.ko

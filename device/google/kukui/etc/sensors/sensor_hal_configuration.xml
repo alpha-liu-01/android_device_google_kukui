@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!--
+     Krane lid sensors, already in the landscape frame that
+     ro.surface_flinger.primary_display_orientation=ORIENTATION_270 presents
+     as ROTATION_0. The postmarketOS matrix (x=y, y=-x, z=-z) is for a
+     desktop that rotates the panel itself. Applying it here reports
+     landscape-up on +X, so auto-rotate stays at ROTATION_90.
+-->
+<sensorHalConfiguration version="1.0" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <modules>
+        <module halName="android.hardware.sensors@2.1-gru-subhal" halVersion="2.1">
+            <sensors>
+                <sensor name="cros-ec-accel" type="1">
+                    <configuration>
+                        <orientation rotate="true">
+                            <x map="0" negate="false"/>
+                            <y map="1" negate="false"/>
+                            <z map="2" negate="false"/>
+                        </orientation>
+                        <location>
+                            <x>0</x>
+                            <y>0</y>
+                            <z>0</z>
+                        </location>
+                    </configuration>
+                </sensor>
+                <sensor name="cros-ec-gyro" type="4">
+                    <configuration>
+                        <orientation rotate="true">
+                            <x map="0" negate="false"/>
+                            <y map="1" negate="false"/>
+                            <z map="2" negate="false"/>
+                        </orientation>
+                        <location>
+                            <x>0</x>
+                            <y>0</y>
+                            <z>0</z>
+                        </location>
+                    </configuration>
+                </sensor>
+            </sensors>
+        </module>
+    </modules>
+</sensorHalConfiguration>

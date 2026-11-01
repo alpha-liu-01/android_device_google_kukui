@@ -29,7 +29,13 @@ PRODUCT_USE_DYNAMIC_PARTITIONS := true
 PRODUCT_SHIPPING_API_LEVEL := 36
 PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
 PRODUCT_CHARACTERISTICS := tablet
-PRODUCT_PACKAGES += kukui-keep KukuiUsbSuspend
+# The EC accelerometer subhal lives in the gru namespace. Only that library is packaged.
+PRODUCT_SOONG_NAMESPACES += device/google/gru
+PRODUCT_PACKAGES += \
+    kukui-keep \
+    KukuiUsbSuspend \
+    android.hardware.sensors-service.multihal \
+    android.hardware.sensors@2.1-gru-subhal
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/etc/permissions/android.software.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.xml \
@@ -73,6 +79,15 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/hidp.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/hidp.ko \
     $(LOCAL_PATH)/modules/rfcomm.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfcomm.ko \
     $(LOCAL_PATH)/modules/uhid.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/uhid.ko \
+    $(LOCAL_PATH)/modules/kfifo_buf.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/kfifo_buf.ko \
+    $(LOCAL_PATH)/modules/industrialio-triggered-buffer.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/industrialio-triggered-buffer.ko \
+    $(LOCAL_PATH)/modules/cros-ec-sensors-core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-sensors-core.ko \
+    $(LOCAL_PATH)/modules/cros_ec_sensors.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_ec_sensors.ko \
+    $(LOCAL_PATH)/modules/cros_ec_light_prox.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros_ec_light_prox.ko \
+    $(LOCAL_PATH)/etc/sensors/hals.conf:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/hals.conf \
+    $(LOCAL_PATH)/etc/sensors/sensor_hal_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/sensors/sensor_hal_configuration.xml \
+    frameworks/native/data/etc/android.hardware.sensor.accelerometer.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.accelerometer.xml \
+    frameworks/native/data/etc/android.hardware.sensor.gyroscope.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.sensor.gyroscope.xml \
     $(LOCAL_PATH)/modules/modules.load:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.load \
     $(LOCAL_PATH)/modules/modules.dep:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.dep \
     $(LOCAL_PATH)/modules/modules.alias:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/modules.alias \
