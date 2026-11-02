@@ -1,6 +1,7 @@
 %YAML 1.1
 ---
-# mtk-seninf has no hardware converter. Debayer on the CPU.
+# mtk-seninf has no hardware converter. Debayer with the GLES ISP.
+# If the surfaceless context cannot be created, libcamera stays on the CPU.
 version: 1
 configuration:
   pipelines:
@@ -9,4 +10,4 @@ configuration:
         - driver: mtk-seninf
           software_isp: true
   software_isp:
-    mode: cpu
+    mode: gpu

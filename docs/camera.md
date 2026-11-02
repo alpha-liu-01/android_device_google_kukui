@@ -74,6 +74,14 @@ ChromeOS 自己的相机栈走完整 ISP，还要配套的下游内核。那条�
 
 取景框慢不是整机没算力。后摄 CAMSV 中断大约每秒 31 次，传感器在出 30 帧。SurfaceFlinger 上预览实际是 7.6 帧每秒，间隔平均 132 毫秒。两根 `DebayerCpu` 线程各占满一个大核（cpu4–7，2.0 GHz），另外两个大核和四个小核空着，所以功耗停在 5 W 出头。软件 ISP 默认只开 2 个线程，而且每帧都要把 1632×1224 的整幅 Bayer 做完才送给预览。预览在等这一帧算完，不是在等传感器。
 
+同一份 libcamera 0.7.1 里本来就有 GLES 2 去马赛克（`DebayerEGL`，McGuire 的 Bayer 片元着色器）。Android 这次编译把它打开了，没有另写一套 Vulkan 计算着色器。片元通道不占用那条 500 毫秒就会复位整颗 GPU 的计算作业槽。着色器仍然是先减黑电平，再乘色彩矩阵、对比度，然后做伽马，和已经确认过的 CPU 查找表不是同一条顺序，所以颜色可能和现在不一样，这次没有提前重调。GPU 路径只输出 32 位 `XRGB8888`（内存里是 B、G、R、X），HAL 在映射预览格式时优先选它，CPU 退路也能出同一种格式。预览仍写进已经确认过的 XBGR8888 gralloc 缓冲，JPEG 和缩略图按 4 字节一行来读。无窗口 EGL 上下文建不起来时，构造函数退回 CPU，预览格式仍是这一种。
+
+第一次挂上去的时候取景仍是两根 `DebayerCpu`。`/vendor/etc/libcamera/configuration.yaml` 里写着 `software_isp.mode: cpu`，GPU 路径根本没被构造。改成 `gpu` 之后，Android 的 `libEGL` 拒绝 `EGL_PLATFORM_SURFACELESS_MESA`，`eglGetDisplay(EGL_DEFAULT_DISPLAY)` 才能拿到 Mesa 25.3.3 的 OpenGL ES 3.1。上下文起来之后，预览拷贝还是逐像素交换 R 和 B，单线程把出帧压在大约 20 帧每秒。改成 libyuv 的 `ARGBToABGR`，输出 dma-buf 按 fd 缓存，Bayer 纹理用 `glTexSubImage2D`，整库用 `-O2` 重编。
+
+2026-11-01 晚上这版从 userdata 挂上：`libcamera.so` sha256 `ea117bfd37849064d2435e6834d9909df0a37b2d4ab6d9444015d604ef188af7`，`camera.libcamera.so` sha256 `c0e1aeb9fc51bca246c778ad269fe7bf3ad39e874b7b52ae9d5c0c24ff3c416e`，`libcamera-base.so` sha256 `b06235c9233ceeceee75bb1d80a56332da7e94c162012e47ce09187254224fa8`。进程里没有 `DebayerCpu`，只有 `SWIspWorker`。日志是 `GL_VERSION: OpenGL ES 3.1 Mesa 25.3.3`。去马赛克本身大约 25 毫秒一帧。HAL 的 `Frames produced` 在 2 秒里从 294 增到 356，大约 31 帧每秒，和传感器中断一致。颜色有没有偏还要看画面。没有写 U 盘，没有重启平板。
+
+取景比传感器小一圈时，片元着色器用一个插值判断 Bayer 相位，用另一个插值决定取样落在哪个像素。缩放后有些行和列正好落在像素边上，两边各进一位，这一行或这一列的红蓝高于绿，就是洋红色细线。后摄 1632×1224 收到 1600×1200，横竖都会碰到；前摄如果高度没缩，就只剩竖线。改成先把源像素坐标做一次 `floor()`，相位和相邻取样都从这一个整数来。截图里后摄和前摄（1280×960）都不再有贯穿画面的洋红色线。正在跑的 `libcamera.so` sha256 是 `b119f2c6085ce21b1326ff5c4121562b437f3e61442f4473295f3e9b9e44f293`。
+
 录像仍等内置麦。
 
 解码器节点从 `/dev/video0` 变成了 `/dev/video2`，因为它在两路 CAMSV 之后注册。它仍报 `S264` 输入和 `MM21` 输出，按格式找设备的路径还能选中它。编码器在 `/dev/video3`。按采集格式找第一块设备的话会先碰到 CAMSV，编码这条还没改。
