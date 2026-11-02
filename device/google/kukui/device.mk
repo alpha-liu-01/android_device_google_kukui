@@ -84,6 +84,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/firmware/qca/rampatch_00440302.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/rampatch_00440302.bin \
     $(LOCAL_PATH)/firmware/mediatek/mt8183/scp.img:$(TARGET_COPY_OUT_VENDOR)/firmware/mediatek/mt8183/scp.img \
     $(LOCAL_PATH)/etc/media_codecs_c2.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_c2.xml \
+    $(LOCAL_PATH)/etc/media_profiles_V1_0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_profiles_V1_0.xml \
     frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
     frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
     $(LOCAL_PATH)/etc/libcamera/configuration.yaml:$(TARGET_COPY_OUT_VENDOR)/etc/libcamera/configuration.yaml \
