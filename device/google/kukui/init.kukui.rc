@@ -12,6 +12,9 @@ on boot
 
 on early-init
     write /sys/module/firmware_class/parameters/path /vendor/firmware
+    # The camera HAL's IPA worker is a vendor binary. The library looks
+    # here before its compiled /vendor/libexec path.
+    export LIBCAMERA_IPA_PROXY_PATH /vendor/bin/libcamera
     setprop vendor.usb.configfs 0
     setprop debug.renderengine.backend skiaglthreaded
     setprop debug.hwui.renderer skiagl

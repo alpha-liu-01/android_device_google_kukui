@@ -1,0 +1,83 @@
+--- a/drivers/media/platform/mediatek/Makefile	2026-05-08 02:40:23.000000000 -0400
++++ b/drivers/media/platform/mediatek/Makefile	2026-11-01 13:02:44.954252909 -0500
+@@ -4,3 +4,4 @@
+ obj-y += vcodec/
+ obj-y += vpu/
+ obj-y += mdp3/
++obj-y += isp/
+--- a/drivers/media/platform/mediatek/Kconfig	2026-05-08 02:40:23.000000000 -0400
++++ b/drivers/media/platform/mediatek/Kconfig	2026-11-01 13:02:45.583243554 -0500
+@@ -7,3 +7,4 @@
+ source "drivers/media/platform/mediatek/vcodec/Kconfig"
+ source "drivers/media/platform/mediatek/vpu/Kconfig"
+ source "drivers/media/platform/mediatek/mdp3/Kconfig"
++source "drivers/media/platform/mediatek/isp/Kconfig"
+--- a/drivers/phy/mediatek/phy-mtk-mipi-csi-0-5.c	2026-05-08 02:40:23.000000000 -0400
++++ b/drivers/phy/mediatek/phy-mtk-mipi-csi-0-5.c	2026-11-01 13:02:46.471230347 -0500
+@@ -276,6 +276,7 @@
+ 
+ static const struct of_device_id mtk_mipi_cdphy_of_match[] = {
+ 	{ .compatible = "mediatek,mt8365-csi-rx" },
++	{ .compatible = "mediatek,mt8183-csi-rx" },
+ 	{ /* sentinel */},
+ };
+ MODULE_DEVICE_TABLE(of, mtk_mipi_cdphy_of_match);
+--- a/drivers/media/v4l2-core/v4l2-subdev.c	2026-05-08 02:40:23.000000000 -0400
++++ b/drivers/media/v4l2-core/v4l2-subdev.c	2026-11-01 13:02:47.414216322 -0500
+@@ -56,7 +56,7 @@
+  * 'v4l2_subdev_enable_streams_api' to 1 below.
+  */
+ 
+-static bool v4l2_subdev_enable_streams_api;
++static bool v4l2_subdev_enable_streams_api = true;
+ #endif
+ 
+ /*
+--- a/drivers/media/i2c/ov8856.c	2026-05-08 02:40:23.000000000 -0400
++++ b/drivers/media/i2c/ov8856.c	2026-11-01 13:02:50.978163318 -0500
+@@ -1973,10 +1973,19 @@
+ 	if (index == ARRAY_SIZE(ov8856_mbus_codes))
+ 		index = mode->default_mbus_index;
+ 	fmt->code = ov8856_mbus_codes[index];
+-	ov8856->cur_mbus_index = index;
+ 	fmt->field = V4L2_FIELD_NONE;
+ }
+ 
++static u32 ov8856_mbus_index(u32 code)
++{
++	u32 index;
++
++	for (index = 0; index < ARRAY_SIZE(ov8856_mbus_codes); ++index)
++		if (ov8856_mbus_codes[index] == code)
++			return index;
++	return 0;
++}
++
+ static int ov8856_start_streaming(struct ov8856 *ov8856)
+ {
+ 	const struct ov8856_reg_list *reg_list;
+@@ -2133,6 +2142,11 @@
+ 		*v4l2_subdev_state_get_format(sd_state, fmt->pad) = fmt->format;
+ 	} else {
+ 		ov8856->cur_mode = mode;
++		/*
++		 * Only an ACTIVE set_fmt selects the Bayer order. TRY formats,
++		 * G_FMT and subdev open() must not change it.
++		 */
++		ov8856->cur_mbus_index = ov8856_mbus_index(fmt->format.code);
+ 		__v4l2_ctrl_s_ctrl(ov8856->link_freq, mode->link_freq_index);
+ 		__v4l2_ctrl_s_ctrl_int64(ov8856->pixel_rate,
+ 					 to_rate(ov8856->priv_lane->link_freq_menu_items,
+@@ -2170,8 +2184,11 @@
+ 	if (fmt->which == V4L2_SUBDEV_FORMAT_TRY)
+ 		fmt->format = *v4l2_subdev_state_get_format(sd_state,
+ 							    fmt->pad);
+-	else
++	else {
++		/* report the active Bayer order, not the mode default */
++		fmt->format.code = ov8856_mbus_codes[ov8856->cur_mbus_index];
+ 		ov8856_update_pad_format(ov8856, ov8856->cur_mode, &fmt->format);
++	}
+ 
+ 	mutex_unlock(&ov8856->mutex);
+ 

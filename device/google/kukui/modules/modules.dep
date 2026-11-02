@@ -39,6 +39,14 @@ videobuf2-memops.ko: videobuf2-common.ko
 videobuf2-dma-contig.ko: videobuf2-memops.ko videobuf2-common.ko
 videodev.ko: mc.ko
 videobuf2-v4l2.ko: videobuf2-common.ko mc.ko videodev.ko
+v4l2-async.ko: videodev.ko mc.ko
+v4l2-fwnode.ko: v4l2-async.ko videodev.ko
+phy-mtk-mipi-csi-0-5.ko:
+mtk-seninf.ko: mc.ko videodev.ko v4l2-async.ko v4l2-fwnode.ko
+mtk-camsv.ko: videobuf2-common.ko videodev.ko mc.ko v4l2-async.ko videobuf2-v4l2.ko videobuf2-dma-contig.ko
+dw9768.ko: videodev.ko mc.ko v4l2-async.ko
+ov8856.ko: videodev.ko mc.ko v4l2-fwnode.ko v4l2-async.ko
+ov02a10.ko: v4l2-fwnode.ko videodev.ko mc.ko v4l2-async.ko
 v4l2-mem2mem.ko: videobuf2-common.ko videobuf2-v4l2.ko videodev.ko mc.ko
 v4l2-h264.ko:
 v4l2-vp9.ko:

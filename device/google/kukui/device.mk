@@ -47,7 +47,13 @@ PRODUCT_PACKAGES += \
     kukui-keep \
     KukuiUsbSuspend \
     android.hardware.sensors-service.multihal \
-    android.hardware.sensors@2.1-kukui-subhal
+    android.hardware.sensors@2.1-kukui-subhal \
+    android.hardware.camera.provider-service.lineage \
+    camera.libcamera \
+    libcamera \
+    libcamera-base \
+    ipa_soft_simple \
+    libcamera_soft_ipa_proxy
 
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/etc/permissions/android.software.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.xml \
@@ -75,6 +81,13 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/firmware/qca/rampatch_00440302.bin:$(TARGET_COPY_OUT_VENDOR)/firmware/qca/rampatch_00440302.bin \
     $(LOCAL_PATH)/firmware/mediatek/mt8183/scp.img:$(TARGET_COPY_OUT_VENDOR)/firmware/mediatek/mt8183/scp.img \
     $(LOCAL_PATH)/etc/media_codecs_c2.xml:$(TARGET_COPY_OUT_VENDOR)/etc/media_codecs_c2.xml \
+    frameworks/native/data/etc/android.hardware.camera.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.xml \
+    frameworks/native/data/etc/android.hardware.camera.front.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.camera.front.xml \
+    $(LOCAL_PATH)/etc/libcamera/configuration.yaml:$(TARGET_COPY_OUT_VENDOR)/etc/libcamera/configuration.yaml \
+    $(LOCAL_PATH)/etc/libcamera/camera_hal.yaml:$(TARGET_COPY_OUT_VENDOR)/etc/libcamera/camera_hal.yaml \
+    $(LOCAL_PATH)/etc/libcamera/ipa/simple/ov8856.yaml:$(TARGET_COPY_OUT_VENDOR)/share/libcamera/ipa/simple/ov8856.yaml \
+    $(LOCAL_PATH)/etc/libcamera/ipa/simple/ov02a10.yaml:$(TARGET_COPY_OUT_VENDOR)/share/libcamera/ipa/simple/ov02a10.yaml \
+    $(LOCAL_PATH)/etc/libcamera/ipa/simple/uncalibrated.yaml:$(TARGET_COPY_OUT_VENDOR)/share/libcamera/ipa/simple/uncalibrated.yaml \
     $(LOCAL_PATH)/modules/rfkill.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rfkill.ko \
     $(LOCAL_PATH)/modules/cfg80211.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cfg80211.ko \
     $(LOCAL_PATH)/modules/libarc4.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/libarc4.ko \
@@ -109,6 +122,14 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/videobuf2-memops.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-memops.ko \
     $(LOCAL_PATH)/modules/videobuf2-dma-contig.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-dma-contig.ko \
     $(LOCAL_PATH)/modules/videodev.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videodev.ko \
+    $(LOCAL_PATH)/modules/v4l2-async.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-async.ko \
+    $(LOCAL_PATH)/modules/v4l2-fwnode.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-fwnode.ko \
+    $(LOCAL_PATH)/modules/phy-mtk-mipi-csi-0-5.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/phy-mtk-mipi-csi-0-5.ko \
+    $(LOCAL_PATH)/modules/mtk-seninf.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-seninf.ko \
+    $(LOCAL_PATH)/modules/mtk-camsv.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-camsv.ko \
+    $(LOCAL_PATH)/modules/dw9768.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/dw9768.ko \
+    $(LOCAL_PATH)/modules/ov8856.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ov8856.ko \
+    $(LOCAL_PATH)/modules/ov02a10.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/ov02a10.ko \
     $(LOCAL_PATH)/modules/videobuf2-v4l2.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/videobuf2-v4l2.ko \
     $(LOCAL_PATH)/modules/v4l2-mem2mem.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-mem2mem.ko \
     $(LOCAL_PATH)/modules/v4l2-h264.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/v4l2-h264.ko \
@@ -204,4 +225,5 @@ PRODUCT_VENDOR_PROPERTIES += \
     ro.vendor.v4l2_codec2.encoder.supported.vp9=false \
     ro.vendor.v4l2_codec2.decode_concurrent_instances=1 \
     ro.vendor.v4l2_codec2.encode_concurrent_instances=1 \
-    debug.stagefright.c2-poolmask=0xf50000
+    debug.stagefright.c2-poolmask=0xf50000 \
+    ro.hardware.camera=libcamera

@@ -1,0 +1,20 @@
+allow hal_camera_default sysfs_v4l:dir r_dir_perms;
+allow hal_camera_default sysfs_v4l:file r_file_perms;
+# Sensor uevent nodes that exist before policy load stay type sysfs.
+# libcamera reads them while matching the pipeline.
+allow hal_camera_default sysfs:file r_file_perms;
+
+# The request FMQ is a memfd. libcutils probes memfd by truncating
+# test_android_memfd; that write is denied, has_memfd_support() stays
+# false, and CameraDeviceSession reports an invalid request queue.
+type hal_camera_default_tmpfs, file_type;
+tmpfs_domain(hal_camera_default)
+allow cameraserver hal_camera_default_tmpfs:file { getattr read write map };
+
+typeattribute cameraserver_tmpfs mlstrustedobject;
+allow appdomain cameraserver_tmpfs:file { getattr read write map };
+
+# The session imports every preview buffer through GraphicBufferMapper.
+hal_client_domain(hal_camera_default, hal_graphics_allocator)
+allow hal_camera_default hal_graphics_composer_default:fd use;
+get_prop({ hal_camera_default cameraserver }, vendor_minigbm_prop)

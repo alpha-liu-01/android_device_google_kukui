@@ -46,6 +46,14 @@ videobuf2-memops.ko
 videobuf2-dma-contig.ko
 videodev.ko
 videobuf2-v4l2.ko
+v4l2-async.ko
+v4l2-fwnode.ko
+phy-mtk-mipi-csi-0-5.ko
+mtk-seninf.ko
+mtk-camsv.ko
+dw9768.ko
+ov8856.ko
+ov02a10.ko
 v4l2-mem2mem.ko
 v4l2-h264.ko
 v4l2-vp9.ko

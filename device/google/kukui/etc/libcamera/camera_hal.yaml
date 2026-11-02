@@ -1,0 +1,10 @@
+# Pictures from both sensors are already the right way up.
+# The front sensor's device tree rotation of 180 does that flip.
+# Do not add another turn here.
+cameras:
+  "/base/soc/i2c@11009000/camera@10":
+    location: back
+    rotation: 0
+  "/base/soc/i2c@11008000/camera@3d":
+    location: front
+    rotation: 0

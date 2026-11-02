@@ -83,3 +83,5 @@ TARGET_SCREEN_DENSITY := 240
 # makefile copies the trunk_staging flag in. Set it again here so the vendor
 # mapper is not deleted by the APEX.
 $(call soong_config_set_bool,minigbm_upstream,RELEASE_SM_OPEN_DECLARED_PASSTHROUGH_HAL,false)
+
+BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor

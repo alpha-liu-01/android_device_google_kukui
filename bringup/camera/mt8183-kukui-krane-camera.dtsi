@@ -1,0 +1,223 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * Camera nodes for MT8183 kukui-krane (Lenovo IdeaPad Duet, sku176), to be
+ * APPENDED to the running (firmware-fixed) device tree, see
+ * scripts/merge-running-dt.sh and docs/kexec-dt.md.
+ *
+ * The running DT has no __symbols__, so existing nodes are referenced by
+ * path (&{/path}) and dt-bindings constants are written as numbers with
+ * comments. Values from the ChromeOS chromeos-5.10 krane DT unless noted.
+ */
+#define TOPCK &{/soc/syscon@10000000}
+#define PIO &{/soc/pinctrl@10005000}
+#define REG(x) &{/soc/pwrap@1000d000/pmic/regulators/x}
+
+&{/chosen} {
+	/delete-property/ linux,booted-from-kexec;
+	/delete-property/ linux,initrd-start;
+	/delete-property/ linux,initrd-end;
+};
+
+&{/soc/pinctrl@10005000} {
+	cam0-pins {
+		pins-mclk { pinmux = <0x6301>; };		/* PINMUX_GPIO99__FUNC_CMMCLK0 */
+		pins-reset { pinmux = <0x6f00>; output-low; };	/* GPIO111 */
+	};
+	cam1-pins {
+		pins-mclk { pinmux = <0x6401>; };		/* PINMUX_GPIO100__FUNC_CMMCLK1 */
+		pins-powerdown { pinmux = <0x6b00>; output-high; };	/* GPIO107 */
+		pins-reset { pinmux = <0x6d00>; output-low; };	/* GPIO109 */
+	};
+};
+
+&{/soc/i2c@11009000} {
+	camera@10 {
+		compatible = "ovti,ov8856";
+		reg = <0x10>;
+		clocks = <TOPCK 4>, <TOPCK 100>;	/* CLK_TOP_MUX_CAMTG, CLK_TOP_UNIVP_192M_D8 */
+		clock-names = "xvclk", "freq_mux";
+		/*
+		 * 24 MHz: CAMTG has no 19.2 MHz parent (asking for 19.2 lets the mux
+		 * round down to 13 MHz csw_f26m_ck_d2). The kukui modes (3264x2448,
+		 * 1632x1224) program PLL 0x0302=0x3c for 24 MHz.
+		 */
+		clock-frequency = <24000000>;
+		assigned-clocks = <TOPCK 4>, <TOPCK 100>;
+		assigned-clock-parents = <TOPCK 100>;
+		assigned-clock-rates = <0>, <24000000>;
+		reset-gpios = <PIO 111 1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&{/soc/pinctrl@10005000/cam0-pins}>;
+		avdd-supply = <REG(ldo_vcama2)>;
+		dvdd-supply = <REG(ldo_vcamd)>;
+		dovdd-supply = <REG(ldo_vcamio)>;
+		lens-focus = <&{/soc/i2c@11009000/lens@c}>;
+		port {
+			ov8856_ep: endpoint {
+				remote-endpoint = <&seninf_in0_ep>;
+				clock-lanes = <0>;
+				clock-noncontinuous;
+				data-lanes = <1 2 3 4>;
+				link-frequencies = /bits/ 64 <360000000 180000000>;
+			};
+		};
+	};
+	lens@c {
+		compatible = "dongwoon,dw9768";
+		reg = <0x0c>;
+		vin-supply = <REG(ldo_vcamio)>;
+		vdd-supply = <REG(ldo_vcama2)>;
+	};
+};
+
+&{/soc/i2c@11008000} {
+	camera@3d {
+		compatible = "ovti,ov02a10";
+		reg = <0x3d>;
+		clocks = <TOPCK 29>, <TOPCK 100>;	/* CLK_TOP_MUX_CAMTG2 */
+		clock-names = "eclk", "freq_mux";
+		clock-frequency = <24000000>;
+		rotation = <180>;
+		assigned-clocks = <TOPCK 29>, <TOPCK 100>;
+		assigned-clock-parents = <TOPCK 100>;
+		assigned-clock-rates = <0>, <24000000>;
+		powerdown-gpios = <PIO 107 0>;
+		reset-gpios = <PIO 109 1>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&{/soc/pinctrl@10005000/cam1-pins}>;
+		avdd-supply = <REG(ldo_vcama1)>;
+		dvdd-supply = <REG(ldo_vcn18)>;
+		dovdd-supply = <REG(ldo_vcamio)>;
+		port {
+			ov02a10_ep: endpoint {
+				remote-endpoint = <&seninf_in1_ep>;
+				data-lanes = <1>;
+				ovti,mipi-clock-voltage = <3>;
+				link-frequencies = /bits/ 64 <390000000>;
+			};
+		};
+	};
+};
+
+/*
+ * CSI-RX PHYs + seninf + CAMSV1/2 (raw capture to memory), drivers in this
+ * repository. CAMSV pages verified by register dump (docs/register-dumps).
+ * IRQs SPI 258/259 confirmed working; which larb6 port the CAMSV write DMA
+ * uses is not known, so all candidates are listed in iommus.
+ */
+#define CAMSYS &{/soc/syscon@1a000000}
+#define SPM_CAM <&{/soc/syscon@10006000/power-controller} 8>	/* MT8183_POWER_DOMAIN_CAM */
+#define IOMMU &{/soc/iommu@10205000}
+
+&{/soc} {
+	mipi_csi0: phy@11c80000 {
+		compatible = "mediatek,mt8183-csi-rx";
+		reg = <0 0x11c80000 0 0x2000>;
+		num-lanes = <4>;
+		#phy-cells = <1>;		/* C/D-PHY combo: arg PHY_TYPE_DPHY */
+	};
+
+	mipi_csi1: phy@11c82000 {
+		compatible = "mediatek,mt8183-csi-rx";
+		reg = <0 0x11c82000 0 0x2000>;
+		num-lanes = <4>;
+		phy-type = <10>;		/* PHY_TYPE_DPHY */
+		#phy-cells = <0>;
+	};
+
+	seninf@1a040000 {
+		compatible = "mediatek,mt8183-seninf";
+		reg = <0 0x1a040000 0 0x8000>;
+		interrupts = <0 251 8>;		/* GIC_SPI 251 IRQ_TYPE_LEVEL_LOW */
+		clocks = <CAMSYS 4>, <TOPCK 27>;	/* CLK_CAM_SENINF, CLK_TOP_MUX_SENINF */
+		clock-names = "camsys", "top_mux";
+		power-domains = SPM_CAM;
+		phys = <&mipi_csi0 10>, <&mipi_csi1>;
+		phy-names = "csi0", "csi1";
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			port@0 {
+				reg = <0>;
+				/* reproduces the cros MIPI_RX_CON24 lane mux 0xc9 */
+				seninf_in0_ep: endpoint {
+					remote-endpoint = <&ov8856_ep>;
+					clock-lanes = <2>;
+					data-lanes = <1 3 0 4>;
+				};
+			};
+
+			port@1 {
+				reg = <1>;
+				seninf_in1_ep: endpoint {
+					remote-endpoint = <&ov02a10_ep>;
+					clock-lanes = <2>;
+					data-lanes = <1>;
+				};
+			};
+
+			port@4 {
+				reg = <4>;
+				seninf_out0_ep: endpoint {
+					remote-endpoint = <&camsv1_ep>;
+				};
+			};
+
+			port@5 {
+				reg = <5>;
+				seninf_out1_ep: endpoint {
+					remote-endpoint = <&camsv2_ep>;
+				};
+			};
+		};
+	};
+
+	camsv@1a050000 {
+		compatible = "mediatek,mt8183-camsv";
+		reg = <0 0x1a050510 0 0x40>,	/* top */
+		      <0 0x1a050020 0 0x28>,	/* IMGO */
+		      <0 0x1a050220 0 0x90>;	/* TG */
+		interrupts = <0 258 8>;
+		clocks = <CAMSYS 2>, <CAMSYS 3>, <CAMSYS 5>;	/* CAM, CAMTG, CAMSV0 */
+		clock-names = "cam", "camtg", "camsv";
+		/* larb6: SOCO, SOC1, SOC2, IMGO - the camsv write port is one of these */
+		iommus = <IOMMU 203>, <IOMMU 204>, <IOMMU 205>, <IOMMU 192>;
+		power-domains = SPM_CAM;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@0 {
+				reg = <0>;
+				camsv1_ep: endpoint {
+					remote-endpoint = <&seninf_out0_ep>;
+				};
+			};
+		};
+	};
+
+	camsv@1a051000 {
+		compatible = "mediatek,mt8183-camsv";
+		reg = <0 0x1a051510 0 0x40>,
+		      <0 0x1a051020 0 0x28>,
+		      <0 0x1a051220 0 0x90>;
+		interrupts = <0 259 8>;
+		clocks = <CAMSYS 2>, <CAMSYS 3>, <CAMSYS 6>;	/* CAM, CAMTG, CAMSV1 */
+		clock-names = "cam", "camtg", "camsv";
+		iommus = <IOMMU 203>, <IOMMU 204>, <IOMMU 205>, <IOMMU 192>;
+		power-domains = SPM_CAM;
+
+		ports {
+			#address-cells = <1>;
+			#size-cells = <0>;
+			port@0 {
+				reg = <0>;
+				camsv2_ep: endpoint {
+					remote-endpoint = <&seninf_out1_ep>;
+				};
+			};
+		};
+	};
+};
