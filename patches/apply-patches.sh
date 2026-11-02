@@ -19,24 +19,36 @@
 #     only when Gru's audio patches are already applied. The Kukui branches
 #     run when ro.vendor.audio.route=kukui; otherwise that tree's DA7219
 #     path stays. Reverse this one before building Gru.
-#   memfd, codec2 IConfigurable, mesa 25 board.mk, v4l2 seccomp
-#     machine-independent fixes this product boots with. --reverse leaves
-#     them in place.
-#   system_cros_codecs_mm21_nv12.patch
-#     the stateless decoder writes MM21 into its own buffers, then copies
-#     linear NV12 into the caller's buffer. A decoded frame stays queued
-#     until that buffer exists. Flush drops the queued picture instead of
-#     copying it. --reverse removes it so a Gru build keeps the zero-copy path.
-#   system_cros_codecs_v4l2_flush_reset.patch
-#     a same-format seek streams the V4L2 queues off and the next SPS starts
-#     a new sequence. VAAPI keeps the old flush path. --reverse removes it.
-#   external_v4l2r_cached_capture.patch
-#   system_cros_codecs_v4l2_cached_capture.patch
-#     the decoder capture queue asks for cached MMAP buffers. DQBUF still
-#     invalidates them. --reverse removes both.
-#   system_cros_codecs_v4l2_poll_wait.patch
-#     wait for a capture or output buffer with poll instead of a doubling
-#     sleep. --reverse removes it.
+#   memfd, codec2 IConfigurable, mesa 25 board.mk, v4l2 seccomp,
+#   vendor_available on libexif/libhwy/skcms, brightness property,
+#   settings and netlink null checks
+#     shared fixes. The brightness switch defaults off. --reverse leaves
+#     these in place.
+#   system_cros_codecs.patch, external_v4l2r.patch, external_v4l2_codec2.patch
+#     stateless H.264 on mtk-vcodec. MM21 is copied to linear NV12.
+#     --reverse removes them so a Gru build keeps its own decoder path.
+#   external_mesa_panvk_host_cached.patch
+#     a second Vulkan memory type with HOST_CACHED. Type 0 stays the old
+#     coherent mapping. --reverse leaves it.
+#   external_drm_hwcomposer_dsi_crtc.patch
+#     DSI prefers the CRTC with more planes. The property defaults on,
+#     which is the RK3399 big VOP. Krane has one DSI CRTC.
+#   external_minigbm*.patch
+#     NV12 decoder stride and an HWC fallback that drops scanout when the
+#     display cannot take the format. The Rockchip AFBC dumb backend is
+#     not included.
+#   system_core healthd and the boot-device filter
+#     healthd accepts the Krane supply nodes. The boot-device filter only
+#     skips a partition when androidboot.boot_devices is set. --reverse
+#     removes the healthd fallbacks and leaves the filter.
+#   system_sepolicy_mainline.patch
+#     devtmpfs nodes and sysfs inodes that never get a genfs label.
+#     --reverse leaves it. Both mainline products need it to compile
+#     enforcing policy.
+#
+# external/libcamera in a tree that was also used for Gru may contain an
+# rkisp1 pipeline. This script does not apply it. Kukui installs the
+# prebuilt camera HAL from device/google/kukui/camera/prebuilt.
 #
 # A Kukui build refuses to start while KukuiMixer.h is absent.
 set -euo pipefail
@@ -111,6 +123,22 @@ apply_audio() {
     fi
 }
 
+reverse_or_skip() {
+    local dir="$1"
+    local patch="$2"
+    local label="$3"
+    if [[ ! -d "$dir" ]]; then
+        echo "[FAIL]  missing ${dir}" >&2
+        return 1
+    fi
+    if patch -d "$dir" -p1 -R --dry-run -s < "$patch" >/dev/null 2>&1; then
+        patch -d "$dir" -p1 -R < "$patch" >/dev/null
+        echo "[OK]    removed ${label}"
+    else
+        echo "[SKIP]  ${label} is not applied"
+    fi
+}
+
 reverse_audio() {
     local target="${LINEAGE_ROOT}/hardware/interfaces"
     local standalone="${REPO_ROOT}/patches/hardware_interfaces_audio_kukui_standalone.patch"
@@ -180,46 +208,18 @@ install_manifest() {
 
 if [[ $REVERSE -eq 1 ]]; then
     reverse_audio
-    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
-        < "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" >/dev/null 2>&1; then
-        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
-            < "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" >/dev/null
-        echo "[OK]    removed MM21 to NV12 decoder copy"
-    else
-        echo "[SKIP]  MM21 to NV12 decoder copy is not applied"
-    fi
-    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
-        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" >/dev/null 2>&1; then
-        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
-            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" >/dev/null
-        echo "[OK]    removed V4L2 flush reset"
-    else
-        echo "[SKIP]  V4L2 flush reset is not applied"
-    fi
-    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
-        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" >/dev/null 2>&1; then
-        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
-            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" >/dev/null
-        echo "[OK]    removed cached capture buffers"
-    else
-        echo "[SKIP]  cached capture buffers are not applied"
-    fi
-    if patch -d "${LINEAGE_ROOT}/external/rust/crates/v4l2r" -p1 -R --dry-run -s \
-        < "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" >/dev/null 2>&1; then
-        patch -d "${LINEAGE_ROOT}/external/rust/crates/v4l2r" -p1 -R \
-            < "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" >/dev/null
-        echo "[OK]    removed v4l2r cached capture request"
-    else
-        echo "[SKIP]  v4l2r cached capture request is not applied"
-    fi
-    if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
-        < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" >/dev/null 2>&1; then
-        patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R \
-            < "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" >/dev/null
-        echo "[OK]    removed V4L2 poll wait"
-    else
-        echo "[SKIP]  V4L2 poll wait is not applied"
-    fi
+    reverse_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+        "${REPO_ROOT}/patches/system_cros_codecs.patch" \
+        "stateless V4L2 decoder"
+    reverse_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
+        "${REPO_ROOT}/patches/external_v4l2r.patch" \
+        "v4l2r capture queue"
+    reverse_or_skip "${LINEAGE_ROOT}/external/v4l2_codec2" \
+        "${REPO_ROOT}/patches/external_v4l2_codec2.patch" \
+        "v4l2 codec2 stateless HAL"
+    reverse_or_skip "${LINEAGE_ROOT}/system/core" \
+        "${REPO_ROOT}/patches/system_core_healthd_supply.patch" \
+        "healthd supply fallbacks"
     exit 0
 fi
 
@@ -229,27 +229,63 @@ apply_audio
 apply_or_skip "${LINEAGE_ROOT}/system/core" \
     "${REPO_ROOT}/patches/system_core_libcutils_memfd_isolated_app.patch" \
     "memfd isolated-app"
+apply_or_skip "${LINEAGE_ROOT}/system/core" \
+    "${REPO_ROOT}/bringup/phase4/init-prefer-boot-device.patch" \
+    "boot-device partition filter"
+apply_or_skip "${LINEAGE_ROOT}/system/core" \
+    "${REPO_ROOT}/patches/system_core_healthd_supply.patch" \
+    "healthd supply fallbacks"
 apply_or_skip "${LINEAGE_ROOT}/frameworks/av" \
     "${REPO_ROOT}/patches/frameworks_av_codec2_ion_fallback.patch" \
     "codec2 IConfigurable"
+apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
+    "${REPO_ROOT}/patches/frameworks_base_brightness_and_media.patch" \
+    "brightness property and media null checks"
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_mesa_board_mk.patch" \
     "mesa 25 board.mk"
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_v4l2_codec2_seccomp.patch" \
     "v4l2 codec2 seccomp"
+apply_or_skip "${LINEAGE_ROOT}/external/XMP-Toolkit-SDK" \
+    "${REPO_ROOT}/patches/external_xmp_vendor_available.patch" \
+    "libexif vendor_available"
+apply_or_skip "${LINEAGE_ROOT}/external/google-highway" \
+    "${REPO_ROOT}/patches/external_google_highway_vendor_available.patch" \
+    "libhwy vendor_available"
+apply_or_skip "${LINEAGE_ROOT}/external/skia" \
+    "${REPO_ROOT}/patches/external_skia_vendor_available.patch" \
+    "skcms vendor_available"
+apply_or_skip "${LINEAGE_ROOT}/external/drm_hwcomposer" \
+    "${REPO_ROOT}/patches/external_drm_hwcomposer_dsi_crtc.patch" \
+    "DSI CRTC selection"
+apply_or_skip "${LINEAGE_ROOT}/external/mesa" \
+    "${REPO_ROOT}/patches/external_mesa_panvk_host_cached.patch" \
+    "panvk HOST_CACHED"
+apply_or_skip "${LINEAGE_ROOT}/external/minigbm" \
+    "${REPO_ROOT}/patches/external_minigbm_nv12.patch" \
+    "minigbm NV12"
+apply_or_skip "${LINEAGE_ROOT}/external/minigbm-upstream" \
+    "${REPO_ROOT}/patches/external_minigbm_upstream_nv12.patch" \
+    "minigbm-upstream NV12"
 apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs_mm21_nv12.patch" \
-    "MM21 to NV12 decoder copy"
-apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_flush_reset.patch" \
-    "V4L2 flush reset"
+    "${REPO_ROOT}/patches/system_cros_codecs.patch" \
+    "stateless V4L2 decoder"
 apply_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
-    "${REPO_ROOT}/patches/external_v4l2r_cached_capture.patch" \
-    "v4l2r cached capture request"
-apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_cached_capture.patch" \
-    "cached capture buffers"
-apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs_v4l2_poll_wait.patch" \
-    "V4L2 poll wait"
+    "${REPO_ROOT}/patches/external_v4l2r.patch" \
+    "v4l2r capture queue"
+apply_or_skip "${LINEAGE_ROOT}/external/v4l2_codec2" \
+    "${REPO_ROOT}/patches/external_v4l2_codec2.patch" \
+    "v4l2 codec2 stateless HAL"
+apply_or_skip "${LINEAGE_ROOT}/packages/apps/Settings" \
+    "${REPO_ROOT}/patches/packages_apps_settings_hearing_aid_null.patch" \
+    "settings hearing-aid null checks"
+apply_or_skip "${LINEAGE_ROOT}/packages/modules/Connectivity" \
+    "${REPO_ROOT}/patches/packages_modules_connectivity_netlink.patch" \
+    "netlink EINVAL"
+apply_or_skip "${LINEAGE_ROOT}/packages/modules/NetworkStack" \
+    "${REPO_ROOT}/patches/packages_modules_networkstack_netlink.patch" \
+    "netlink monitor restart"
+apply_or_skip "${LINEAGE_ROOT}/system/sepolicy" \
+    "${REPO_ROOT}/patches/system_sepolicy_mainline.patch" \
+    "mainline sepolicy"

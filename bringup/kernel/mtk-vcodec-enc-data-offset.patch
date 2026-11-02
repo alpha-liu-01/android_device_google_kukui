@@ -1,0 +1,32 @@
+Subject: [PATCH] mtk-vcodec-enc: honor vb2 data_offset
+
+codec2 stores the chroma plane offset in data_offset. Both NV12
+planes share one dmabuf, so the encoder otherwise treats chroma as luma.
+
+--- a/drivers/media/platform/mediatek/vcodec/encoder/mtk_vcodec_enc.c
++++ b/drivers/media/platform/mediatek/vcodec/encoder/mtk_vcodec_enc.c
+@@ -1169,10 +1169,21 @@
+ 
+ 	memset(&frm_buf, 0, sizeof(frm_buf));
+ 	for (i = 0; i < src_buf->vb2_buf.num_planes ; i++) {
++		/*
++		 * codec2 stores the chroma offset inside the dmabuf in
++		 * data_offset. Both NV12 planes share one object, so without
++		 * this the chroma address is the start of luma and the
++		 * encoded picture is split in half.
++		 */
++		unsigned int data_offset = src_buf->vb2_buf.planes[i].data_offset;
++		size_t length = src_buf->vb2_buf.planes[i].length;
++
+ 		frm_buf.fb_addr[i].dma_addr =
+-				vb2_dma_contig_plane_dma_addr(&src_buf->vb2_buf, i);
+-		frm_buf.fb_addr[i].size =
+-				(size_t)src_buf->vb2_buf.planes[i].length;
++				vb2_dma_contig_plane_dma_addr(&src_buf->vb2_buf, i) +
++				data_offset;
++		if (length > data_offset)
++			length -= data_offset;
++		frm_buf.fb_addr[i].size = length;
+ 	}
+ 	bs_buf.va = vb2_plane_vaddr(&dst_buf->vb2_buf, 0);
+ 	bs_buf.dma_addr = vb2_dma_contig_plane_dma_addr(&dst_buf->vb2_buf, 0);

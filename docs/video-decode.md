@@ -78,7 +78,7 @@ JPEG 编码器是另一颗设备，不走 SCP。MDP3 是缩放和颜色转换，
 
 第 2 步用 `ccdec` 解了 10 帧 640x360 baseline H.264，输出 I420。和 ffmpeg 软解逐字节相同，sha256 `1bb4b34778fa8186d147229da3828257f3e40b057e876cfed23c578d9fa60b96`。VP9 没有枚举到，没有测，也不进清单。
 
-第 3 步不把 gralloc 的一张 fd 直接交给解码器。这颗驱动两个平面各取自己的 dma 地址，不加 `data_offset`，Y 和 UV 会写到同一处。解码进驱动自己的 mmap 缓冲，再用已有的 `mm21_to_nv12` 抄成线性 NV12。补丁是 `patches/system_cros_codecs_mm21_nv12.patch`。
+第 3 步不把 gralloc 的一张 fd 直接交给解码器。这颗驱动两个平面各取自己的 dma 地址，不加 `data_offset`，Y 和 UV 会写到同一处。解码进驱动自己的 mmap 缓冲，再用已有的 `mm21_to_nv12` 抄成线性 NV12。补丁在 `patches/system_cros_codecs.patch`。
 
 第 4 步打开了 `v4l2_codec2`。清单里只有 `c2.v4l2.avc.decoder` 和 `c2.v4l2.avc.encoder`。VP8、VP9、HEVC、AV1 和安全解码的属性是 false。
 
@@ -124,7 +124,7 @@ HW+ 在第一个实例还活着的时候再创建 `c2.v4l2.avc.decoder`，被 `t
 
 现在这一帧留在 FFI 里。`next_event` 改发 `CC_EVENT_NEED_OUTPUT`，C++ 停掉当前这次解码任务并去申请缓冲。缓冲到了，下一次任务先把留下的帧拷成 NV12，再继续读码流。没有缓冲时不再丢帧，也不再报错。
 
-改动在 `system/cros-codecs/ffi/src/lib.rs`、`ffi/include/cros_codecs_ffi.h`（`patches/system_cros_codecs_mm21_nv12.patch`），以及 `external/v4l2_codec2/v4l2/StatelessV4L2Decoder.cpp`。播放是否顺还没看。帧能出来但 1080p60 仍一顿一顿的话，下一步看不带缓存的 mmap 反块，不先改 minigbm pitch，也不开 Vulkan。
+改动在 `system/cros-codecs/ffi/src/lib.rs`、`ffi/include/cros_codecs_ffi.h`（`patches/system_cros_codecs.patch`），以及 `external/v4l2_codec2/v4l2/StatelessV4L2Decoder.cpp`（`patches/external_v4l2_codec2.patch`）。播放是否顺还没看。帧能出来但 1080p60 仍一顿一顿的话，下一步看不带缓存的 mmap 反块，不先改 minigbm pitch，也不开 Vulkan。
 
 2026-11-01 写入 super：`work/phase4/super.outbuf.raw`，8589934592 字节，sha256 `e195504c427deaf0bfb213e67b65449b2a4654f65f8dcc30697058110e707236`。读回和源一致，内核、pmOS_boot、metadata、misc、userdata 的前 1 MiB 没变。U 盘已卸载。播放是否顺还没看。
 
@@ -158,7 +158,7 @@ HW+ 在第一个实例还活着的时候再创建 `c2.v4l2.avc.decoder`，被 `t
 
 上一节的 35 ms 花在从不带缓存的映射里读 MM21。这块解码器的捕获队列已经允许缓存提示。申请捕获缓冲时带上 `V4L2_MEMORY_FLAG_NON_COHERENT`，mmap 是普通可缓存内存。驱动在把缓冲交回用户态之前作废这些缓存行，反块读到的是解码器刚写完的数据。码流那条队列仍走不带缓存的映射，数据量小，不改。没有关掉缓存同步，也没有重编内核。快进之后重新申请捕获缓冲时同样带这个标志。
 
-改动在 `patches/external_v4l2r_cached_capture.patch` 和 `patches/system_cros_codecs_v4l2_cached_capture.patch`。编 Gru 之前，`--reverse` 会把这两份和 MM21、flush 那两份一起拿掉。
+改动在 `patches/external_v4l2r.patch` 和 `patches/system_cros_codecs.patch`。编 Gru 之前，`--reverse` 会把解码器这几份一起拿掉。
 
 2026-11-01 写入 super：`work/phase4/super.cache.raw`，8589934592 字节，sha256 `730467bf11dcb9fb0d591e087710d8a7e43a7adf620ebb534aad993d9e5e8572`。读回和源一致，内核、pmOS_boot、metadata、misc、userdata 的前 1 MiB 没变。U 盘已卸载。1080p60 能不能连续播还没看。
 
@@ -174,7 +174,7 @@ HW+ 在第一个实例还活着的时候再创建 `c2.v4l2.avc.decoder`，被 `t
 
 ## 2026-11-01 等缓冲改成 poll
 
-`DeviceHandle::sync` 和输出缓冲不够时的等待不再按 2、4、8 ms 往上睡。捕获缓冲用 `POLLIN`，输出缓冲用 `POLLOUT`，缓冲一就绪 `poll` 就返回。2 秒还没有缓冲才放弃。改动在 `patches/system_cros_codecs_v4l2_poll_wait.patch`。编 Gru 之前，`--reverse` 会把这份和前面的解码补丁一起拿掉。
+`DeviceHandle::sync` 和输出缓冲不够时的等待不再按 2、4、8 ms 往上睡。捕获缓冲用 `POLLIN`，输出缓冲用 `POLLOUT`，缓冲一就绪 `poll` 就返回。2 秒还没有缓冲才放弃。改动在 `patches/system_cros_codecs.patch`。编 Gru 之前，`--reverse` 会把这份和前面的解码补丁一起拿掉。
 
 2026-11-01 写入 super：`work/phase4/super.poll.raw`，8589934592 字节，sha256 `bd1875c009697517ce82ec203353a6a53f7df4c053ca285efb9400fc5fafe3cb`。读回和源一致，内核、pmOS_boot、metadata、misc、userdata 的前 1 MiB 没变。U 盘已卸载。1080p60 能不能连续播还没看。
 

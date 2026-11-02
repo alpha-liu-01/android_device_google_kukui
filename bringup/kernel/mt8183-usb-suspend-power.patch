@@ -1,0 +1,301 @@
+Subject: [PATCH] mt8183-usb: keep the Type-C port powered across s2idle
+
+The only data connector is also the boot disk. Powering it off ends
+the session. suspend_power_off defaults to 0.
+
+--- a/drivers/usb/mtu3/mtu3.h
++++ b/drivers/usb/mtu3/mtu3.h
+@@ -265,8 +265,17 @@
+ 	struct regmap *uwk;
+ 	u32 uwk_reg_base;
+ 	u32 uwk_vers;
++	/*
++	 * When false, system sleep leaves this controller's ports, PHY and
++	 * clocks running. The boot disk on Krane is a USB card reader, and
++	 * powering that bus down ends the running boot. Userspace writes
++	 * suspend_power_off to choose.
++	 */
++	bool suspend_power_off;
+ };
+ 
++bool mtu3_suspend_powers_off(struct device *ssusb_dev);
++
+ /**
+  * @fifo_size: it is (@slot + 1) * @fifo_seg_size
+  * @fifo_seg_size: it is roundup_pow_of_two(@maxp)
+--- a/drivers/usb/mtu3/mtu3_plat.c
++++ b/drivers/usb/mtu3/mtu3_plat.c
+@@ -12,13 +12,106 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/platform_device.h>
++#include <linux/pm_runtime.h>
+ #include <linux/pm_wakeirq.h>
+ #include <linux/reset.h>
++#include <linux/suspend.h>
++#include <linux/usb.h>
++#include <linux/usb/hcd.h>
+ 
+ #include "mtu3.h"
+ #include "mtu3_dr.h"
+ #include "mtu3_debug.h"
+ 
++static ssize_t suspend_power_off_show(struct device *dev,
++				       struct device_attribute *attr, char *buf);
++static ssize_t suspend_power_off_store(struct device *dev,
++					struct device_attribute *attr,
++					const char *buf, size_t count);
++static DEVICE_ATTR_RW(suspend_power_off);
++
++bool mtu3_suspend_powers_off(struct device *ssusb_dev);
++
++static struct device *ssusb_policy_dev;
++static bool policy_nb_registered;
++
++static bool udev_on_this_ssusb(struct usb_device *udev)
++{
++	struct usb_hcd *hcd;
++	struct device *ctl;
++
++	if (!ssusb_policy_dev || !udev->bus)
++		return false;
++	hcd = bus_to_hcd(udev->bus);
++	ctl = hcd ? hcd->self.controller : NULL;
++	return ctl && ctl->parent == ssusb_policy_dev;
++}
++
++static int keep_usb_device(struct usb_device *udev, void *data)
++{
++	bool power_off = *(bool *)data;
++
++	if (!udev_on_this_ssusb(udev))
++		return 0;
++	if (power_off) {
++		if (!udev->dev.power.runtime_auto)
++			pm_runtime_allow(&udev->dev);
++		device_wakeup_enable(&udev->dev);
++	} else {
++		device_wakeup_disable(&udev->dev);
++		if (udev->dev.power.runtime_auto)
++			pm_runtime_forbid(&udev->dev);
++	}
++	return 0;
++}
++
++static void apply_usb_sleep_policy(struct device *dev, bool power_off)
++{
++	if (power_off)
++		pm_set_mem_sleep(PM_SUSPEND_MEM);
++	else
++		pm_set_mem_sleep(PM_SUSPEND_TO_IDLE);
++	usb_for_each_dev(&power_off, keep_usb_device);
++	dev_info(dev, "suspend_power_off=%d, mem_sleep=%s\n", power_off,
++		 power_off ? "deep" : "s2idle");
++}
++
++static int usb_policy_notify(struct notifier_block *nb, unsigned long action,
++			     void *data)
++{
++	struct usb_device *udev = data;
++	bool power_off;
++
++	if (action != USB_DEVICE_ADD || !ssusb_policy_dev)
++		return NOTIFY_DONE;
++	power_off = mtu3_suspend_powers_off(ssusb_policy_dev);
++	if (!power_off)
++		keep_usb_device(udev, &power_off);
++	return NOTIFY_OK;
++}
++
++static struct notifier_block usb_policy_nb = {
++	.notifier_call = usb_policy_notify,
++};
++
++static void policy_register(struct device *dev)
++{
++	if (policy_nb_registered)
++		return;
++	ssusb_policy_dev = dev;
++	usb_register_notify(&usb_policy_nb);
++	policy_nb_registered = true;
++}
++
++static void policy_unregister(void)
++{
++	if (!policy_nb_registered)
++		return;
++	usb_unregister_notify(&usb_policy_nb);
++	policy_nb_registered = false;
++	ssusb_policy_dev = NULL;
++}
++
+ /* u2-port0 should be powered on and enabled; */
+ int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks)
+ {
+@@ -389,6 +482,7 @@
+ 
+ 	/* default as host */
+ 	ssusb->is_host = !(ssusb->dr_mode == USB_DR_MODE_PERIPHERAL);
++	policy_register(dev);
+ 
+ 	switch (ssusb->dr_mode) {
+ 	case USB_DR_MODE_PERIPHERAL:
+@@ -435,6 +529,11 @@
+ 	pm_runtime_put_autosuspend(dev);
+ 	pm_runtime_forbid(dev);
+ 
++	ret = device_create_file(dev, &dev_attr_suspend_power_off);
++	if (ret)
++		dev_warn(dev, "suspend_power_off sysfs not created: %d\n", ret);
++	apply_usb_sleep_policy(dev, false);
++
+ 	return 0;
+ 
+ host_exit:
+@@ -442,6 +541,7 @@
+ gadget_exit:
+ 	ssusb_gadget_exit(ssusb);
+ comm_exit:
++	policy_unregister();
+ 	ssusb_rscs_exit(ssusb);
+ comm_init_err:
+ 	pm_runtime_put_noidle(dev);
+@@ -455,6 +555,8 @@
+ {
+ 	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
+ 
++	policy_unregister();
++	device_remove_file(&pdev->dev, &dev_attr_suspend_power_off);
+ 	pm_runtime_get_sync(&pdev->dev);
+ 
+ 	switch (ssusb->dr_mode) {
+@@ -510,11 +612,50 @@
+ 	return 0;
+ }
+ 
++static ssize_t suspend_power_off_show(struct device *dev,
++					 struct device_attribute *attr, char *buf)
++{
++	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
++
++	return sysfs_emit(buf, "%d\n", READ_ONCE(ssusb->suspend_power_off));
++}
++
++static ssize_t suspend_power_off_store(struct device *dev,
++					struct device_attribute *attr,
++					const char *buf, size_t count)
++{
++	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
++	bool val;
++	int ret;
++
++	ret = kstrtobool(buf, &val);
++	if (ret)
++		return ret;
++	WRITE_ONCE(ssusb->suspend_power_off, val);
++	apply_usb_sleep_policy(dev, val);
++	return count;
++}
++
++bool mtu3_suspend_powers_off(struct device *ssusb_dev)
++{
++	struct ssusb_mtk *ssusb = dev_get_drvdata(ssusb_dev);
++
++	if (!ssusb)
++		return true;
++	return READ_ONCE(ssusb->suspend_power_off);
++}
++EXPORT_SYMBOL_GPL(mtu3_suspend_powers_off);
++
+ static int mtu3_suspend_common(struct device *dev, pm_message_t msg)
+ {
+ 	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
+ 	int ret = 0;
+ 
++	if (!READ_ONCE(ssusb->suspend_power_off)) {
++		dev_info(dev, "suspend_power_off=0, leave USB powered\n");
++		return 0;
++	}
++
+ 	dev_dbg(dev, "%s\n", __func__);
+ 
+ 	switch (ssusb->dr_mode) {
+@@ -559,6 +700,9 @@
+ 	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
+ 	int ret;
+ 
++	if (!READ_ONCE(ssusb->suspend_power_off))
++		return 0;
++
+ 	dev_dbg(dev, "%s\n", __func__);
+ 
+ 	ssusb_wakeup_set(ssusb, false);
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -736,6 +736,37 @@
+ 	pm_runtime_set_suspended(dev);
+ }
+ 
++extern bool mtu3_suspend_powers_off(struct device *ssusb_dev);
++
++static bool xhci_mtk_keeps_bus(struct usb_hcd *hcd)
++{
++	struct device *ctl = hcd->self.controller;
++
++	/*
++	 * xhci_bus_suspend() puts every live port in U3. On Krane that is
++	 * the Genesys hub in front of the USB boot disk, so the reader
++	 * loses power even when the MTK port-PDN path is skipped.
++	 */
++	return ctl && ctl->parent && !mtu3_suspend_powers_off(ctl->parent);
++}
++
++static int xhci_mtk_bus_suspend(struct usb_hcd *hcd)
++{
++	if (xhci_mtk_keeps_bus(hcd)) {
++		dev_info(hcd->self.controller,
++			 "suspend_power_off=0, USB bus stays in U0\n");
++		return 0;
++	}
++	return xhci_bus_suspend(hcd);
++}
++
++static int xhci_mtk_bus_resume(struct usb_hcd *hcd)
++{
++	if (xhci_mtk_keeps_bus(hcd))
++		return 0;
++	return xhci_bus_resume(hcd);
++}
++
+ static int __maybe_unused xhci_mtk_suspend(struct device *dev)
+ {
+ 	struct xhci_hcd_mtk *mtk = dev_get_drvdata(dev);
+@@ -744,6 +775,9 @@
+ 	struct usb_hcd *shared_hcd = xhci->shared_hcd;
+ 	int ret;
+ 
++	if (dev->parent && !mtu3_suspend_powers_off(dev->parent))
++		return 0;
++
+ 	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
+ 	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
+ 	timer_delete_sync(&hcd->rh_timer);
+@@ -779,6 +813,9 @@
+ 	struct usb_hcd *shared_hcd = xhci->shared_hcd;
+ 	int ret;
+ 
++	if (dev->parent && !mtu3_suspend_powers_off(dev->parent))
++		return 0;
++
+ 	usb_wakeup_set(mtk, false);
+ 	ret = clk_bulk_prepare_enable(BULK_CLKS_NUM, mtk->clks);
+ 	if (ret)
+@@ -864,6 +901,8 @@
+ static int __init xhci_mtk_init(void)
+ {
+ 	xhci_init_driver(&xhci_mtk_hc_driver, &xhci_mtk_overrides);
++	xhci_mtk_hc_driver.bus_suspend = xhci_mtk_bus_suspend;
++	xhci_mtk_hc_driver.bus_resume = xhci_mtk_bus_resume;
+ 	return platform_driver_register(&mtk_xhci_driver);
+ }
+ module_init(xhci_mtk_init);

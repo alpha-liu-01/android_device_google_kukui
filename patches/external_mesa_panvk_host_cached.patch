@@ -1,0 +1,220 @@
+diff --git a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+index 68cb362..9a11aeb 100644
+--- a/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/jm/panvk_vX_cmd_dispatch.c
+@@ -214,6 +214,68 @@ cmd_dispatch(struct panvk_cmd_buffer *cmdbuf, struct panvk_dispatch_info *info)
+    clear_dirty_after_dispatch(cmdbuf);
+ }
+ 
++#if PAN_ARCH <= 7
++/* The kernel job timeout is 500ms.  A Bifrost compute job that is still
++ * ACTIVE when that fires resets the GPU and the compositor's fragment job
++ * with it.  Geekbench completed at 16384 groups and 4 MiB threads (score
++ * 493).  Raising that to 32768 groups let a 60x1080 local-32 dispatch
++ * (64800 groups) run long enough to hit the timeout, and the score did not
++ * move.  Barriers are per workgroup.  gl_NumWorkGroups stays the original
++ * size; gl_WorkGroupID gets wg_base added by NIR.
++ */
++static void
++cmd_dispatch_sliced(struct panvk_cmd_buffer *cmdbuf, uint32_t base_x,
++                    uint32_t base_y, uint32_t base_z, uint32_t count_x,
++                    uint32_t count_y, uint32_t count_z, uint32_t full_x,
++                    uint32_t full_y, uint32_t full_z)
++{
++   const struct panvk_shader_variant *shader =
++      panvk_shader_only_variant(cmdbuf->state.compute.shader);
++   if (!shader)
++      return;
++
++   unsigned local = shader->cs.local_size.x * shader->cs.local_size.y *
++                    shader->cs.local_size.z;
++   uint32_t max_groups = 16384;
++   const uint64_t max_threads = 4ull << 20;
++
++   if (local && (uint64_t)max_groups * local > max_threads)
++      max_groups = MAX2((uint32_t)(max_threads / local), 1u);
++
++   uint64_t groups = (uint64_t)count_x * count_y * count_z;
++
++   if (groups <= max_groups || (count_x <= 1 && count_y <= 1 && count_z <= 1)) {
++      struct panvk_dispatch_info info = {
++         .wg_base = {base_x, base_y, base_z},
++         .direct.wg_count = {count_x, count_y, count_z},
++         .num_wg = {full_x, full_y, full_z},
++      };
++      cmd_dispatch(cmdbuf, &info);
++      return;
++   }
++
++   if (count_x >= count_y && count_x >= count_z) {
++      uint32_t mid = count_x / 2;
++      cmd_dispatch_sliced(cmdbuf, base_x, base_y, base_z, mid, count_y, count_z,
++                          full_x, full_y, full_z);
++      cmd_dispatch_sliced(cmdbuf, base_x + mid, base_y, base_z, count_x - mid,
++                          count_y, count_z, full_x, full_y, full_z);
++   } else if (count_y >= count_z) {
++      uint32_t mid = count_y / 2;
++      cmd_dispatch_sliced(cmdbuf, base_x, base_y, base_z, count_x, mid, count_z,
++                          full_x, full_y, full_z);
++      cmd_dispatch_sliced(cmdbuf, base_x, base_y + mid, base_z, count_x,
++                          count_y - mid, count_z, full_x, full_y, full_z);
++   } else {
++      uint32_t mid = count_z / 2;
++      cmd_dispatch_sliced(cmdbuf, base_x, base_y, base_z, count_x, count_y, mid,
++                          full_x, full_y, full_z);
++      cmd_dispatch_sliced(cmdbuf, base_x, base_y, base_z + mid, count_x, count_y,
++                          count_z - mid, full_x, full_y, full_z);
++   }
++}
++#endif
++
+ VKAPI_ATTR void VKAPI_CALL
+ panvk_per_arch(CmdDispatchBase)(VkCommandBuffer commandBuffer,
+                                 uint32_t baseGroupX, uint32_t baseGroupY,
+@@ -225,11 +287,17 @@ panvk_per_arch(CmdDispatchBase)(VkCommandBuffer commandBuffer,
+    if (groupCountX == 0 || groupCountY == 0 || groupCountZ == 0)
+       return;
+ 
++#if PAN_ARCH <= 7
++   cmd_dispatch_sliced(cmdbuf, baseGroupX, baseGroupY, baseGroupZ, groupCountX,
++                       groupCountY, groupCountZ, groupCountX, groupCountY,
++                       groupCountZ);
++#else
+    struct panvk_dispatch_info info = {
+       .wg_base = {baseGroupX, baseGroupY, baseGroupZ},
+       .direct.wg_count = {groupCountX, groupCountY, groupCountZ},
+    };
+    cmd_dispatch(cmdbuf, &info);
++#endif
+ }
+ 
+ VKAPI_ATTR void VKAPI_CALL
+diff --git a/src/panfrost/vulkan/panvk_buffer.c b/src/panfrost/vulkan/panvk_buffer.c
+index 5aba3d0..ff0b4c5 100644
+--- a/src/panfrost/vulkan/panvk_buffer.c
++++ b/src/panfrost/vulkan/panvk_buffer.c
+@@ -49,7 +49,7 @@ panvk_GetDeviceBufferMemoryRequirements(VkDevice _device,
+          : 64;
+    const uint64_t size = align64(pInfo->pCreateInfo->size, align);
+ 
+-   pMemoryRequirements->memoryRequirements.memoryTypeBits = 1;
++   pMemoryRequirements->memoryRequirements.memoryTypeBits = PANVK_MEM_TYPE_BITS;
+    pMemoryRequirements->memoryRequirements.alignment = align;
+    pMemoryRequirements->memoryRequirements.size = size;
+ 
+diff --git a/src/panfrost/vulkan/panvk_cmd_dispatch.h b/src/panfrost/vulkan/panvk_cmd_dispatch.h
+index a9466cd..c4533e4 100644
+--- a/src/panfrost/vulkan/panvk_cmd_dispatch.h
++++ b/src/panfrost/vulkan/panvk_cmd_dispatch.h
+@@ -68,6 +68,13 @@ struct panvk_dispatch_info {
+       } wg_count;
+    } direct;
+ 
++   /* gl_NumWorkGroups when a dispatch is split into several jobs.
++    * Zero means "use direct.wg_count".
++    */
++   struct {
++      uint32_t x, y, z;
++   } num_wg;
++
+    struct {
+       uint64_t buffer_dev_addr;
+    } indirect;
+diff --git a/src/panfrost/vulkan/panvk_device_memory.c b/src/panfrost/vulkan/panvk_device_memory.c
+index bdbcb1d..1fd0eae 100644
+--- a/src/panfrost/vulkan/panvk_device_memory.c
++++ b/src/panfrost/vulkan/panvk_device_memory.c
+@@ -325,7 +325,7 @@ panvk_GetMemoryFdPropertiesKHR(VkDevice _device,
+                                VkMemoryFdPropertiesKHR *pMemoryFdProperties)
+ {
+    assert(handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT);
+-   pMemoryFdProperties->memoryTypeBits = 1;
++   pMemoryFdProperties->memoryTypeBits = PANVK_MEM_TYPE_BITS;
+    return VK_SUCCESS;
+ }
+ 
+diff --git a/src/panfrost/vulkan/panvk_device_memory.h b/src/panfrost/vulkan/panvk_device_memory.h
+index 6fc545b..2979ee6 100644
+--- a/src/panfrost/vulkan/panvk_device_memory.h
++++ b/src/panfrost/vulkan/panvk_device_memory.h
+@@ -12,6 +12,13 @@
+ 
+ struct panvk_priv_bo;
+ 
++/* One system heap. Type 0 is the original coherent mapping. Type 1 is the
++ * same mapping with HOST_CACHED, which compute clients require. Every
++ * memoryTypeBits mask has to include both, or the cached type is invisible.
++ */
++#define PANVK_MEM_TYPE_COUNT 2
++#define PANVK_MEM_TYPE_BITS  ((1u << PANVK_MEM_TYPE_COUNT) - 1)
++
+ struct panvk_device_memory {
+    struct vk_device_memory vk;
+    struct pan_kmod_bo *bo;
+diff --git a/src/panfrost/vulkan/panvk_image.c b/src/panfrost/vulkan/panvk_image.c
+index 38be444..971b7d9 100644
+--- a/src/panfrost/vulkan/panvk_image.c
++++ b/src/panfrost/vulkan/panvk_image.c
+@@ -796,7 +796,7 @@ panvk_GetImageMemoryRequirements2(VkDevice device,
+          ? align64(size_non_sparse, panvk_get_gpu_page_size(dev))
+          : size_non_sparse;
+ 
+-   pMemoryRequirements->memoryRequirements.memoryTypeBits = 1;
++   pMemoryRequirements->memoryRequirements.memoryTypeBits = PANVK_MEM_TYPE_BITS;
+    pMemoryRequirements->memoryRequirements.alignment = alignment;
+    pMemoryRequirements->memoryRequirements.size = size;
+ 
+diff --git a/src/panfrost/vulkan/panvk_physical_device.c b/src/panfrost/vulkan/panvk_physical_device.c
+index 59e8465..163db49 100644
+--- a/src/panfrost/vulkan/panvk_physical_device.c
++++ b/src/panfrost/vulkan/panvk_physical_device.c
+@@ -24,6 +24,7 @@
+ #include "vk_util.h"
+ 
+ #include "panvk_device.h"
++#include "panvk_device_memory.h"
+ #include "panvk_entrypoints.h"
+ #include "panvk_image.h"
+ #include "panvk_instance.h"
+@@ -481,11 +482,16 @@ panvk_GetPhysicalDeviceMemoryProperties2(
+       .memoryHeapCount = 1,
+       .memoryHeaps[0].size = get_system_heap_size(),
+       .memoryHeaps[0].flags = VK_MEMORY_HEAP_DEVICE_LOCAL_BIT,
+-      .memoryTypeCount = 1,
++      .memoryTypeCount = PANVK_MEM_TYPE_COUNT,
+       .memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+                                       VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                       VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+       .memoryTypes[0].heapIndex = 0,
++      .memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
++                                      VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
++                                      VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
++                                      VK_MEMORY_PROPERTY_HOST_CACHED_BIT,
++      .memoryTypes[1].heapIndex = 0,
+    };
+ }
+ 
+diff --git a/src/panfrost/vulkan/panvk_vX_cmd_dispatch.c b/src/panfrost/vulkan/panvk_vX_cmd_dispatch.c
+index ec9d2b0..fa76d10 100644
+--- a/src/panfrost/vulkan/panvk_vX_cmd_dispatch.c
++++ b/src/panfrost/vulkan/panvk_vX_cmd_dispatch.c
+@@ -22,12 +22,13 @@ panvk_per_arch(cmd_prepare_dispatch_sysvals)(
+     * buffer.
+     */
+    if (info->indirect.buffer_dev_addr == 0) {
+-      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.x,
+-                         info->direct.wg_count.x);
+-      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.y,
+-                         info->direct.wg_count.y);
+-      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.z,
+-                         info->direct.wg_count.z);
++      uint32_t num_x = info->num_wg.x ? info->num_wg.x : info->direct.wg_count.x;
++      uint32_t num_y = info->num_wg.y ? info->num_wg.y : info->direct.wg_count.y;
++      uint32_t num_z = info->num_wg.z ? info->num_wg.z : info->direct.wg_count.z;
++
++      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.x, num_x);
++      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.y, num_y);
++      set_compute_sysval(cmdbuf, dirty_sysvals, num_work_groups.z, num_z);
+    } else {
+       BITSET_SET_RANGE(dirty_sysvals,
+                        sysval_fau_start(compute, num_work_groups),

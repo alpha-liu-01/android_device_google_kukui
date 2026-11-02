@@ -8,7 +8,7 @@ Android 17 是这套板级工作做完之后的换源码，不和第一台机器
 
 沿用这台机器已经在跑的 `linux-postmarketos-mediatek-mt81` 6.18.28-mt81，以及 depthcharge 从 U 盘启动。图形走 `mtk-drm`、Mesa Panfrost 和 `drm_hwcomposer`。无线走已经在用的 ath10k SDIO。
 
-不刷 UEFI，不替换只读固件，不换内核系列。U 盘上的系统能重复启动、日常功能完成之前，不写 eMMC。
+不刷 UEFI，不替换只读固件，不换内核系列。U 盘上的系统能重复启动之后才写 eMMC。2026-11-02 内置盘上的 Android 已经进到桌面，Linux 也还能从菜单进入。
 
 已经同步的源码是 `/run/media/alpha/YMTC/lineage-23.2`。板级文件放在这个仓库，再逐个文件链进那棵树。Soong 不跟随目录符号链接。不继承 Android 树里的 `device/google/gru` 或 `device/google/trogdor`。编译也不需要把 Gru 的设备树检出：EC 传感器 HAL 在 `device/google/kukui/hal/sensors`，共享修改在 `patches/`，`patches/apply-patches.sh` 打到一份官方 LineageOS 23.2 上。`local_manifests/kukui.xml` 只补 mainline、mesa 和 minigbm 这几个上游仓库。Gru 那份设备树是产品形态的样板，芯片相关的项全部换掉。Gru 的阶段记录在 [docs_from_googlegru](docs_from_googlegru/roadmap.md)。
 
@@ -33,7 +33,7 @@ Android 17 是这套板级工作做完之后的换源码，不和第一台机器
 | Wi-Fi | QCA6174 hw3.2 SDIO，`ath10k_sdio`，固件 `WLAN.RMH.4.4.1-00174`。文件在 `ath10k/QCA6174/hw3.0/`，是 `.zst` |
 | 蓝牙 | `hci0`，`hci_uart` + `btqca`，固件 `qca/nvm_00440302_i2s_eu.bin`，磁盘上是 `.zst` |
 | USB | 唯一控制器 `11201000.usb`（`mtu3`），xHCI `11200000.usb`，USB 2.0。采集时 Type-C 是 PD 受电，`/sys/class/udc` 为空 |
-| 外接显示 | 驱动 `CONFIG_DRM_ITE_IT6505=y`，运行中的设备树没有这个节点，DRM 只有 DSI-1 |
+| 外接显示 | 驱动 `CONFIG_DRM_ITE_IT6505=y`，运行中的设备树没有这个节点。不做 |
 | 电池 / 充电 | `sbs-12-000b` 型号 `L16D2P3`。充电器 `cros-usbpd-charger` |
 | EC / 安全芯片 | `cros-ec` SPI。`tpm0` 是 TPM 2.0 |
 | 视频 / 摄像头 | `mtk-vcodec-dec` 在 `/dev/video3`，同时加载了 `v4l2_h264` 和 `v4l2_vp9`。没有传感器节点 |
@@ -91,7 +91,7 @@ Gru 上已经证明、和芯片无关、第一份镜像就要带上的用户空�
 | 触摸 / 笔 | Elan I2C + 独立的 Wacom HID | Goodix `27C6:0E30`，触摸和笔在同一颗 HID 上 |
 | 键盘 | 无可拆底座 | `cros-cbas` + 内部 USB hub 上的键盘和触控板 |
 | 视频 | Hantro / rkvdec，无状态 V4L2 | `mtk-vcodec-dec`，已加载 `v4l2_h264` 和 `v4l2_vp9`。不搬 rkvdec 补丁 |
-| 外接显示 | `cdn-dp` + `rockchip/dptx.bin` | 这颗设备树没有 IT6505 节点。内置屏完成之前不做 |
+| 外接显示 | `cdn-dp` + `rockchip/dptx.bin` | 不做。postmarketOS 上 IT6505 只能到 1080p30 或 720p60 |
 | 看门狗 | RK3399 的 `dw_wdt`。6.6 上一休眠就死在 bootloader，所以 Android 从启动就喂 `/dev/watchdog` | `mtk_wdt`。这次启动里 deep 休眠成功 11 次，失败 2 次都回到了同一次启动。Android 不从第一份镜像开始喂看门狗 |
 | 盘容量 | eMMC 约 29 GiB，super 后来按 SD 做成 8 GiB | eMMC 约 112 GiB。开发期 super 按 U 盘算，8 GiB 够 vanilla 镜像。写 eMMC 时不必为了 32 GB 盘去缩小 |
 
@@ -196,10 +196,10 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 日常路径通了之后，按实机现象处理，不把 Gru 的芯片补丁提前打进来。
 
 - SELinux 改成 enforcing。Gru 上这一步暴露过的、需要在这台机器上重新写路径的有：`vendor_init` 加载模块、surfaceflinger 读显示 uevent、devtmpfs 上内核创建节点、memfd 在改标签之前被音频和蓝牙映射。genfs 按这台的 sysfs 路径写。
-- 视频解码。调查在 [video-decode.md](video-decode.md)。解码器是无状态的 `mtk-vcodec-dec`，输出是 `MM21` 不是 NV12，固件在 SCP。这次 Android 开机里模块没装，节点不存在。按 cros-codecs 接 codec2，不搬 rkvdec 的补丁。还没改镜像。
-- 摄像头。调查在 [camera.md](camera.md)。后摄是 OV8856，前摄是 OV02A10，走 seninf 和 CAMSV，不搬 rkisp1。方向和颜色已确认，两路饱和度 1.8。`super.camera-hal.raw`（sha256 `6ee9cc4b1d3661144aa75bc829ddc3f8d0c49bc1cd1c620735cea0e360c067f3`）上相机应用一打开就退出：IPA 没有帧间隔，HAL 不注册相机。正在跑的系统里换了 HAL 之后应用能停住，后摄在出帧，大约 7 到 8 帧每秒。预览大约 16 秒后 provider 被 SIGPIPE 杀掉，再次打开就是 0 个相机。忽略 SIGPIPE 之后应用能保持打开。预览曾因 NV12 色度被读成 0 而整幅发绿，改成 XBGR8888 之后颜色已确认正常。取景框实测 7.6 帧每秒：传感器约 30 帧，两根去马赛克线程占满两个大核，其余核空着。这些修改和 Vulkan 一起在 `super.vk.raw`（sha256 `a4ab55590721edc89fc5440d7ec328047e47d027b71315e49791d6219eb75ed7`）。2026-11-01 只把这张 super 写入 SanDisk。内核槽没动。还没有这次 Ctrl+U。录像等内置麦。
-- IT6505 外接显示器。运行中的设备树没有这个节点。内置屏的旋转和合成先稳定，确认节点出现之后再做。
-- 刷新率、开机动画、自动熄屏这类产品细节，按实机显示结果改。
+- 视频解码。调查在 [video-decode.md](video-decode.md)。解码器是无状态的 `mtk-vcodec-dec`，输出是 `MM21`，固件在 SCP。1080p60 H.264 已由 cros-codecs 接到 codec2。不搬 rkvdec 的补丁。
+- 摄像头。调查在 [camera.md](camera.md)。后摄是 OV8856，前摄是 OV02A10。方向、颜色和录像已经确认。
+- 外接显示器不做。运行中的设备树没有 IT6505 节点，postmarketOS 上这块桥也只能到 1080p30 或 720p60。
+- 刷新率、开机动画、自动熄屏这类产品细节，按实机显示结果改。SELinux enforcing 仍未做。
 
 完成标准：设置里 SELinux 正在运行，阶段 4 的各项仍在。enforcing 下复现的故障记进 `docs/bugs.md`，修完再进阶段 6。
 
@@ -223,7 +223,9 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 命令行里的 `androidboot.boot_devices` 改成 `11230000.mmc`。这一步才把 Type-C 做成有线 adb、MTP 和 OTG。改完的内核不再用于「从 U 盘当根文件系统」的那张 FIT，否则 U 盘和 gadget 会抢 `11201000.usb`。对外发布的 U 盘镜像保持 host，用来在 eMMC 写坏时启动。
 
-完成标准：从 eMMC 进入桌面，阶段 4 的功能仍在，有线 adb 可用。U 盘上的恢复镜像仍能 Ctrl+U 启动。
+2026-11-02 从菜单进入 eMMC 上的 Android，桌面起来了，Linux 也还能进。这台机器只有一个 Type-C，启动时它是 USB 主机，有线 adb 仍然没有。U 盘上的恢复镜像仍用 Ctrl+U。
+
+完成标准：从 eMMC 进入桌面，阶段 4 的功能仍在。有线 adb 不作为这台 Krane 的通过条件。U 盘上的恢复镜像仍能 Ctrl+U 启动。
 
 ## 明确后做
 
@@ -237,4 +239,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 4 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md)、[阶段 3](phase-3.md) 和 [阶段 4](phase-4.md)。eMMC 还没写，调查在 [emmc.md](emmc.md)。2026-11-02 的 super（sha256 `e58df4603da72075515bc54f004afd8c7e8a57ce6da53cbfb3ca1ba2f41665cf`）已写入 SanDisk，读回一致，还没有这次 Ctrl+U。音视频编解码的调查在 [video-decode.md](video-decode.md)，还没改镜像。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到音频 HAL。加速度计的单位矩阵和 FIFO 超时已在 2026-10-31 这次 Ctrl+U 确认：正放是横屏，读数大约每 40 毫秒一笔。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 4 已结束。eMMC 上的 Android 已经进到桌面，菜单也能进 Linux，见 [emmc.md](emmc.md)。外接显示器不做。还没做的是 SELinux enforcing、可分发镜像，以及没有实机的同族型号。共享源码的补丁在 `patches/`，`patches/apply-patches.sh` 打到一份官方 LineageOS 23.2 上。编 Gru 之前对这份树跑 `--reverse`：音频走回 DA7219，解码器走回 Gru 自己的路径，healthd 拿掉 Krane 的电源节点回退。`external/libcamera` 里如果还有 rkisp1，那是以前 Gru 的试验，Kukui 不用，脚本也不会打上去。内核相对 6.18.28 的两处改动在 `bringup/kernel/`。摄像头的内核补丁在 `bringup/camera/kernel-camera.patch`。模块、固件和相机 HAL 预编译库在 `device/google/kukui`。
