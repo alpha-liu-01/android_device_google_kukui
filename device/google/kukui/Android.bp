@@ -12,6 +12,26 @@ cc_binary {
     cflags: ["-Wall", "-Wextra", "-Werror"],
 }
 
+cc_binary {
+    name: "kukui-keep-emmc",
+    srcs: ["kukui-keep.c"],
+    static_executable: true,
+    stl: "none",
+    system_shared_libs: [],
+    static_libs: ["libc"],
+    cflags: ["-Wall", "-Wextra", "-Werror", "-DKUKUI_EMMC"],
+}
+
+cc_binary {
+    name: "kukui-menu",
+    srcs: ["kukui-menu.c"],
+    static_executable: true,
+    stl: "none",
+    system_shared_libs: [],
+    static_libs: ["libc"],
+    cflags: ["-Wall", "-Wextra", "-Werror"],
+}
+
 cc_prebuilt_library_shared {
     name: "libcamera-base",
     vendor: true,

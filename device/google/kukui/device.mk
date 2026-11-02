@@ -45,6 +45,8 @@ PRODUCT_CHARACTERISTICS := tablet
 # EC accelerometer subhal. Sources are hal/sensors in this tree.
 PRODUCT_PACKAGES += \
     kukui-keep \
+    KukuiInstall \
+    kukui-installd \
     KukuiUsbSuspend \
     android.hardware.sensors-service.multihal \
     android.hardware.sensors@2.1-kukui-subhal \
@@ -73,8 +75,10 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_RAMDISK)/fstab.kukui \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.kukui \
     $(LOCAL_PATH)/init.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/hw/init.kukui.rc \
+    $(LOCAL_PATH)/installer/kukui-install.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/kukui-install.rc \
     $(LOCAL_PATH)/kukui-logcat.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-logcat.sh \
     $(LOCAL_PATH)/kukui-usb-suspend.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-usb-suspend.sh \
+    $(LOCAL_PATH)/kukui-wifi-reprobe.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-wifi-reprobe.sh \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_RAMDISK)/ueventd.kukui.rc \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc \
     $(LOCAL_PATH)/wpa_supplicant.conf:$(TARGET_COPY_OUT_VENDOR)/etc/wifi/wpa_supplicant.conf \

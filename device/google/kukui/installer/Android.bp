@@ -1,0 +1,20 @@
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+android_app {
+    name: "KukuiInstall",
+    srcs: [
+        "src/**/*.java",
+    ],
+    sdk_version: "current",
+    min_sdk_version: "34",
+    certificate: "platform",
+    vendor: true,
+}
+
+sh_binary {
+    name: "kukui-installd",
+    src: "kukui-installd.sh",
+    vendor: true,
+}

@@ -65,8 +65,16 @@ on post-fs-data
     # left this directory empty. kukui-logcat does not depend on it.
     mkdir /data/tombstones 0775 system system
     mkdir /data/anr 0775 system system
+    mkdir /data/vendor/wifi 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
+    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
+    mkdir /data/vendor/wifi/hostapd 0770 wifi wifi
+    mkdir /data/vendor/wifi/hostapd/sockets 0770 wifi wifi
     start kukui-logcat
     start kukui-usb-suspend
+
+on property:sys.boot_completed=1
+    start kukui-wifi-reprobe
 
 service kukui-logcat /system/bin/sh /vendor/bin/kukui-logcat.sh
     disabled
@@ -78,4 +86,10 @@ service kukui-usb-suspend /system/bin/sh /vendor/bin/kukui-usb-suspend.sh
     disabled
     user root
     group root system
+    oneshot
+
+service kukui-wifi-reprobe /system/bin/sh /vendor/bin/kukui-wifi-reprobe.sh
+    disabled
+    user root
+    group root
     oneshot

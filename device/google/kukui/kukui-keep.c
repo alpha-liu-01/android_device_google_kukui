@@ -70,10 +70,29 @@ static int read_file(const char *path, char *buf, size_t len) {
     return 0;
 }
 
-static int name_is_usb_partition(const char *name) {
+static int name_is_target(const char *name) {
+#ifdef KUKUI_EMMC
+    /* mmcblk0p1, not the whole disk mmcblk0. */
+    return strncmp(name, "mmcblk", 6) == 0 && strchr(name, 'p') != NULL;
+#else
     return strncmp(name, "sd", 2) == 0 && strchr(name, 'p') == NULL &&
            strlen(name) > 3;
+#endif
 }
+
+#ifdef KUKUI_EMMC
+static int on_emmc(const char *name) {
+    char path[160], link[512];
+    ssize_t n;
+
+    snprintf(path, sizeof(path), SYSFS "/class/block/%s", name);
+    n = readlink(path, link, sizeof(link) - 1);
+    if (n < 0)
+        return 0;
+    link[n] = 0;
+    return strstr(link, "11230000.mmc") != NULL;
+}
+#endif
 
 static int find_part(const char *partname, char *out, size_t outlen) {
     char buf[4096];
@@ -94,8 +113,12 @@ static int find_part(const char *partname, char *out, size_t outlen) {
             off += ent->d_reclen;
             if (ent->d_name[0] == '.')
                 continue;
-            if (!name_is_usb_partition(ent->d_name))
+            if (!name_is_target(ent->d_name))
                 continue;
+#ifdef KUKUI_EMMC
+            if (!on_emmc(ent->d_name))
+                continue;
+#endif
             snprintf(path, sizeof(path), SYSFS "/class/block/%s/partition", ent->d_name);
             if (access(path, F_OK) != 0)
                 continue;
@@ -117,6 +140,7 @@ static int find_part(const char *partname, char *out, size_t outlen) {
     return -1;
 }
 
+#ifndef KUKUI_EMMC
 static int load_usb_storage(void) {
     int fd;
     if (access(SYSFS "/module/usb_storage", F_OK) == 0)
@@ -131,6 +155,7 @@ static int load_usb_storage(void) {
     close(fd);
     return 0;
 }
+#endif
 
 /* Keep the previous boot. A new boot used to truncate the only copy
  * before any new line was durable. */
@@ -204,8 +229,12 @@ int main(void) {
     mount("sysfs", "/kukui-sys", "sysfs", 0, NULL);
     kmsg("kukui-android phase3\n");
 
+#ifndef KUKUI_EMMC
     if (load_usb_storage() != 0)
         kmsg("kukui-android phase3 usb-storage load failed\n");
+#else
+    kmsg("kukui-android phase3 emmc\n");
+#endif
 
     boot[0] = super[0] = 0;
     for (waited = 0; waited < 45; waited++) {

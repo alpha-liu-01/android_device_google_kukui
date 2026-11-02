@@ -1,0 +1,31 @@
+diff --git a/init/block_dev_initializer.cpp b/init/block_dev_initializer.cpp
+index 70ca0e4..a7bd8ed 100644
+--- a/init/block_dev_initializer.cpp
++++ b/init/block_dev_initializer.cpp
+@@ -152,6 +152,14 @@ ListenerAction BlockDevInitializer::HandleUevent(const Uevent& uevent,
+ 
+     LOG(VERBOSE) << __PRETTY_FUNCTION__ << ": found partition: " << name;
+ 
++    // The same GPT name can exist on another disk. Kukui's installer
++    // creates an eMMC "super" while Android is still booted from USB.
++    // The first match used to satisfy the wait, so /dev/block/by-name/super
++    // pointed nowhere and first-stage init rebooted in a few seconds.
++    if (!device_handler_->IsBootDevice(uevent) && device_handler_->HasBootDevices()) {
++        return ListenerAction::kContinue;
++    }
++
+     // Remove the partition from the list of partitions we're waiting for.
+     //
+     // Partitions that we're waiting for here are expected to be on the boot
+diff --git a/init/devices.h b/init/devices.h
+index 10dc089..fd3c1c1 100644
+--- a/init/devices.h
++++ b/init/devices.h
+@@ -151,6 +151,7 @@ class DeviceHandler : public UeventHandler {
+     static std::string GetPartitionNameForDevice(const std::string& device);
+     bool IsBootDeviceStrict() const;
+     bool IsBootDevice(const Uevent& uevent) const;
++    bool HasBootDevices() const { return !boot_devices_.empty(); }
+     void EnqueueUevent(const Uevent& uevent, ThreadPool& thread_pool) override;
+ 
+   private:

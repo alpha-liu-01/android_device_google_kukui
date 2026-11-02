@@ -217,6 +217,8 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 ### 8 eMMC
 
+调查在 [emmc.md](emmc.md)。Trogdor 那份 `InstallAndroid` 按 `mmcblk` 序号选盘，会把 SD 卡当成 eMMC，这台上不能用。从 U 盘安装要认 `11230000.mmc`，并且另做一条 `boot_devices` 指到 eMMC 的 FIT。depthcharge 的开发者屏幕不能在内置盘上列出 Android 和 postmarketOS。没有现成的触摸选单可以原样用。
+
 U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核分区再对一遍阶段 0 的记录，并在移动硬盘上留一份可恢复的内核分区副本。112 GiB 的盘按实盘重算分区，super 可以维持 8 GiB。
 
 命令行里的 `androidboot.boot_devices` 改成 `11230000.mmc`。这一步才把 Type-C 做成有线 adb、MTP 和 OTG。改完的内核不再用于「从 U 盘当根文件系统」的那张 FIT，否则 U 盘和 gadget 会抢 `11201000.usb`。对外发布的 U 盘镜像保持 host，用来在 eMMC 写坏时启动。
@@ -235,4 +237,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 4 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md)、[阶段 3](phase-3.md) 和 [阶段 4](phase-4.md)。音视频编解码的调查在 [video-decode.md](video-decode.md)，还没改镜像。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到音频 HAL。加速度计的单位矩阵和 FIFO 超时已在 2026-10-31 这次 Ctrl+U 确认：正放是横屏，读数大约每 40 毫秒一笔。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。
+当前进度：阶段 0 到阶段 4 已结束，见 [阶段 0](phase-0.md)、[阶段 1](phase-1.md)、[阶段 2](phase-2.md)、[阶段 3](phase-3.md) 和 [阶段 4](phase-4.md)。eMMC 还没写，调查在 [emmc.md](emmc.md)。2026-11-02 的 super（sha256 `e58df4603da72075515bc54f004afd8c7e8a57ce6da53cbfb3ca1ba2f41665cf`）已写入 SanDisk，读回一致，还没有这次 Ctrl+U。音视频编解码的调查在 [video-decode.md](video-decode.md)，还没改镜像。Wi-Fi、无线 adb 和 USI 笔方向已确认。2026-10-31 这次 Ctrl+U 后蓝牙自己打开，蓝牙鼠标能用。A2DP 能连上，耳机没有声音，留到音频 HAL。加速度计的单位矩阵和 FIFO 超时已在 2026-10-31 这次 Ctrl+U 确认：正放是横屏，读数大约每 40 毫秒一笔。睡眠时 USB 主机掉电会结束从 U 盘启动的这次会话。内核已加上 `suspend_power_off`，默认不断电。2026-10-31 这次 Ctrl+U 在开关为关时进入过 `s2idle`，USB 灯保持亮，唤醒后仍是同一次启动。每次大约 1 秒。PD 在进系统后停在 5 V，见 [阶段 4](phase-4.md)。

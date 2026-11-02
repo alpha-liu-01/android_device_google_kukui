@@ -1,0 +1,5 @@
+service kukui_installd /vendor/bin/kukui-installd
+    class late_start
+    user root
+    group root system
+    seclabel u:r:su:s0

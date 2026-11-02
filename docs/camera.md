@@ -1,6 +1,6 @@
 # 前后摄像头
 
-2026-11-01。路线图在 [roadmap.md](roadmap.md)。不改内核版本字符串，不写 eMMC，不把 Gru 的 `rkisp1` 补丁搬过来。驱动和设备树已经编好，这次 Ctrl+U 上两颗传感器都出了图。方向已确认。软件颜色已确认，两路饱和度是 1.8。Android 相机 HAL 已经放进 `super.camera-hal.raw` 并写入了 U 盘。那张镜像上相机应用一打开就退出。正在跑的系统里换上了修好的 HAL，应用能停住，后摄已经在出帧。画面还要人看。新的 super 还没写入。
+2026-11-01。路线图在 [roadmap.md](roadmap.md)。不改内核版本字符串，不写 eMMC，不把 Gru 的 `rkisp1` 补丁搬过来。驱动和设备树已经编好，这次 Ctrl+U 上两颗传感器都出了图。方向已确认。软件颜色已确认，两路饱和度是 1.8。Android 相机 HAL 已经放进 `super.camera-hal.raw` 并写入了 U 盘。那张镜像上相机应用一打开就退出。正在跑的系统里换上了修好的 HAL，应用能停住，后摄已经在出帧。录像颜色后来已经确认，带上这些修改的 super 记在文末。
 
 Gru 的笔记在 [docs_from_googlegru/camera.md](docs_from_googlegru/camera.md)。那台是 RK3399 的 `rkisp1`，后摄 `ov5695`、前摄 `ov2685`，色彩靠 ISP 里的黑电平、色彩矩阵和伽马。这台 Krane 没有这条管线。能留的是后半段的接法：相机服务、权限、gralloc，以及录像要等第一帧音频。芯片、调校文件和 `rkisp1` 补丁都不能拿来用。
 
@@ -96,8 +96,8 @@ ChromeOS 自己的相机栈走完整 ISP，还要配套的下游内核。那条�
 
 NV12 配上之后，720p 仍然只有下半幅是画面，上半幅发灰而且有重影，分界正好在高度的一半。480p 走软件编码器时则整幅发绿，上半几乎没有细节。色度面和亮度面在同一个 dmabuf 里，色度从 `stride × height` 开始。HAL 按这个偏移去 `mmap`，dma-buf 却从对象开头映射，色度就写进了亮度的上半幅。硬件编码器也不看 `data_offset`，两路平面的地址都是这块缓冲的开头，于是上半幅亮度变成色度，下半幅才是画面。软件编码器按 gralloc 的偏移去读色度，那里仍是 0，整幅就发绿。
 
-HAL 现在从 dmabuf 开头映射，再自行加上平面偏移。编码器模块 `mtk_vcodec_enc` 把 `data_offset` 加进平面的 DMA 地址。2026-11-02 01:26 的 `DCIM/Camera/2026-11-02-01-26-12-842.mp4` 是 1280×720，整幅都有画面，第 359 行和第 360 行的亮度不再断开，色度在 128 附近而不是 0。01:25 的 640×480 同样是整幅，不再上绿下绿。颜色和有没有残影还要人看。这个编码器模块只换在正在跑的系统里，重启会回到原来的 `/vendor/lib/modules/mtk-vcodec-enc.ko`。
+HAL 现在从 dmabuf 开头映射，再自行加上平面偏移。编码器模块 `mtk_vcodec_enc` 把 `data_offset` 加进平面的 DMA 地址。2026-11-02 01:26 的 `DCIM/Camera/2026-11-02-01-26-12-842.mp4` 是 1280×720，整幅都有画面，第 359 行和第 360 行的亮度不再断开，色度在 128 附近而不是 0。01:25 的 640×480 同样是整幅，不再上绿下绿。录像颜色已经确认正常。
 
 拍照切到录像时应用报 “Error while setting up the session” 然后退出，是因为有一帧的传感器时间戳是 0。框架把快门时间 0 当成“还没到”，这帧元数据和缓冲都回来了也永远留在在途队列里。下一次建会话要等这帧排空，大约 5 秒后超时，错误码 3 接着 4，活动被关掉。HAL 现在把非递增的时间戳换成单调时钟，并写回同一份结果元数据。2026-11-02 00:57 连续做了拍照→录像→拍照→录像→拍照→录像，每次都重新配上了对应的流（录像是 1600×1200 加 1280×720，usage `0x30030`；拍照是 1600×1200 加 MJPEG），应用一直停在 Aperture，没有错误码。切换已经确认。
 
-正在跑的 HAL 是 `camera.libcamera.rec9.so`，sha256 `9e0ab77c6eaab2e021d96df9b2398bdb294c84c37c5491acb6f72b7c53f410cc`。`libcamera.so` 仍是 `libcamera.rec3.so`，sha256 `11def3e08e458c8f2493ef0c3f8dabd0e4b6c15d5b1695fb9e423925f1ca825b`。都是 userdata 上的绑定，没有写 U 盘，没有重启平板。重启会丢掉绑定、编码器模块和 `/dev/video3`、`/dev/dma_heap/system` 的临时权限。
+确认颜色时，正在跑的 HAL 还是 userdata 上的绑定：`camera.libcamera.rec9.so`，sha256 `9e0ab77c6eaab2e021d96df9b2398bdb294c84c37c5491acb6f72b7c53f410cc`。`libcamera.so` 是 `libcamera.rec3.so`，sha256 `11def3e08e458c8f2493ef0c3f8dabd0e4b6c15d5b1695fb9e423925f1ca825b`。2026-11-02 把同一份源码重新编进了镜像。HAL sha256 `90952c517b06e12979b4efd2838e7daca6395a22b1ade37baecfea67a3d55e1d`，`libcamera.so` sha256 `a93c177cb5cbc402f78e43ae60e247db5514bd23ab2b351b5dd8dfc9955659fd`，`libcamera-base.so` 仍是 `b06235c9233ceeceee75bb1d80a56332da7e94c162012e47ce09187254224fa8`。编码器模块 sha256 `ece7fd4de41d7a6e3537c8c373486315270edc4282fa45aef802ecf1ea398da4`，放在 `vendor_dlkm`。`ueventd.kukui.rc` 把 `/dev/dma_heap/system` 交给 `0666`，codec2 服务加入 `camera` 组，所以 `/dev/video*` 保持 `0660`。`media_profiles_V1_0.xml` 也放进了 vendor。super 是 `work/phase4/super.cam.raw`，8589934592 字节，sha256 `e58df4603da72075515bc54f004afd8c7e8a57ce6da53cbfb3ca1ba2f41665cf`。只写入 SanDisk（序列号 `000000002959`）的 super。读回一致。内核槽开头 1 MiB 仍是 `1ebedee8e582b76f78dd6f3b7468ca3d4a1c5164c222ce11aacf66d7df9ed545`。pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。卡已卸载。eMMC 没写。还没有这次 Ctrl+U。
