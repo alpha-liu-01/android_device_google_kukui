@@ -16,6 +16,10 @@ on early-init
     # here before its compiled /vendor/libexec path.
     export LIBCAMERA_IPA_PROXY_PATH /vendor/bin/libcamera
     setprop vendor.usb.configfs 0
+    # Apps load vulkan.panfrost.so. The compositor stays on GLES: the
+    # shadow pass on this Mali-G72 already misses 60 Hz.
+    # Mesa hides Bifrost panvk unless this is set. G72 is that generation.
+    export PAN_I_WANT_A_BROKEN_VULKAN_DRIVER 1
     setprop debug.renderengine.backend skiaglthreaded
     setprop debug.hwui.renderer skiagl
     # The tenth boot got past HWC hotplug (ctl.start bootanim) and then

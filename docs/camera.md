@@ -66,11 +66,11 @@ ChromeOS 自己的相机栈走完整 ISP，还要配套的下游内核。那条�
 
 会话接着被拒绝。预览和 JPEG 都是 1600×1200，合成一路 RGB888。管线只是补上了缓冲区数量和色彩空间，却报成 Adjusted，HAL 把这当成失败。改成只拒绝尺寸或格式被改掉的情况之后，会话能配上。接下来 provider 在克隆请求元数据时断言失败：HAL 自己带的 `camera_metadata` 和框架发下来的结构不一致，改成链接系统里的 `libcamera_metadata.so`。内部的 RGB 缓冲不能向 minigbm 要 `YCbCr_420_888`，它直接返回 EINVAL，改从 `/dev/dma_heap/system` 分配。预览缓冲是 minigbm 的两路 fd，HAL 原先只接受单个连续 fd，按 `cros_gralloc_handle`（magic `0xABCDDCBA`）读每路的 fd、偏移和 stride。
 
-2026-11-01 晚上，这台还在用 U 盘上的旧 super。新的 HAL 和 IPA 从 userdata 挂到 `/vendor/lib64/hw/camera.libcamera.so` 和 `/vendor/lib64/libcamera/ipa/ipa_soft_simple.so`，重启就没了。Aperture 保持打开，相机 0 是后摄 1600×1200，软件 ISP 输入 1632×1224 GRBG。30 帧花了大约 3.9 秒，还是 7 到 8 帧每秒。画面和 JPEG 都还要人看。没有开始录像。内核槽没动。新的 super 还没写入。
+2026-11-01 晚上，这些改动先从 userdata 挂到正在跑的系统上验证。Aperture 保持打开，相机 0 是后摄 1600×1200，软件 ISP 输入 1632×1224 GRBG。30 帧花了大约 3.9 秒，还是 7 到 8 帧每秒。没有开始录像。同一天把修好的 HAL、IPA 和 Vulkan 写进 `work/phase4/super.vk.raw`，8589934592 字节，sha256 `a4ab55590721edc89fc5440d7ec328047e47d027b71315e49791d6219eb75ed7`。只写入 SanDisk（序列号 `000000002959`）的 super。读回一致。内核槽开头 1 MiB 没变。卡已卸载。eMMC 没写。还没有这次 Ctrl+U。
 
 预览跑了大约 16 秒之后 provider 收到 SIGPIPE，init 把整个进程杀掉，下一次打开就是 0 个相机。libcamera 往已关闭的套接字或 init 的日志管道写数据时，默认会用 SIGPIPE 结束进程。`libcamera-base` 现在忽略 SIGPIPE，套接字发送带 `MSG_NOSIGNAL`，改成返回 EPIPE。
 
-预览能保持打开之后，前后摄都是一片纯绿，上半截没有细节，下半截只有绿色的明暗。`HW_CAMERA_WRITE` 让 minigbm 把预览缓冲分配成 NV12，这块 dumb 显示把色度面读成 0，亮的地方就饱和成纯绿。去掉这个 usage 之后，同一块缓冲变成 XBGR8888，HAL 把软件 ISP 的 BGR 写进去。截图里后摄能看到深蓝毯子和床单，前摄能看到人和窗帘，红绿蓝都有数值，不再是纯绿。颜色已确认正常。重启之后这些改动会消失。
+预览能保持打开之后，前后摄都是一片纯绿，上半截没有细节，下半截只有绿色的明暗。`HW_CAMERA_WRITE` 让 minigbm 把预览缓冲分配成 NV12，这块 dumb 显示把色度面读成 0，亮的地方就饱和成纯绿。去掉这个 usage 之后，同一块缓冲变成 XBGR8888，HAL 把软件 ISP 的 BGR 写进去。截图里后摄能看到深蓝毯子和床单，前摄能看到人和窗帘，红绿蓝都有数值，不再是纯绿。颜色已确认正常。这些改动已经在 `super.vk.raw` 里。
 
 取景框慢不是整机没算力。后摄 CAMSV 中断大约每秒 31 次，传感器在出 30 帧。SurfaceFlinger 上预览实际是 7.6 帧每秒，间隔平均 132 毫秒。两根 `DebayerCpu` 线程各占满一个大核（cpu4–7，2.0 GHz），另外两个大核和四个小核空着，所以功耗停在 5 W 出头。软件 ISP 默认只开 2 个线程，而且每帧都要把 1632×1224 的整幅 Bayer 做完才送给预览。预览在等这一帧算完，不是在等传感器。
 

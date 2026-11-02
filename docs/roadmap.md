@@ -197,7 +197,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 - SELinux 改成 enforcing。Gru 上这一步暴露过的、需要在这台机器上重新写路径的有：`vendor_init` 加载模块、surfaceflinger 读显示 uevent、devtmpfs 上内核创建节点、memfd 在改标签之前被音频和蓝牙映射。genfs 按这台的 sysfs 路径写。
 - 视频解码。调查在 [video-decode.md](video-decode.md)。解码器是无状态的 `mtk-vcodec-dec`，输出是 `MM21` 不是 NV12，固件在 SCP。这次 Android 开机里模块没装，节点不存在。按 cros-codecs 接 codec2，不搬 rkvdec 的补丁。还没改镜像。
-- 摄像头。调查在 [camera.md](camera.md)。后摄是 OV8856，前摄是 OV02A10，走 seninf 和 CAMSV，不搬 rkisp1。方向和颜色已确认，两路饱和度 1.8。`super.camera-hal.raw`（sha256 `6ee9cc4b1d3661144aa75bc829ddc3f8d0c49bc1cd1c620735cea0e360c067f3`）上相机应用一打开就退出：IPA 没有帧间隔，HAL 不注册相机。正在跑的系统里换了 HAL 之后应用能停住，后摄在出帧，大约 7 到 8 帧每秒。预览大约 16 秒后 provider 被 SIGPIPE 杀掉，再次打开就是 0 个相机。忽略 SIGPIPE 之后应用能保持打开。预览曾因 NV12 色度被读成 0 而整幅发绿，改成 XBGR8888 之后颜色已确认正常。取景框实测 7.6 帧每秒：传感器约 30 帧，两根去马赛克线程占满两个大核，其余核空着。这次修改还没写进新的 super，重启会回到会闪退的那张。内核槽没动。录像等内置麦。
+- 摄像头。调查在 [camera.md](camera.md)。后摄是 OV8856，前摄是 OV02A10，走 seninf 和 CAMSV，不搬 rkisp1。方向和颜色已确认，两路饱和度 1.8。`super.camera-hal.raw`（sha256 `6ee9cc4b1d3661144aa75bc829ddc3f8d0c49bc1cd1c620735cea0e360c067f3`）上相机应用一打开就退出：IPA 没有帧间隔，HAL 不注册相机。正在跑的系统里换了 HAL 之后应用能停住，后摄在出帧，大约 7 到 8 帧每秒。预览大约 16 秒后 provider 被 SIGPIPE 杀掉，再次打开就是 0 个相机。忽略 SIGPIPE 之后应用能保持打开。预览曾因 NV12 色度被读成 0 而整幅发绿，改成 XBGR8888 之后颜色已确认正常。取景框实测 7.6 帧每秒：传感器约 30 帧，两根去马赛克线程占满两个大核，其余核空着。这些修改和 Vulkan 一起在 `super.vk.raw`（sha256 `a4ab55590721edc89fc5440d7ec328047e47d027b71315e49791d6219eb75ed7`）。2026-11-01 只把这张 super 写入 SanDisk。内核槽没动。还没有这次 Ctrl+U。录像等内置麦。
 - IT6505 外接显示器。运行中的设备树没有这个节点。内置屏的旋转和合成先稳定，确认节点出现之后再做。
 - 刷新率、开机动画、自动熄屏这类产品细节，按实机显示结果改。
 
@@ -229,7 +229,7 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 - OTA
 - GApps、Widevine
 - 没有机器在手上的 Kukui / Jacuzzi 型号
-- Vulkan
+- Vulkan。步骤在 [vulkan.md](vulkan.md)。补上 `HOST_CACHED` 之后不再闪退。`super.vk2.raw`（sha256 `6f84e6c6bbc0fdc1757b95099dfd8a8326d3b6c060d31eadc741824b1303bed4`，16384 组、4 MiB 线程）Ctrl+U 之后 Geekbench GPU 493，3DMark Sling Shot Extreme Vulkan 图形 1695。再放到 32768 组的库已在正在跑的系统上测过，整次仍是 493，并且 Background Blur 的 64800 组派发会触发 500 毫秒作业超时。合成器仍用 GLES。镜像里没有 `PANVK_DEBUG`。
 
 ## 这个仓库
 

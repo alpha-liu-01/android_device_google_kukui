@@ -10,7 +10,7 @@ DEVICE_PACKAGE_OVERLAYS += $(LOCAL_PATH)/overlay
 
 AB_OTA_UPDATER := false
 TARGET_GRAPHICS := mesa
-TARGET_GRAPHICS_VULKAN := none
+TARGET_GRAPHICS_VULKAN := mesa
 # Before mainline_common.mk, which pulls in optional/v4l2_codec2/product.mk.
 # The example configuration advertises VP8, VP9 and secure decoders this chip
 # does not enumerate. Kukui ships its own media_codecs_c2.xml.
@@ -64,6 +64,9 @@ PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.software.print.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.print.xml \
     frameworks/native/data/etc/android.software.device_admin.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.device_admin.xml \
     frameworks/native/data/etc/android.hardware.touchscreen.multitouch.distinct.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.touchscreen.multitouch.distinct.xml \
+    frameworks/native/data/etc/android.hardware.vulkan.version-1_0_3.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.version.xml \
+    frameworks/native/data/etc/android.hardware.vulkan.level-0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.level.xml \
+    frameworks/native/data/etc/android.hardware.vulkan.compute-0.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.hardware.vulkan.compute.xml \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E30.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E30.idc \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E30_Stylus.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E30_Stylus.idc \
     $(LOCAL_PATH)/keylayout/Vendor_18d1_Product_503c.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Vendor_18d1_Product_503c.kl \
@@ -226,4 +229,5 @@ PRODUCT_VENDOR_PROPERTIES += \
     ro.vendor.v4l2_codec2.decode_concurrent_instances=1 \
     ro.vendor.v4l2_codec2.encode_concurrent_instances=1 \
     debug.stagefright.c2-poolmask=0xf50000 \
-    ro.hardware.camera=libcamera
+    ro.hardware.camera=libcamera \
+    ro.hardware.vulkan=panfrost
