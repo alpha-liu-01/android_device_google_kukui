@@ -273,3 +273,11 @@ PiliPlus 的 SurfaceView 每秒帧数在 9 到 62 之间跳，长时间停在 11
 01:03 编出的 `libv4l2_codec2_v4l2.so` 是 251496 字节，sha256 `c77669c6b171d0e3…`。和前两节的 `libcros_codecs_ffi.so`、`libv4l2_codec2_components.so` 一起 bind 到 `/vendor/lib64`，重启解码服务，进程 24394。mpv 在服务重启时收到 `DEAD_OBJECT`，这一条之后走的是软解，换到另一条离线的 1080p60 才重新建了 `c2.v4l2.avc.decoder`。日志 `Decoder thread runs on the big cores`，线程 27969 的亲和性是 `f0`。SurfaceView 30 秒是 57 59 58 54 58 59 50 51 56 53 49 59 55 50 56 53 53 57 60 55 58 58 57 53 58 58 38 55 59 58。10 秒 atrace 里 HAL 交出 599 帧，`MediaCodec_loop` 渲染 600 帧，解码线程 4.62 s 都在大核，小核 0。剩下 50 多的波动在 Flutter 合成，不在解码器。
 
 同一份源码重新编了 super，raw 是 `work/phase4/super.bigcore.raw`，正好 8589934592 字节，sha256 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。vendor 里的三份解码库和正在跑的一致。它包含前两节的修改，替代 `super.igba.raw`。还没写到 U 盘，也没写 eMMC。
+
+## 2026-11-03 把这三处解码修改写进 U 盘 super
+
+这一系列改动都在 super 里：`libsfplugin_ccodec.so` 在 system，`libcros_codecs_ffi.so`、`libv4l2_codec2_components.so`、`libv4l2_codec2_v4l2.so` 在 vendor。内核 FIT、启动菜单、pmOS_boot 没有重新编。
+
+写入的是 `work/phase4/super.bigcore.raw`，正好 8589934592 字节，sha256 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。目标是序列号 `20120501030900000` 的 USB SD/MMC 的 super（`/dev/sdb3`，起点 1122304，16777216 扇区）。读回和源一致。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。内核槽开头仍是 `6db5dfcb4c03938b7972d73de32c245874e3e300fba7032af4563332d187dd35`。写之前核对过 `pmOS_boot` 里的 `android.kpart`（12505088 字节）含 `androidboot.boot_devices=soc/11230000.mmc`，`menu.kpart`（10383360 字节）含 `console=ttynull`。盘上没有挂载。eMMC 没写。
+
+eMMC 现在是双系统布局，`super` 是 `mmcblk0p7`，16777216 扇区。安装器的“更新系统”把 U 盘的 super 整份复制到这个分区，再核对全部 8192 MiB 的 sha256，然后写 `android_kernel` 和 `menu_kernel`。这次变更的分区只有 super，这一步会整份覆盖。`android.kpart` 和 `menu.kpart` 仍是 U 盘上原来的，安装器会再写一遍，内容和这次解码修改无关。userdata 不格式化，分区表和启动优先级不动。

@@ -27,10 +27,26 @@ does not flash UEFI and does not replace the read-only firmware.
 
 ## Write the stick
 
-Unpack the zip. The script refuses to guess a disk. It also refuses the
-computer's root disk, the disk that holds the home directory, any nvme
-device, a disk that is not USB, and the build disk used on the machine
-this tree was developed on (serial `0123456789ABC`, model `YMTC`).
+The release zip contains one GPT disk image, `lineage-23.2-kukui-*.img`.
+Rufus and BalenaEtcher write that zip directly. In Rufus choose DD mode
+if it asks. The image is 10.9 GiB, so the stick must be at least 16 GiB.
+`userdata` inside the image is 2.4 GiB and is not grown to fill a larger
+stick. The installer only needs the kernel slot, `pmOS_boot`, and the
+8 GiB `super`.
+
+Linux can write the same image without unpacking it:
+
+```
+unzip -p lineage-23.2-kukui-YYYYMMDD.zip | sudo dd of=/dev/sdX bs=4M status=progress conv=fsync
+```
+
+`bringup/release/flash-usb.sh` is the other writer. It builds the same
+partition table on the stick and gives `userdata` the rest of the disk.
+Unpack is not how that script is used. It refuses to guess a disk. It
+also refuses the computer's root disk, the disk that holds the home
+directory, any nvme device, a disk that is not USB, and the build disk
+used on the machine this tree was developed on (serial `0123456789ABC`,
+model `YMTC`).
 
 Check `lsblk` and use the whole-disk node, not a partition.
 

@@ -167,3 +167,15 @@ recovery 也能做，形态是菜单里的第三项，或者一个平时 priorit
 - 不在 eMMC 系统里打开 USB gadget，也不为了 sideload 去抢 `11201000.usb`。
 - 不在更新里重写分区表，不缩小 Linux 根分区，不格式化 `userdata`。
 - 不把发布脚本接到 `write-sandisk.sh` 那条会清空目标盘、并且只认某一张读卡器的路径上。
+
+## 2026-11-03 Rufus 用的磁盘镜像包
+
+`work/release/kukui-usb-20261103.zip` 是不压缩的分区文件，8.6 GB，Rufus 无法把它当成磁盘镜像写入。按 Gru 的 `pack_release_image.sh` 重打了一份：zip 里只有一个 GPT 磁盘镜像，用 deflate 压缩。
+
+`work/release/lineage-23.2-kukui-20261103.zip`，1094072429 字节，sha256 `62fb53a451f7e4dc8e45814aecee7980d02189a897b897582c632676c64c0fff`。里面的 `lineage-23.2-kukui-20261103.img` 是 11756634112 字节，压缩后 1094072109 字节。内核槽类型是 ChromeOS kernel，属性 `0x01ff000000000000`。分区和已经测过的安装盘一致：`pmOS_kernel` 32 MiB、`pmOS_boot` 512 MiB、`super` 8 GiB、`metadata` 16 MiB、`misc` 4 MiB、`userdata` 2.4 GiB。`super` 的 sha256 仍是 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。`pmOS_boot` 里的两份 kpart 和清单一致。这张镜像没有写到盘上，也没有用 Rufus 试过。`userdata` 不会在开机时扩到整张盘。
+
+## 2026-11-03 解码修改之后的安装包
+
+`work/release/kukui-usb-20261103.zip`，8625370686 字节，sha256 `83763c0cef8ef430f4ec92bca00137230b206df29ad7997fffe625c828729bcc`。`flash-usb.sh` 在包里是 755。镜像不压缩。
+
+`images/super.img` 是 `work/phase4/super.bigcore.raw`，8589934592 字节，sha256 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。这就是写进序列号 `20120501030900000` 那张 U 盘、再由「更新系统」装进 eMMC、用户确认解码正常的那一份。`kernel.kpart` 开头 1 MiB 是 `6db5dfcb4c03938b7972d73de32c245874e3e300fba7032af4563332d187dd35`，和这张 U 盘的内核槽一致。`android.kpart` 12505088 字节，`menu.kpart` 10383360 字节，命令行仍分别是 `soc/11230000.mmc` 和 `console=ttynull`。内核这次没有重新编。
