@@ -88,6 +88,9 @@ service kukui-usb-suspend /system/bin/sh /vendor/bin/kukui-usb-suspend.sh
     group root system
     oneshot
 
+# The ramdisk init starts the same script. This service covers a super
+# image that has the script but an older ramdisk. The script's lock
+# directory makes the second start exit.
 service kukui-wifi-reprobe /system/bin/sh /vendor/bin/kukui-wifi-reprobe.sh
     disabled
     user root

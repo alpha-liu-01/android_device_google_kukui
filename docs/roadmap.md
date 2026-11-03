@@ -205,7 +205,7 @@ FIT 使用这份 `vmlinuz` 和 `mt8183-kukui-krane-sku176.dtb`，压缩 lzma。�
 
 ### 6 可分发的 U 盘镜像
 
-本仓库提供打包脚本和安装说明：开发者模式、`dev_boot_usb`、Ctrl+U、写入 U 盘、校验和。FIT 里是已经验证的 `krane-sku176`。
+打包和更新的做法在 [release.md](release.md)。本仓库提供打包脚本和安装说明：开发者模式、`dev_boot_usb`、Ctrl+U、写入 U 盘、校验和。FIT 里是已经验证的 `krane-sku176`。
 
 完成标准：按文档从零写入一张 U 盘可以启动。eMMC 上的 postmarketOS 仍在。
 
@@ -230,7 +230,7 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 ## 明确后做
 
 - Android 17：把同一份 `device/google/kukui` 换到新的 Lineage 源码树上
-- OTA
+- OTA。第一版是从 U 盘更新 eMMC 的 `super` 和 Android 内核槽，保留用户数据，见 [release.md](release.md)
 - GApps、Widevine
 - 没有机器在手上的 Kukui / Jacuzzi 型号
 - Vulkan。步骤在 [vulkan.md](vulkan.md)。补上 `HOST_CACHED` 之后不再闪退。`super.vk2.raw`（sha256 `6f84e6c6bbc0fdc1757b95099dfd8a8326d3b6c060d31eadc741824b1303bed4`，16384 组、4 MiB 线程）Ctrl+U 之后 Geekbench GPU 493，3DMark Sling Shot Extreme Vulkan 图形 1695。再放到 32768 组的库已在正在跑的系统上测过，整次仍是 493，并且 Background Blur 的 64800 组派发会触发 500 毫秒作业超时。合成器仍用 GLES。镜像里没有 `PANVK_DEBUG`。
@@ -239,4 +239,4 @@ U 盘上的 Android 必须能重复启动。写之前把 eMMC 分区表和内核
 
 这里放路线、板级设备树、local manifest、补丁和 U 盘打包脚本。LineageOS 树在 `/run/media/alpha/YMTC/lineage-23.2`。
 
-当前进度：阶段 0 到阶段 4 已结束。eMMC 上的 Android 已经进到桌面，菜单也能进 Linux，见 [emmc.md](emmc.md)。外接显示器不做。还没做的是 SELinux enforcing、可分发镜像，以及没有实机的同族型号。共享源码的补丁在 `patches/`，`patches/apply-patches.sh` 打到一份官方 LineageOS 23.2 上。编 Gru 之前对这份树跑 `--reverse`：音频走回 DA7219，解码器走回 Gru 自己的路径，healthd 拿掉 Krane 的电源节点回退。`external/libcamera` 里如果还有 rkisp1，那是以前 Gru 的试验，Kukui 不用，脚本也不会打上去。内核相对 6.18.28 的两处改动在 `bringup/kernel/`。摄像头的内核补丁在 `bringup/camera/kernel-camera.patch`。模块、固件和相机 HAL 预编译库在 `device/google/kukui`。
+当前进度：阶段 0 到阶段 4 已结束。eMMC 上的 Android 已经进到桌面，菜单也能进 Linux，见 [emmc.md](emmc.md)。刷写后第一次开机的 Wi-Fi 那次是第一次探测自己起来的。重试子进程当时没有进入 Android 的根。等第二阶段 init 才进根的那张内核，第一次开机 ath10k 探测超时，脚本没有执行。`/vendor` 在 init 单独的挂载命名空间里。先 `setns` 再 chroot 的内核这次第一次开机有 Wi-Fi，探测本身成功了，重试脚本仍没执行。会重试 `exec` 的内核这次第一次开机在探测超时后重载了 ath10k，进桌面时 Wi-Fi 已经连上，记在 [emmc.md](emmc.md)。外接显示器不做。还没做的是 SELinux enforcing、可分发镜像，以及没有实机的同族型号。共享源码的补丁在 `patches/`，`patches/apply-patches.sh` 打到一份官方 LineageOS 23.2 上。编 Gru 之前对这份树跑 `--reverse`：音频走回 DA7219，解码器走回 Gru 自己的路径，healthd 拿掉 Krane 的电源节点回退。`external/libcamera` 里如果还有 rkisp1，那是以前 Gru 的试验，Kukui 不用，脚本也不会打上去。内核相对 6.18.28 的两处改动在 `bringup/kernel/`。摄像头的内核补丁在 `bringup/camera/kernel-camera.patch`。模块、固件和相机 HAL 预编译库在 `device/google/kukui`。

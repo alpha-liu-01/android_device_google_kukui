@@ -32,27 +32,10 @@ test -f "$work/rd/init.android"
 test -d "$work/rd/lib/modules/6.18.28-mt81-kukui2"
 cp "$KEEP" "$work/rd/init"
 chmod 755 "$work/rd/init"
-# The running super still has the old vendor rc. This ramdisk file is
-# parsed as /init.kukui.rc and is what actually retries the SDIO probe.
+# kukui-keep reads this into memory and starts it after vendor is
+# mounted. An init.rc in the ramdisk does not survive FreeRamdisk.
 cp "$ROOT/device/google/kukui/kukui-wifi-reprobe.sh" "$work/rd/kukui-wifi-reprobe.sh"
 chmod 755 "$work/rd/kukui-wifi-reprobe.sh"
-cat > "$work/rd/init.kukui.rc" << 'EOF'
-on post-fs-data
-    mkdir /data/vendor/wifi 0770 wifi wifi
-    mkdir /data/vendor/wifi/wpa 0770 wifi wifi
-    mkdir /data/vendor/wifi/wpa/sockets 0770 wifi wifi
-    mkdir /data/vendor/wifi/hostapd 0770 wifi wifi
-    mkdir /data/vendor/wifi/hostapd/sockets 0770 wifi wifi
-
-on property:sys.boot_completed=1
-    start kukui-wifi-reprobe
-
-service kukui-wifi-reprobe /system/bin/sh /kukui-wifi-reprobe.sh
-    disabled
-    user root
-    group root
-    oneshot
-EOF
 (cd "$work/rd" && find . -print0 | sort -z | cpio --null -o -H newc --quiet | gzip -n > "$work/emmc-ramdisk.gz")
 
 cat > "$work/android-cmd.txt" << 'EOF'

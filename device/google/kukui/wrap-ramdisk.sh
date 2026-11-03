@@ -32,6 +32,8 @@ if [ ! -f "$KEEP" ]; then
 fi
 mv init init.android
 cp "$KEEP" init
+cp "$ROOT/kukui-wifi-reprobe.sh" kukui-wifi-reprobe.sh
+chmod 755 kukui-wifi-reprobe.sh
 mkdir -p lib/modules/6.18.28-mt81-kukui2
 cp "$MODS/"*.ko "$MODS/modules.dep" "$MODS/modules.load" lib/modules/6.18.28-mt81-kukui2/
 chmod 755 init init.android
