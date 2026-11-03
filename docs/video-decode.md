@@ -259,3 +259,17 @@ IGBA 自己用 maxDequeueCount 限住取出的缓冲数，现在 IGBA 下不再�
 00:40 编出的 `libv4l2_codec2_components.so` 是 271136 字节，sha256 `40aa9bb89fa94374f2f8bca5f375a2811d52bb999e166439b0a9c6d2d02074d6`。和上一节的 `libcros_codecs_ffi.so` 一起 bind 到 `/vendor/lib64`，重启解码服务，进程 779。PipePipe 里 B 站视频进全屏 15 秒之后，SurfaceView 6 秒 30.3 fps，丢帧 0。退出全屏之后 30.2 fps，丢帧 0，窗口里有画面。进出全屏之后没有再出现 flush。中途有一次退出全屏后窗口是黑的，那是 2:09 的片子刚好播完，位置 129008 ms，状态 STOPPED。
 
 同一份源码重新编了 super，raw 是 `work/phase4/super.igba.raw`，正好 8589934592 字节，sha256 `7d75d5c60f8c746a7a866801206f661e94ea646e0880f28a2170f7167619698d`。vendor 分区里的 `libcros_codecs_ffi.so`、`libv4l2_codec2_components.so`、`libv4l2_codec2_v4l2.so` 和正在跑的三份一致。它包含上一节的 SPS 修改，替代 `super.sps.raw`。还没写到 U 盘，也没写 eMMC。
+
+## 2026-11-03 PiliPlus 1080p60 卡几秒是解码线程落在小核
+
+PipePipe 全屏用上一节的库已经正常，用户确认过。PiliPlus（media_kit，mpv，`hwdec` 选 mediacodec）播离线缓存的 1080p60 H.264，流畅几秒，掉到几帧，再回来。只在硬解时出现，MX 播 1080p60 是流畅的。
+
+PiliPlus 的 SurfaceView 每秒帧数在 9 到 62 之间跳，长时间停在 11 到 13。10 秒的 atrace 里，HAL 交出 630 帧，`MediaCodec_loop` 往视频表面 `queueBuffer` 只有 90 次，其余的被 mpv 当作迟到丢掉。`DecodeComponent` 线程在大核（A73，capacity 1024）上一帧大约 4 ms，在小核（A53，capacity 741）上大约 11 ms，CPU 频率在 0.9 到 2.0 GHz 之间来回。按 0.5 秒分段，线程落在小核的那几段每段只出 24 帧左右，也就是 48 fps，低于 60，mpv 开始丢帧；回到大核的那几段每段出 36 到 39 帧。应用自己的 Flutter 和 GL 线程占着大核，调度器就把解码线程放在小核上好几秒。
+
+`taskset -p f0` 把当时的解码线程（15932）手动钉在大核上，SurfaceView 20 秒里除了开头两秒都在 49 到 58。去掉之后又回到 9 到 56 来回跳。
+
+服务是 `media` 用户，没有 `CAP_SYS_NICE`，改不了 uclamp；cpu cgroup 里除了 nnapi-hal 都没设 `uclamp.min`。seccomp 允许 `sched_setaffinity`，给自己的线程设亲和性不需要权限。现在 `StatelessV4L2Decoder::onFormatChanged` 在解码线程上按 `/sys/devices/system/cpu/cpu*/cpu_capacity` 选出容量最高的核：编码尺寸不小于 1920×1080 时只在这些核上跑，更小的流放回所有核。各核容量相同或读不到时不动。改动只在 `libv4l2_codec2_v4l2.so`，头文件不变。
+
+01:03 编出的 `libv4l2_codec2_v4l2.so` 是 251496 字节，sha256 `c77669c6b171d0e3…`。和前两节的 `libcros_codecs_ffi.so`、`libv4l2_codec2_components.so` 一起 bind 到 `/vendor/lib64`，重启解码服务，进程 24394。mpv 在服务重启时收到 `DEAD_OBJECT`，这一条之后走的是软解，换到另一条离线的 1080p60 才重新建了 `c2.v4l2.avc.decoder`。日志 `Decoder thread runs on the big cores`，线程 27969 的亲和性是 `f0`。SurfaceView 30 秒是 57 59 58 54 58 59 50 51 56 53 49 59 55 50 56 53 53 57 60 55 58 58 57 53 58 58 38 55 59 58。10 秒 atrace 里 HAL 交出 599 帧，`MediaCodec_loop` 渲染 600 帧，解码线程 4.62 s 都在大核，小核 0。剩下 50 多的波动在 Flutter 合成，不在解码器。
+
+同一份源码重新编了 super，raw 是 `work/phase4/super.bigcore.raw`，正好 8589934592 字节，sha256 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。vendor 里的三份解码库和正在跑的一致。它包含前两节的修改，替代 `super.igba.raw`。还没写到 U 盘，也没写 eMMC。

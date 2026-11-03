@@ -555,10 +555,10 @@ index b243d47..4f82d55 100644
      static scoped_refptr<V4L2Device> create(uint32_t debugStreamId = -1);
 diff --git a/v4l2/StatelessV4L2Decoder.cpp b/v4l2/StatelessV4L2Decoder.cpp
 new file mode 100644
-index 0000000..7b92475
+index 0000000..03457f4
 --- /dev/null
 +++ b/v4l2/StatelessV4L2Decoder.cpp
-@@ -0,0 +1,597 @@
+@@ -0,0 +1,645 @@
 +// Copyright 2026 The LineageOS Project
 +// Use of this source code is governed by a BSD-style license that can be
 +// found in the LICENSE file.
@@ -569,7 +569,11 @@ index 0000000..7b92475
 +
 +#include <v4l2_codec2/v4l2/StatelessV4L2Decoder.h>
 +
++#include <errno.h>
 +#include <inttypes.h>
++#include <sched.h>
++#include <stdio.h>
++#include <string.h>
 +#include <unistd.h>
 +
 +#include <algorithm>
@@ -594,6 +598,49 @@ index 0000000..7b92475
 +constexpr size_t kNumPrefetchedFrames = 2;
 +// Number of consecutive cros-codecs calls without progress before giving up.
 +constexpr int kMaxCallsWithoutProgress = 16;
++// Pictures at least this large are detiled on the CPU in the decoder thread. A little core needs
++// about 11 ms for 1080p, too slow for 60 fps, and the scheduler keeps the thread there for
++// seconds while the app's render threads load the big cores.
++constexpr int kMinAreaForBigCores = 1920 * 1080;
++
++// Restricts the calling thread to the CPUs with the highest capacity, or allows all CPUs again.
++void restrictToBigCores(bool restrict) {
++    const long numCpus = sysconf(_SC_NPROCESSORS_CONF);
++    if (numCpus <= 0 || numCpus > CPU_SETSIZE) {
++        return;
++    }
++    std::vector<unsigned int> capacities(numCpus, 0);
++    for (long cpu = 0; cpu < numCpus; ++cpu) {
++        char path[64];
++        snprintf(path, sizeof(path), "/sys/devices/system/cpu/cpu%ld/cpu_capacity", cpu);
++        FILE* file = fopen(path, "re");
++        if (!file) {
++            return;
++        }
++        const int read = fscanf(file, "%u", &capacities[cpu]);
++        fclose(file);
++        if (read != 1) {
++            return;
++        }
++    }
++    const auto [minIt, maxIt] = std::minmax_element(capacities.begin(), capacities.end());
++    if (*minIt == *maxIt) {
++        return;
++    }
++
++    cpu_set_t set;
++    CPU_ZERO(&set);
++    for (long cpu = 0; cpu < numCpus; ++cpu) {
++        if (!restrict || capacities[cpu] == *maxIt) {
++            CPU_SET(cpu, &set);
++        }
++    }
++    if (sched_setaffinity(0, sizeof(set), &set) != 0) {
++        ALOGW("Failed to set the decoder thread affinity: %s", strerror(errno));
++        return;
++    }
++    ALOGI("Decoder thread runs on %s", restrict ? "the big cores" : "all cores");
++}
 +
 +uint32_t toCcCodec(VideoCodec codec, bool* ok) {
 +    *ok = true;
@@ -913,6 +960,7 @@ index 0000000..7b92475
 +    if (mVisibleRect.isEmpty()) {
 +        mVisibleRect = Rect(mCodedSize.width, mCodedSize.height);
 +    }
++    restrictToBigCores(mCodedSize.width * mCodedSize.height >= kMinAreaForBigCores);
 +
 +    // Frames of the previous pool still referenced by cros-codecs are dropped on release.
 +    mPoolGeneration++;
