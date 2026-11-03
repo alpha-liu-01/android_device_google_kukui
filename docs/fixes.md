@@ -29,3 +29,17 @@ WoWLAN is enabled:
 固件 `WLAN.RMH.4.4.1-00174` 里有 `fail to enter wow`。主机只在收到 HTC 消息 6 时才算睡眠完成。这次先到的是一条没被认出来的 ep0 消息，消息号没有打出来。为了看这条消息，把 `ath10k_core` 的 `debug_mask` 设成 6，再写了一次 `/sys/power/state`。之后 `10.0.0.113` 不再应答。调试输出把那次的消息号冲出了内核缓冲。平板唤醒后 `debug_mask` 已改回 0。
 
 2026-11-03 15:31 用户再锁屏并唤醒。电源键睡眠到电源键唤醒间隔 4.6 秒（`mLastSleepTime=2895555`，`mLastWakeTime=2900186`）。前两次 `deep` 在冻结用户空间时中止，358 个任务拒绝冻结。第三次内核时间 2900.10 秒 `PM: suspend entry (deep)`，冻结完成，CPU1 到 CPU7 被 PSCI 关掉，随后立刻重新打开，`crng reseeded on system resumption`，2900.34 秒 `PM: suspend exit`。15:31:30.921 SurfaceFlinger 把显示电源模式设回 2。从挂起控制台到关掉非启动 CPU 只有大约 31 毫秒，没有 `failed to start wow`，也没有 `Some devices failed to suspend`。这次没有 `wlan0: deauthenticating`。15:31:30.973 唤醒时状态已经是 `L2ConnectedState`，15:31:31.248 supplicant 仍把 `34:98:b5:88:a8:a3` 标成 associated。同一 BSSID「Not 6GHz」，地址仍是 `10.0.0.113`。`setSuspendModeEnabled` 在唤醒时返回失败，连接没有因此拆掉。CPU 关掉之后没有在睡眠里停留，唤醒请求已经在入口等着。
+
+## ReSukiSU
+
+可以。这棵内核是 6.18.28，不是 GKI。Tracepoint 挂钩只给 GKI 2，这里不能用。SuSFS 没有移植，不开。用手动挂钩，源固定在 BakaSU `v4.2.0-rc3`（`239e1e88`，4471 个提交）。版本号按他们的算法是 `30000 + 4471 + 700 = 35171`，和官方 arm64 管理器 `com.resukisu.resukisu` 的 versionCode 一致。管理器必须保持原签名。用 ROM 证书重签之后，内核会拒绝它。
+
+6.8 以后不能再用 LSM 自动挂钩 setuid 和 init rc。`CONFIG_KSU_MANUAL_HOOK_AUTO_SETUID_HOOK` 和 `CONFIG_KSU_MANUAL_HOOK_AUTO_INITRC_HOOK` 关掉，改在 `kernel/sys.c` 的 `__sys_setresuid` 和 `fs/read_write.c` 的 `read` 里调用。另外按文档挂了 `do_execveat_common`、`faccessat`、`newfstatat`、`fstatat64`、`newfstat`、`fstat64`、`reboot`。音量减的自动 input handler 留着。`KALLSYMS_ALL` 本来就是打开的。`CONFIG_MODVERSIONS` 没开，`UTS_RELEASE` 仍是 `6.18.28-mt81-kukui2`，已有模块的 vermagic 没变。
+
+「更新系统」会写三样：U 盘上的 super、`android.kpart` 写到名字是 `android_kernel` 的分区、`menu.kpart` 写到 `menu_kernel`。它不写 U 盘自己启动用的 `kernel.kpart`。所以 eMMC 上的 Android 内核可以跟系统一起换。菜单内核也会被重写，但它不需要 ReSukiSU，可以继续用原来的 `menu.kpart`。`android_kernel` 分区是 32 MiB，新的 `android.kpart` 是 12488704 字节。
+
+2026-11-03 内核编过。`Image` 在 `work/phase2/linux-6.18.28/arch/arm64/boot/Image`。内核里的版本字符串是 `v4.2.0-rc3-239e1e88@ReSukiSU`。用原来那份 `android.kpart` 的 ramdisk、dtb 和命令行，只换了内核，打到 `work/resukisu/android.kpart`，sha256 `1998cc6475f44654ba19e47532822d336083bce4499554c9d589bbf93754ceed`。命令行仍有 `androidboot.boot_devices=soc/11230000.mmc`。没有写 U 盘，没有写 eMMC，没有重启。
+
+管理器是官方 `ReSukiSU_v4.2.0-rc3_35171-arm64-v8a-release.apk`，sha256 `25657bc449439687608fffa04b4b586de90fc405e3dc6217bd997fc71ba0a0a1`。`device.mk` 把它作为 `ReSukiSU` 收进 system_ext。包是预签名，dex 和 JNI 都是压缩的，所以 Android.bp 用 `presigned`、`preprocessed` 和 `skip_preprocessed_apk_checks`，不放进 priv-app。清单里还有可选的 `androidx.window.extensions` 和 `androidx.window.sidecar`，这两项写在 `optional_uses_libs`。Soong 读到的 apk 必须是普通文件。第一次编出来的 system_ext 里，`ReSukiSU.apk` 是一条 133 字节的符号链接，指向编译机路径。改成普通文件之后再编，`system_ext.img` 里是 9379362 字节的普通文件。
+
+新的 super 展开后是 `work/resukisu/super.raw`，正好 8589934592 字节，sha256 `a3b991c9a19efc9fbef43af86a9fe83ecb8e1b4891fae624551a9365e8fdc945`。它来自当前树的一次 `m superimage`，不是在 `super.bigcore.raw` 上打补丁。内核模块没有重编，vermagic 仍是 `6.18.28-mt81-kukui2 SMP preempt mod_unload aarch64`。没有写 U 盘，没有写 eMMC，没有重启。还没有启动过这份内核，不能说 root 已经可用。

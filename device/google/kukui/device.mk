@@ -48,6 +48,7 @@ PRODUCT_PACKAGES += \
     KukuiInstall \
     kukui-installd \
     KukuiUsbSuspend \
+    ReSukiSU \
     android.hardware.sensors-service.multihal \
     android.hardware.sensors@2.1-kukui-subhal \
     android.hardware.camera.provider-service.lineage \
