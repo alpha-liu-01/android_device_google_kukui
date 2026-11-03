@@ -1,16 +1,19 @@
 package org.kukui.usbsuspend;
 
-import android.app.Activity;
 import android.os.Bundle;
-import android.widget.Switch;
 import android.widget.TextView;
+
+import androidx.appcompat.app.AppCompatActivity;
+
+import com.google.android.material.color.DynamicColors;
+import com.google.android.material.materialswitch.MaterialSwitch;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.charset.StandardCharsets;
 
-public class UsbSuspendActivity extends Activity {
+public class UsbSuspendActivity extends AppCompatActivity {
     private static final String NODE =
             "/sys/devices/platform/soc/11201000.usb/suspend_power_off";
     private static final String CHOICE = "/data/system/kukui_usb_suspend_power_off";
@@ -19,9 +22,10 @@ public class UsbSuspendActivity extends Activity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_usb_suspend);
-        Switch powerOff = findViewById(R.id.power_off);
+        MaterialSwitch powerOff = findViewById(R.id.power_off);
         TextView status = findViewById(R.id.status);
         String current = readText(NODE);
         if (current == null) {

@@ -3,9 +3,9 @@
     package="org.lineageos.kukuiinstaller">
 
     <application
-        android:label="安装到 eMMC"
+        android:label="@string/title"
         android:icon="@android:drawable/ic_menu_manage"
-        android:theme="@android:style/Theme.DeviceDefault.Light">
+        android:theme="@style/Theme.KukuiInstall">
         <activity
             android:name=".MainActivity"
             android:exported="true">

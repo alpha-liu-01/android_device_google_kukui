@@ -2,27 +2,30 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?android:colorBackground"
+    android:background="?attr/colorSurface"
     android:fitsSystemWindows="true"
     android:orientation="vertical"
-    android:padding="24dp">
+    android:paddingStart="24dp"
+    android:paddingTop="24dp"
+    android:paddingEnd="24dp"
+    android:paddingBottom="24dp">
 
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingBottom="24dp"
         android:text="@string/title"
-        android:textColor="?android:textColorPrimary"
-        android:textSize="24sp" />
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textColor="?attr/colorOnSurface" />
 
-    <Switch
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/power_off"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
+        android:minHeight="48dp"
         android:text="@string/switch_label"
-        android:textColor="?android:textColorPrimary"
-        android:textSize="18sp" />
+        android:textAppearance="?attr/textAppearanceBodyLarge"
+        android:textColor="?attr/colorOnSurface" />
 
     <TextView
         android:id="@+id/detail"
@@ -30,14 +33,14 @@
         android:layout_height="wrap_content"
         android:paddingTop="16dp"
         android:text="@string/detail"
-        android:textColor="?android:textColorSecondary"
-        android:textSize="16sp" />
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
     <TextView
         android:id="@+id/status"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:paddingTop="16dp"
-        android:textColor="?android:textColorPrimary"
-        android:textSize="16sp" />
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorError" />
 </LinearLayout>

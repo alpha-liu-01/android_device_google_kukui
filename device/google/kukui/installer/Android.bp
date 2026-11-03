@@ -7,10 +7,13 @@ android_app {
     srcs: [
         "src/**/*.java",
     ],
+    resource_dirs: ["res"],
+    manifest: "AndroidManifest.xml",
     sdk_version: "current",
     min_sdk_version: "34",
     certificate: "platform",
-    vendor: true,
+    system_ext_specific: true,
+    static_libs: ["com.google.android.material_material"],
 }
 
 sh_binary {

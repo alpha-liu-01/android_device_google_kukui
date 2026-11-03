@@ -4,6 +4,7 @@ android_app {
     resource_dirs: ["res"],
     manifest: "AndroidManifest.xml",
     certificate: "platform",
+    static_libs: ["com.google.android.material_material"],
     privileged: true,
     platform_apis: true,
     system_ext_specific: true,

@@ -7,7 +7,7 @@
 先做两样可以分开交付的东西。
 
 1. 工作站上的一条打包流程，产出一个 zip。zip 里是 U 盘各分区的镜像和一个写盘脚本。用户在电脑上解压、指定 U 盘，脚本写成一张能 Ctrl+U 的安装盘。这张盘不写 eMMC。
-2. 安装器里加「更新系统」。机器从这张 U 盘启动，确认目标是 `11230000.mmc` 之后，只换 eMMC 上的 `super` 和 Android 内核槽。`userdata`、`metadata`、Linux 根分区和分区表都不动。
+2. 安装器里加「更新系统」。机器从这张 U 盘启动，确认目标是 `11230000.mmc` 之后，用 U 盘上已经展开的 `super`、`android.kpart` 和 `menu.kpart` 换掉 eMMC 上同名的系统分区。`userdata`、`metadata`、Linux 根分区和分区表都不动。不再另做一份更新 zip。
 
 在 eMMC 上已经启动的 Android 里直接换自己的 `super`，留到这两步都稳定之后。depthcharge 没有 recovery 键，Type-C 也不能同时当启动盘和 sideload 口。恢复模式可以以后做成菜单里的第三项，用现在这条「从 U 盘写 eMMC」的路径就够做第一次可分发的更新。
 
@@ -120,38 +120,30 @@ kukui-usb-<日期>.zip
 
 ### 怎么更新
 
-更新包比安装盘小，里面没有空的 `userdata`，也没有整盘 GPT。
+不再另做 `kukui-update-*.zip`。用户只拿全量安装包，在电脑上写成 U 盘，Ctrl+U 进 Android，在安装器里点「更新系统」。`flash-usb.sh` 会把 U 盘的数据分区格式化成空的，所以安装器不找 zip，只读这张盘上已经展开的镜像：第 3 分区的 `super`，以及 `/kukui-install/android.kpart` 和 `menu.kpart`。U 盘第 1 分区那个内核是给 U 盘自己启动用的，命令行是 `11201000.usb`，不写进 eMMC。
 
-```
-kukui-update-<日期>.zip
-  manifest.txt
-  super.img
-  android.kpart
-  menu.kpart          # 菜单没变就可以不放
-```
+这样就不能把一份更新文件只放在 eMMC 的 `userdata` 里、再用一张旧 U 盘启动来刷。每次更新都要先用新的全量包重写 U 盘。除此以外和原先的更新范围一样。
 
-`manifest.txt` 写版本、四个文件里实际存在的那些的 sha256，以及它们要写到的分区名（`super`、`android_kernel`、`menu_kernel`）。安装器只认分区名和 sysfs 路径，不认 `mmcblk0p7` 这种序号。
-
-使用时从 U 盘上的 Android 打开现在的安装器，多一个「更新系统」。包可以放在 U 盘的数据分区上，也可以放在 eMMC 的 `userdata` 里事先下载好。安装器：
+安装器：
 
 1. 确认这次启动的盘是 `11201000.usb` / `11200000.usb`，目标盘是 `11230000.mmc`，而且两块不是同一个磁盘。
-2. 核对 zip 里的哈希，以及 FIT 命令行。eMMC 那份必须是 `soc/11230000.mmc`。
-3. 核对 eMMC 上已经有 `super`、`android_kernel`、`userdata`，并且 `userdata` 的文件系统是 f2fs。对不上就停，不格式化。
-4. 把 `super.img` 写到名为 `super` 的那一个分区，读回整段 sha256。
-5. 把 `android.kpart` 写到 `android_kernel`。分区属性原样留下。菜单 FIT 只有清单里带了才写，同样不改属性。
-6. 不调用 `mke2fs`、`make_f2fs`、`sgdisk` 和 `resize2fs`。
+2. 核对 `/kukui-install/android.kpart` 的命令行是 `soc/11230000.mmc`，菜单内核的命令行里有 `console=ttynull`。
+3. 按分区名找 eMMC 上的 `super`、`android_kernel`、`menu_kernel`、`userdata`。不认 `mmcblk0p7` 这种序号。`super` 必须是 8 GiB，`userdata` 必须是 f2fs。对不上就停。
+4. 确认画面写出父设备路径、将要写入的分区名，以及「不格式化 userdata」。用户点更新之后才 `dd`。
+5. 把 U 盘的 `super` 写到 eMMC 上名为 `super` 的分区，读回整段 sha256。再写 `android.kpart` 和 `menu.kpart`，按文件长度读回。
+6. 不调用 `mke2fs`、`make_f2fs`、`sgdisk` 的写入选项和 `resize2fs`。写完再读一次两个内核槽的属性，和写入前不一致就报失败。
 
 属性必须留下。菜单能在下次开机出现，是因为 `menu_kernel` 的 priority 是 14 且 successful，两个系统槽的 priority 是 0。更新把某个槽写成 priority 15、successful 1 之后，depthcharge 会一直进那个槽，菜单不再出现。
 
-`metadata` 留下，已有的锁屏和加密数据才能在新系统里打开。这一次更新不改加密格式。以后若要改，清单里单独写一项，安装器在动 `metadata` 之前再问一次，默认不碰。
+`metadata` 留下，已有的锁屏和加密数据才能在新系统里打开。这一次更新不改加密格式。
 
-Linux 根分区、Linux 内核槽和 `pmOS_boot` 不在这个包里。
+Linux 根分区、Linux 内核槽和 `pmOS_boot` 不动。
 
 ### 为什么这一步从 U 盘启动
 
 eMMC 上的 Android 正在使用的 `super` 已经挂到 device-mapper 上。把新镜像写进这块正在使用的分区，写到一半断电，下次就起不来。用户数据在另一个分区上，所以数据还在，但系统本身要靠 U 盘才能再写回去。更新本来就是在做这件事，所以第一次就放在已经能识别 `11230000.mmc` 的安装器里，不在正在运行的系统上写自己的 `super`。
 
-下载可以在 eMMC 的系统里做。8 GiB 的包放到 `userdata`，然后 Ctrl+U，安装器从那里读取。U 盘 2.0 拷一整张 `super` 已经慢，更新包用 sparse 镜像，安装器在写入前展开到一个临时文件，展开后的长度仍必须是 8589934592。
+U 盘 2.0 拷一整张 `super` 已经慢。第一版接受这一点，因为全量包写成 U 盘时这份 `super` 已经在盘上，安装器直接从分区读，不再展开 sparse 文件。
 
 ### 在设备上更新，以及 recovery
 
@@ -159,17 +151,15 @@ eMMC 上的 Android 正在使用的 `super` 已经挂到 device-mapper 上。把
 
 在 eMMC 系统里后台更新，走的是 virtual A/B：新系统先写成 `userdata` 上的快照，重启后由第一阶段 init 合并进 `super`。depthcharge 不用理解 Android 的 A/B 槽。要加的是 `update_engine`、`snapuserd`，以及 ramdisk 里合并快照的那段。内核 FIT 仍然得单独写进 `android_kernel`，而且不能改 GPT 属性。这是一套新的启动路径，等「从 U 盘换 super 和内核、用户数据还在」已经在这台上重复成功，再做。
 
-recovery 也能做，形态是菜单里的第三项，或者一个平时 priority 为 0 的小 FIT。它从 `userdata` 或 U 盘读同一个更新 zip，规则和安装器相同。depthcharge 的开发者屏幕没有「进 recovery」这一项，音量键组合也进不了一个 `recovery.img`。标准 Lineage 的 `adb sideload` 还要把 Type-C 切成 gadget，而这份内核为了 U 盘启动把控制器留在 host。所以第一版不增加 recovery 分区，也不打开 USB gadget。
+recovery 也能做，形态是菜单里的第三项，或者一个平时 priority 为 0 的小 FIT。它读的仍是 U 盘上展开的那三份镜像，规则和安装器相同。depthcharge 的开发者屏幕没有「进 recovery」这一项，音量键组合也进不了一个 `recovery.img`。标准 Lineage 的 `adb sideload` 还要把 Type-C 切成 gadget，而这份内核为了 U 盘启动把控制器留在 host。所以第一版不增加 recovery 分区，也不打开 USB gadget。
 
-菜单第三项的价值是：更新包已经在 `userdata` 里时，可以不另外做一张安装盘。那是第 2 步的安装器跑通之后的减负，写盘规则不另起一套。
+菜单第三项以后如果要做，也是少一次进入 Android 再点按键，不是另一套写盘规则。
 
 ### 实现步骤
 
-1. 给 `kukui-installd.sh` 加一条更新路径，和现有的「全新安装」「双系统安装」并列。入口先只接受本地 zip 路径。
-2. 写分区之前把将要写入的分区名、父设备路径和「不格式化 userdata」打到状态文件里，界面原样显示。用户确认之后才 `dd`。
-3. 用一张已知的 `super.img` 和 `android.kpart` 在现有 eMMC 上试一次。试完核对 `userdata` 的文件系统 UUID 没变，`pmOS_root` 的大小没变，`menu_kernel` 的 GPT 属性仍是 priority 14、tries 15、successful 1。
-4. 重启进菜单，再进 Android。原来的账号、已装应用还在，新系统的行为符合这次镜像。Linux 仍能从菜单进入。
-5. 这一步成功之后，再把同一个 zip 的下载放到 eMMC 系统里。应用只负责下到 `userdata` 并核对 sha256，然后提示拔下别的盘、Ctrl+U、在安装器里点更新。
+1. `kukui-installd.sh` 的 `mode=update` 从 U 盘的 `super` 分区和 `/kukui-install/` 读取，不读 zip。界面多一个「更新系统」。确认画面显示父设备、分区名和「不格式化 userdata」，点更新之后才 `dd`。这一步已经打进 `work/release/kukui-usb-20261102b.zip` 的 super（sha256 `b74834ed…`）。这张包还没有写入 U 盘，正在运行的系统里还是旧安装器。
+2. 用一张已知的全量 U 盘在现有 eMMC 上试一次。试完核对 `userdata` 的文件系统 UUID 没变，`pmOS_root` 的大小没变，`menu_kernel` 的 GPT 属性仍是 priority 14、tries 15、successful 1。
+3. 重启进菜单，再进 Android。原来的账号、已装应用还在，新系统的行为符合这次镜像。Linux 仍能从菜单进入。
 
 ## 完成之前不做的
 

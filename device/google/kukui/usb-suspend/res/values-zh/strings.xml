@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="title">USB 睡眠供电</string>
+    <string name="summary">睡眠时是否断开 USB 供电</string>
+    <string name="switch_label">睡眠时断开 USB 供电</string>
+    <string name="detail">关闭时，睡眠期间 USB 主机保持供电，从 U 盘启动的系统可以醒来后继续同一次启动。打开后，睡眠会关掉 USB 端口和 PHY。系统盘如果就在这个 USB 口上，灯会灭，唤醒后这次启动无法继续。</string>
+    <string name="missing">这颗内核还没有 suspend_power_off。需要写入带这个开关的新内核后才能改。</string>
+    <string name="write_failed">没有写成。开关已改回原来的状态。</string>
+</resources>

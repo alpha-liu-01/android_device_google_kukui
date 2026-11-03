@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="title">USB 睡眠供电</string>
-    <string name="summary">睡眠时是否断开 USB 供电</string>
-    <string name="switch_label">睡眠时断开 USB 供电</string>
-    <string name="detail">关闭时，睡眠期间 USB 主机保持供电，从 U 盘启动的系统可以醒来后继续同一次启动。打开后，睡眠会关掉 USB 端口和 PHY。系统盘如果就在这个 USB 口上，灯会灭，唤醒后这次启动无法继续。</string>
-    <string name="missing">这颗内核还没有 suspend_power_off。需要写入带这个开关的新内核后才能改。</string>
-    <string name="write_failed">没有写成。开关已改回原来的状态。</string>
+    <string name="title">USB power during sleep</string>
+    <string name="summary">Whether sleep turns USB power off</string>
+    <string name="switch_label">Turn USB power off during sleep</string>
+    <string name="detail">When this is off, the USB host stays powered during sleep, so a system started from a USB disk can continue the same boot after waking. When this is on, sleep turns the USB port and PHY off. If the system disk is on that USB port, its light goes out and that boot cannot continue after wake.</string>
+    <string name="missing">This kernel has no suspend_power_off node. A kernel that includes the switch has to be written before this can be changed.</string>
+    <string name="write_failed">The setting was not saved. The switch is back to its previous state.</string>
 </resources>
