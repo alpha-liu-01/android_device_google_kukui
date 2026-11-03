@@ -1,0 +1,57 @@
+This repository is mixed-license. The license that applies to a file is the
+one named below. The Apache License 2.0 in LICENSE does not replace a more
+specific license that ships next to a file.
+
+Device tree, installer, and scripts
+  Apache License 2.0. See LICENSE.
+  Files that already carry an SPDX-License-Identifier header keep that
+  identifier.
+
+Kernel modules, kernel patches, and the boot menu
+  GNU General Public License, version 2 only.
+  This covers device/google/kukui/modules/*.ko,
+  device/google/kukui/prebuilt/6.18.28-mt81-kukui2/*.ko,
+  bringup/kernel/, bringup/camera/*.patch, bringup/camera/isp/,
+  and device/google/kukui/kukui-menu.c.
+  The modules were built from Linux 6.18.28 as packaged by
+  linux-postmarketos-mediatek-mt81, plus the config fragment and patches
+  in bringup/. That kernel source is not vendored in this repository.
+
+Wi-Fi firmware
+  device/google/kukui/firmware/ath10k/QCA6174/hw3.0/firmware-sdio-6.bin
+  device/google/kukui/firmware/ath10k/QCA6174/hw3.0/board-2.bin
+  Copyright (c) 2008-2010, Atheros Communications, Inc.
+  Redistribution in binary form is permitted under
+  device/google/kukui/firmware/ath10k/QCA6174/hw3.0/LICENCE.atheros_firmware.
+  The firmware version string is WLAN.RMH.4.4.1-00174.
+
+Bluetooth firmware
+  device/google/kukui/firmware/qca/rampatch_00440302.bin
+  device/google/kukui/firmware/qca/nvm_00440302_i2s_eu.bin
+  Qualcomm Technologies, Inc. Redistributable binary code, for machines
+  that contain a Qualcomm chipset. The terms are
+  device/google/kukui/firmware/qca/LICENSE.qcom.
+  These files may be redistributed only in binary form, and this license
+  text has to stay with them.
+
+SCP firmware
+  device/google/kukui/firmware/mediatek/mt8183/scp.img
+  MediaTek Inc. Redistribution is permitted for devices that contain a
+  MediaTek chipset. The firmware itself is not GPL.
+  See device/google/kukui/firmware/mediatek/mt8183/LICENCE.mediatek.
+
+Camera prebuilts
+  device/google/kukui/camera/prebuilt/libcamera.so
+  device/google/kukui/camera/prebuilt/libcamera-base.so
+  device/google/kukui/camera/prebuilt/ipa_soft_simple.so
+  device/google/kukui/camera/prebuilt/soft_ipa_proxy
+    LGPL-2.1-or-later. Built from the LineageOS 23.2 external/libcamera
+    tree, with the YAML under device/google/kukui/etc/libcamera/.
+  device/google/kukui/camera/prebuilt/libexif.so
+    LGPL-2.1-or-later.
+  device/google/kukui/camera/prebuilt/libjpeg.so
+    Independent JPEG Group license.
+  device/google/kukui/camera/prebuilt/libyuv.so
+    BSD 3-Clause.
+  The corresponding source is the LineageOS 23.2 projects those libraries
+  come from. This repository does not relicense those binaries.
