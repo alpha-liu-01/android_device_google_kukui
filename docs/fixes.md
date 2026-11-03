@@ -42,4 +42,26 @@ WoWLAN is enabled:
 
 管理器是官方 `ReSukiSU_v4.2.0-rc3_35171-arm64-v8a-release.apk`，sha256 `25657bc449439687608fffa04b4b586de90fc405e3dc6217bd997fc71ba0a0a1`。`device.mk` 把它作为 `ReSukiSU` 收进 system_ext。包是预签名，dex 和 JNI 都是压缩的，所以 Android.bp 用 `presigned`、`preprocessed` 和 `skip_preprocessed_apk_checks`，不放进 priv-app。清单里还有可选的 `androidx.window.extensions` 和 `androidx.window.sidecar`，这两项写在 `optional_uses_libs`。Soong 读到的 apk 必须是普通文件。第一次编出来的 system_ext 里，`ReSukiSU.apk` 是一条 133 字节的符号链接，指向编译机路径。改成普通文件之后再编，`system_ext.img` 里是 9379362 字节的普通文件。
 
-新的 super 展开后是 `work/resukisu/super.raw`，正好 8589934592 字节，sha256 `a3b991c9a19efc9fbef43af86a9fe83ecb8e1b4891fae624551a9365e8fdc945`。它来自当前树的一次 `m superimage`，不是在 `super.bigcore.raw` 上打补丁。内核模块没有重编，vermagic 仍是 `6.18.28-mt81-kukui2 SMP preempt mod_unload aarch64`。没有写 U 盘，没有写 eMMC，没有重启。还没有启动过这份内核，不能说 root 已经可用。
+新的 super 展开后是 `work/resukisu/super.raw`，正好 8589934592 字节，sha256 `a3b991c9a19efc9fbef43af86a9fe83ecb8e1b4891fae624551a9365e8fdc945`。它来自当前树的一次 `m superimage`，不是在 `super.bigcore.raw` 上打补丁。内核模块没有重编，vermagic 仍是 `6.18.28-mt81-kukui2 SMP preempt mod_unload aarch64`。2026-11-03 17:02 写入序列号 `20120501030900000` 的安装盘 `/dev/sdb`。super 写到 `sdb3`，读回 sha256 `a3b991c9a19efc9fbef43af86a9fe83ecb8e1b4891fae624551a9365e8fdc945`。`pmOS_boot` 上的 `kukui-install/android.kpart` 换成新文件，读回 sha256 `1998cc6475f44654ba19e47532822d336083bce4499554c9d589bbf93754ceed`。`menu.kpart` 仍是 `bc28358a4f965cc4f1cf0da1ff84d42814cacabdd2dff4d8509b5822945b84a6`。U 盘自己的内核槽没有写。没有写 eMMC，没有重启。还没有启动过这份内核，不能说 root 已经可用。
+
+2026-11-03 17:19 平板从 U 盘启动，正在把系统写入 eMMC。`ro.boot.boot_devices=soc/11201000.usb/11200000.usb`。这次启动的 `/data/vendor/wifi/wpa/wpa_supplicant.conf` 只有 `wowlan_disconnect_on_deinit=1`，没有 `wowlan_triggers`。`/vendor/etc/wifi/wpa_supplicant.conf` 已经有 `wowlan_triggers=disconnect magic_pkt`。supplicant 在 data 文件已经存在时不会用模板覆盖。U 盘自己的 userdata 是以前生成的那份，和 eMMC 上改过的 data 文件不是同一个。这次更新不格式化 userdata。锁屏修复在这次 U 盘启动里不生效是预期情况。
+
+ReSukiSU 闪退不是预期。崩溃是 `UnsatisfiedLinkError: library "libkernelsu.so" not found`，发生在进内核之前。包在 `/system_ext/app/ReSukiSU/ReSukiSU.apk`，9379362 字节，清单 `extractNativeLibs=true`，旁边没有 `lib/arm64`。预签名导入不会把 apk 里的 JNI 解出来安装。正在写入 eMMC 的就是这份镜像，写完后打开管理器仍会同样闪退。U 盘启动用的内核槽也没有 ReSukiSU，那是另一件事，不是这次闪退的原因。
+
+库已从官方 apk 解出，复制到 `system_ext/app/ReSukiSU/lib/arm64/`。新 super 展开后仍是 8589934592 字节，sha256 `2250044b06359bb534f0d079e6cb601d0b23b22e5c723d63bead76d83404adce`，在 `work/resukisu/super.raw`。`system_ext.img` 里 `libkernelsu.so` 是 18704 字节的普通文件。这次 eMMC 写入还在用 U 盘上的旧 super，没有改那张盘。
+
+2026-11-03 17:39 新 super 写入序列号 `20120501030900000` 的 `/dev/sdb` 分区 `sdb3`。读回 sha256 `2250044b06359bb534f0d079e6cb601d0b23b22e5c723d63bead76d83404adce`。`android.kpart`、`menu.kpart` 和 U 盘自己的内核槽没有再写。没有写 eMMC。
+
+2026-11-03 18:00 eMMC 启动，`ro.boot.boot_devices=soc/11230000.mmc`。内核日志有 KernelSU 35171，工作模式 Built-in。管理器能打开，界面仍是「未安装」，点下去要修补 `init_boot`。这台没有 `init_boot`，那个按钮不能按。
+
+两条界面现象是同一条失败。`KsuCli` 18:00:24 执行 `/system_ext/app/ReSukiSU/lib/arm64/libksud.so` 返回 error 13，接着 `Unable to create a shell!`。这个文件在 erofs 里是 0644。管理器要把 `libksud.so` 当程序执行，权限不够。没有这个 shell 时，`getDefaultPartition()` 在内核版本大于 5 的机器上把默认分区写成 `init_boot`。签名检查也走这个 shell：`ksud debug get-sign` 拿不到输出，就显示「您使用的管理器并非 ReSukiSU 官方管理器」。apk 本身是官方包，签名长度 `0x377`，哈希 `d3469712b6214462764a1d8d3e5cbe1d6819a0b629791b9f4101867821f1df64`，和内核 `EXPECTED_HASH_RESUKISU`、管理器源码里的官方值一致。横幅不是签错了包。
+
+只改权限也不够。`Natives.isManager` 为假时，版本号被写成空，6.18 会被 `isGKI()` 判成「未安装」。内核只在 `/data/app` 里找 `base.apk`。系统里的路径是 `/system_ext/app/ReSukiSU/ReSukiSU.apk`，`get_pkg_from_apk_path` 解析不了，所以没有 `Crowning manager`。`handle_setresuid` 到 uid 10148 只说明 setuid 挂钩看见了这个进程，不代表它被登记成管理器。
+
+`device/google/kukui/config.fs` 把 `system_ext/app/ReSukiSU/lib/arm64/libksud.so` 设成 0755。`BoardConfig.mk` 把它加进 `TARGET_FS_CONFIG_GEN`。编出来的 `system_ext.img` 里这个文件是 `0755/rwxr-xr-x`，5679064 字节；`libkernelsu.so` 仍是 0644。apk 仍是 9379362 字节的普通文件。
+
+内核在 `throne_tracker.c` 增加 `crown_system_manager`。扫完 `/data/app` 之后，再对 `/system_ext/app/ReSukiSU/ReSukiSU.apk` 做原来的 v2 签名检查，包名对上 `packages.list` 里的 `com.resukisu.resukisu` 才登记。补丁是 `bringup/kernel/0002-resukisu-system-manager.patch`。版本字符串仍是 `v4.2.0-rc3-239e1e88@ReSukiSU`，版本号仍是 35171。新 `android.kpart` 12484608 字节，sha256 `514c836321c71dfd5d139cff7ad8d9e202a34eebda11263e0648f597f07ffd85`，命令行仍是 `androidboot.boot_devices=soc/11230000.mmc`。
+
+新 super 展开后 `work/resukisu/super.raw`，正好 8589934592 字节，sha256 `85f8afaeaec11d74c2351aa7b307583f4f1c7146240dab1b44508659c79bda1f`。上一份 `2250044b06359bb534f0d079e6cb601d0b23b22e5c723d63bead76d83404adce` 已经在 eMMC 上。管理器要等这份 super 和这份 `android.kpart` 一起通过「更新系统」写上去之后才能看。还不能说 root 已经可用。
+
+2026-11-03 18:25 这两份写入序列号 `20120501030900000` 的 `/dev/sdb`。super 写到 `sdb3`，读回 sha256 `85f8afaeaec11d74c2351aa7b307583f4f1c7146240dab1b44508659c79bda1f`。`pmOS_boot` 上的 `kukui-install/android.kpart` 读回 sha256 `514c836321c71dfd5d139cff7ad8d9e202a34eebda11263e0648f597f07ffd85`，命令行仍是 `androidboot.boot_devices=soc/11230000.mmc`。`menu.kpart` 仍是 `bc28358a4f965cc4f1cf0da1ff84d42814cacabdd2dff4d8509b5822945b84a6`。U 盘自己的内核槽写前写后都是 `2c52f071bdd707b2078e1e30aeb344b645a3a64f51e7e9d233e53f50f64a5512`。没有写 eMMC，没有重启。

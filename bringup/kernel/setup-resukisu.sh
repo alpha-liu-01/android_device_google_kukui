@@ -27,4 +27,8 @@ if ! grep -q ksu_handle_execveat "$KERNEL/fs/exec.c"; then
     patch -d "$KERNEL" -p1 < "$ROOT/bringup/kernel/0001-resukisu-manual-hooks.patch"
 fi
 
+if ! grep -q crown_system_manager "$SRC/kernel/manager/throne_tracker.c"; then
+    patch -d "$SRC" -p1 < "$ROOT/bringup/kernel/0002-resukisu-system-manager.patch"
+fi
+
 echo "hooks present; merge bringup/kernel/resukisu.fragment into .config before building"

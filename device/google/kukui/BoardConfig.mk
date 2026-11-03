@@ -85,3 +85,7 @@ TARGET_SCREEN_DENSITY := 240
 $(call soong_config_set_bool,minigbm_upstream,RELEASE_SM_OPEN_DECLARED_PASSTHROUGH_HAL,false)
 
 BOARD_VENDOR_SEPOLICY_DIRS += $(DEVICE_PATH)/sepolicy/vendor
+
+# libksud.so is executed by the manager. PRODUCT_COPY_FILES installs it 0644,
+# and system_ext is erofs, so the mode has to be set here.
+TARGET_FS_CONFIG_GEN += $(DEVICE_PATH)/config.fs

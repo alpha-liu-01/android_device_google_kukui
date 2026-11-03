@@ -58,6 +58,15 @@ PRODUCT_PACKAGES += \
     ipa_soft_simple \
     libcamera_soft_ipa_proxy
 
+# The manager manifest sets extractNativeLibs, and this import does not
+# install the embedded JNI libs. The linker looks next to the apk.
+PRODUCT_COPY_FILES += \
+    $(LOCAL_PATH)/resukisu/lib/arm64/libkernelsu.so:$(TARGET_COPY_OUT_SYSTEM_EXT)/app/ReSukiSU/lib/arm64/libkernelsu.so \
+    $(LOCAL_PATH)/resukisu/lib/arm64/libksud.so:$(TARGET_COPY_OUT_SYSTEM_EXT)/app/ReSukiSU/lib/arm64/libksud.so \
+    $(LOCAL_PATH)/resukisu/lib/arm64/libadbroot.so:$(TARGET_COPY_OUT_SYSTEM_EXT)/app/ReSukiSU/lib/arm64/libadbroot.so \
+    $(LOCAL_PATH)/resukisu/lib/arm64/libandroidx.graphics.path.so:$(TARGET_COPY_OUT_SYSTEM_EXT)/app/ReSukiSU/lib/arm64/libandroidx.graphics.path.so \
+    $(LOCAL_PATH)/resukisu/lib/arm64/libdatastore_shared_counter.so:$(TARGET_COPY_OUT_SYSTEM_EXT)/app/ReSukiSU/lib/arm64/libdatastore_shared_counter.so
+
 PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/etc/permissions/android.software.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.xml \
     frameworks/native/data/etc/android.software.cts.xml:$(TARGET_COPY_OUT_VENDOR)/etc/permissions/android.software.cts.xml \
