@@ -289,7 +289,7 @@ index b7481ad..5ed2898 100644
      mVisibleRect = visibleRect;
  }
 diff --git a/components/VideoFramePool.cpp b/components/VideoFramePool.cpp
-index ae5cd34..ad33d44 100644
+index ae5cd34..df0aa8a 100644
 --- a/components/VideoFramePool.cpp
 +++ b/components/VideoFramePool.cpp
 @@ -12,6 +12,7 @@
@@ -345,6 +345,18 @@ index ae5cd34..ad33d44 100644
      }
      }
  
+@@ -164,6 +181,11 @@ void VideoFramePool::destroyTask() {
+ }
+ 
+ bool VideoFramePool::shouldDropBuffer(uint32_t bufferId) {
++    // IGBA limits the dequeued buffers itself and allocates new buffers on a new surface. The
++    // IDs of the old surface never come back, so a full set would drop every new buffer.
++    if (mBlockPool->getAllocatorId() == C2PlatformAllocatorStore::IGBA) {
++        return false;
++    }
+     if (mBuffers.size() < mMaxBufferCount) {
+         return false;
+     }
 diff --git a/components/include/v4l2_codec2/components/DecodeInterface.h b/components/include/v4l2_codec2/components/DecodeInterface.h
 index 7e513c5..180623a 100644
 --- a/components/include/v4l2_codec2/components/DecodeInterface.h

@@ -247,3 +247,15 @@ PipePipe 全屏的选项是表面变化时释放并重新创建解码器，而�
 Just Player 在这份库上横划快进到 544500 ms，就是之前停住的位置，之后进度从 544.5 s 走到 550.7 s，状态是 PLAYING。来回划了四次，每次之后进度都在走，日志没有 `Decode error` 或 `Decoder stuck`。PipePipe 关掉那个选项之后的全屏还没看。
 
 这个 bind 重启就没了。同一份源码重新编了 super，raw 是 `work/phase4/super.sps.raw`，正好 8589934592 字节，sha256 `409c69b6ed07f7b37d0cc9df17cf06a890e8c7707db3c15bbfec03c438e5dc64`。里面 vendor 分区的 `libcros_codecs_ffi.so` 和上面那份一致，两份 v4l2 codec2 库和现在 eMMC 上的一致。这张 super 还没写到 U 盘，也没写 eMMC。
+
+## 2026-11-03 PipePipe 全屏之后新表面的缓冲全被丢掉
+
+Just Player 用上一节的库快进不再停住，用户确认过。PipePipe 仍停住，B 站任何一条都一样。复现：1920×1080 H.264（`avc1.640033`），`c2.v4l2.avc.decoder`。进全屏时 `setOutputSurface` 连续两次，GraphicsTracker 在新表面上 `maxDequeue:20`。之后每 5 秒左右来一次 flush，正好是一个关键帧间隔。这是 ExoPlayer 输出太晚时丢到下一个关键帧的做法，不是解码器自己出错。
+
+原因在 `VideoFramePool::shouldDropBuffer`。池子把拿到过的缓冲 ID 记在 `mBuffers` 里，满了 `mMaxBufferCount` 之后，不认识的 ID 一律还回去再取。AIDL 下客户端把 BUFFERQUEUE 换成 IGBA，ID 是 `AHardwareBuffer_getId`，每次分配都是新的。换表面之后新表面分配的是新缓冲，旧表面的 ID 再也不会回来，所以几乎每个新缓冲都被丢掉，解码一直在退避重试，画面掉到 2 fps 左右然后停住。NDK 复现程序用的 ImageReader 缓冲少，`mBuffers` 没满，所以没碰到。
+
+IGBA 自己用 maxDequeueCount 限住取出的缓冲数，现在 IGBA 下不再按 ID 丢缓冲。其他分配器照旧。改动只在 `libv4l2_codec2_components.so` 的 `VideoFramePool.cpp`，头文件和对象布局不变，`libv4l2_codec2_v4l2.so` 不用一起换。
+
+00:40 编出的 `libv4l2_codec2_components.so` 是 271136 字节，sha256 `40aa9bb89fa94374f2f8bca5f375a2811d52bb999e166439b0a9c6d2d02074d6`。和上一节的 `libcros_codecs_ffi.so` 一起 bind 到 `/vendor/lib64`，重启解码服务，进程 779。PipePipe 里 B 站视频进全屏 15 秒之后，SurfaceView 6 秒 30.3 fps，丢帧 0。退出全屏之后 30.2 fps，丢帧 0，窗口里有画面。进出全屏之后没有再出现 flush。中途有一次退出全屏后窗口是黑的，那是 2:09 的片子刚好播完，位置 129008 ms，状态 STOPPED。
+
+同一份源码重新编了 super，raw 是 `work/phase4/super.igba.raw`，正好 8589934592 字节，sha256 `7d75d5c60f8c746a7a866801206f661e94ea646e0880f28a2170f7167619698d`。vendor 分区里的 `libcros_codecs_ffi.so`、`libv4l2_codec2_components.so`、`libv4l2_codec2_v4l2.so` 和正在跑的三份一致。它包含上一节的 SPS 修改，替代 `super.sps.raw`。还没写到 U 盘，也没写 eMMC。
