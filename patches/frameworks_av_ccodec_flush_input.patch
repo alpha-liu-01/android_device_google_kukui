@@ -1,0 +1,73 @@
+diff --git a/media/codec2/sfplugin/CCodecBufferChannel.cpp b/media/codec2/sfplugin/CCodecBufferChannel.cpp
+index 5330a02..a644cf7 100644
+--- a/media/codec2/sfplugin/CCodecBufferChannel.cpp
++++ b/media/codec2/sfplugin/CCodecBufferChannel.cpp
+@@ -28,6 +28,7 @@
+ #include <thread>
+ #include <chrono>
+ #include <regex>
++#include <vector>
+ 
+ #include <android_media_codec.h>
+ #include <android_media_tv_flags.h>
+@@ -2375,12 +2376,23 @@ void CCodecBufferChannel::release() {
+ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) {
+     ALOGV("[%s] flush", mName);
+     std::list<std::unique_ptr<C2Work>> configs;
++    // Input buffers the component is returning with these works. Taken out of
++    // the pipeline watcher before the frame entry is dropped, so the array
++    // slot can be expired before start() asks for buffers again.
++    std::vector<std::shared_ptr<C2Buffer>> returnedInputs;
+     mInput.lock()->lastFlushIndex = mFrameIndex.load(std::memory_order_relaxed);
+     {
+         Mutexed<PipelineWatcher>::Locked watcher(mPipelineWatcher);
+         for (const std::unique_ptr<C2Work> &work : flushedWork) {
+             uint64_t frameIndex = work->input.ordinal.frameIndex.peeku();
+             if (!(work->input.flags & C2FrameData::FLAG_CODEC_CONFIG)) {
++                for (size_t i = 0; i < work->input.buffers.size(); ++i) {
++                    std::shared_ptr<C2Buffer> returned =
++                            watcher->onInputBufferReleased(frameIndex, i);
++                    if (returned) {
++                        returnedInputs.push_back(std::move(returned));
++                    }
++                }
+                 watcher->onWorkDone(frameIndex);
+                 continue;
+             }
+@@ -2415,6 +2427,13 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
+     mFlushedConfigs.lock()->swap(configs);
+     {
+         Mutexed<Input>::Locked input(mInput);
++        if (input->buffers) {
++            for (const std::shared_ptr<C2Buffer> &returned : returnedInputs) {
++                if (!input->buffers->expireComponentBuffer(returned)) {
++                    (void)input->extraBuffers.expireComponentBuffer(returned);
++                }
++            }
++        }
+         input->buffers->flush();
+         input->extraBuffers.flush();
+     }
+@@ -2451,14 +2470,19 @@ void CCodecBufferChannel::onInputBufferDone(
+     bool newInputSlotAvailable = false;
+     {
+         Mutexed<Input>::Locked input(mInput);
++        // Flush raises lastFlushIndex, then this callback arrives. An async
++        // client only hears about a free input slot from
++        // feedInputBufferIfAvailable. Leaving the slot uncleared here makes
++        // the next start() wait forever.
+         if (input->lastFlushIndex >= frameIndex) {
+-            ALOGD("[%s] Ignoring stale input buffer done callback: "
++            ALOGD("[%s] stale input buffer done after flush: "
+                   "last flush index = %lld, frameIndex = %lld",
+                   mName, input->lastFlushIndex.peekll(), (long long)frameIndex);
+-        } else {
++        }
++        if (input->buffers) {
+             newInputSlotAvailable = input->buffers->expireComponentBuffer(buffer);
+             if (!newInputSlotAvailable) {
+-                (void)input->extraBuffers.expireComponentBuffer(buffer);
++                newInputSlotAvailable = input->extraBuffers.expireComponentBuffer(buffer);
+             }
+         }
+     }

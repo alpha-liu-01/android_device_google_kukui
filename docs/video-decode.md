@@ -179,3 +179,71 @@ HW+ 在第一个实例还活着的时候再创建 `c2.v4l2.avc.decoder`，被 `t
 2026-11-01 写入 super：`work/phase4/super.poll.raw`，8589934592 字节，sha256 `bd1875c009697517ce82ec203353a6a53f7df4c053ca285efb9400fc5fafe3cb`。读回和源一致，内核、pmOS_boot、metadata、misc、userdata 的前 1 MiB 没变。U 盘已卸载。1080p60 能不能连续播还没看。
 
 同一版上，1920×1080 的 H.264 由 `c2.v4l2.avc.decoder` 打开 `/dev/video0`，音频仍是 `c2.android.aac.decoder`。12:35:06 到 12:35:15 交出 559 帧，大约 61 fps，这 9.2 秒丢掉 2 帧。整段 8555 帧里丢掉 36 帧（0.42%）。`DecodeComponent` 大约占一颗核的 57%，一帧大约 9.3 ms，线程停在 `poll` 而不是 `nanosleep`。没有 `C2_CORRUPTED`。用户看这条是正常的，整机大约 5.5 W。
+
+## 2026-11-02 PipePipe 全屏之后画面停住
+
+同一条 1920×1080、30 fps 的 H.264，MX 能连续硬解。PipePipe（`InfinityLoop1309.NewPipeEnhanced`，ExoPlayer 2.18.7）选的也是 `c2.v4l2.avc.decoder`，编码尺寸 1920×1088，可见 1920×1080，`NV12`。先流畅几秒，然后掉到大约 2 fps，最后停在最后一帧。播放状态仍是 PLAYING，进度停在 120015 ms 不再走。解码线程空闲在自己的消息循环里，不是卡在反块。
+
+21:28:06 播放器换了两次输出 Surface（进入全屏）。21:28:10 `MediaCodec::start()` 再次进来，这是 flush 之后的恢复。同一时刻输入缓冲的归还被记成 `last flush index = 269` 的过期回调，直接丢掉，没有把槽位还给播放器。之后没有任何新的输出。
+
+`flush_sm` 只是把 `flushTask` 丢进解码线程就返回。客户端随即把 flush 序号抬高，再 `start()`。解码线程稍后才放下输入缓冲，这次归还已经晚于 flush 序号，槽位就永久空不出来。播放器没有缓冲可送，解码线程也没有新任务，画面停住。MX 播放中途不换 Surface，不走这条 flush，所以同一条片能播完。
+
+`flush_sm` 在源码里改成等到解码线程把这些 work 收进返回列表再回去。只换了 `libv4l2_codec2_components.so` 就重启服务时，旁边的 `libv4l2_codec2_v4l2.so` 还是按旧的对象布局读 `mDecoderTaskRunner`，读到空指针，`schedulePump` 崩溃。解码器创建直接失败，MX 也打不开。这个 bind 已经卸掉，正在跑的是原来的库。2026-11-02 21:47 用原来的库创建 `c2.v4l2.avc.decoder`，configure 和 start 都返回成功，服务进程没有退出。配对的 v4l2 库还没一起换上去，这版 flush 修改不在正在跑的系统里。
+
+21:53 把按新头文件重新编过的 `libv4l2_codec2_components.so`（271136 字节）和 `libv4l2_codec2_v4l2.so` 一起 bind 到 `/vendor/lib64`，再启动服务。进程 598 映射的是这两份，不是 erofs 里的原件。21:54 创建 `c2.v4l2.avc.decoder`，configure 和 start 都返回成功，进程号没变。日志里的 `ParseFrameError` 是测试送进去的截断 SPS，不是初始化失败。这两份只活在这次启动里，重启会回到原来的库。全屏之后会不会再停住还没看。
+
+## 2026-11-02 Just Player 同一条 1080p 硬解在走
+
+PipePipe 的提取器把地址封了，这条片改用 Just Player（`com.brouken.player` 0.217，AndroidX Media3 1.11.1）播。标题仍是 “The Evolution64 - Is it worth the money?”。解码服务还是 21:53 换上去的那对库，进程 598。
+
+22:32:24 创建 `c2.v4l2.avc.decoder#220`。输入 `video/avc`，1920×1080，profile 2，level 4096。输出 `video/raw`，`COLOR_FormatSurface`。cros-codecs 打开 `/dev/video2`，编码尺寸 1920×1088，可见 1920×1080，`NV12`。音频是 `c2.android.aac.decoder`，不是 PipePipe 那次的 Opus。`setOutputSurface` 的 `BAD_INDEX` 和 “Failed to query component interface for required system resources: 6” 仍是可选参数没实现，组件随后正常出画。开头那条 `last flush index = 0, frameIndex = 0` 是第一块输入缓冲，后面没有更高序号的过期归还，也没有 `reportError`。
+
+22:32:17 和 22:32:20 各创建过一个解码器（`#214`、`#266`），几秒后播放器自己 `Release` 再新建，不是同一个组件 flush 之后空转。稳定的是 `#220`，资源管理器从 22:32:24 起一直记着 `hw-video-codec`。
+
+22:36 左右播放状态是 PLAYING。进度从 212463 ms 走到 218454 ms，缓冲从 186038 ms 补到 237725 ms。SurfaceView 这 5.21 秒交出 155 帧，大约 29.8 fps。画面层可见，没有停在某一帧。
+
+这只说明 Media3 1.11.1 这条路径能把 1080p30 H.264 硬解播下去。它换 Surface 时是拆掉播放器重建解码器，没有走 PipePipe 那个中途 flush 再 `start()` 的过程。日志缓冲里已经没有这次 PipePipe 的解码记录，只剩一个退出的 `NewPipeEnhanced` 进程。用户看到换库之后 PipePipe 仍会停住，这边对不上当时的组件日志。
+
+## 2026-11-02 Just Player 快进之后停在 BUFFERING
+
+同一条片顺播到大约 331 s 之后快进。22:37:31 进度在几百毫秒里从 333259 ms 扫到 544500 ms，状态变成 BUFFERING，速度 0。之后进度和缓冲都停在 544500 ms，`updated=6211516` 不再变。SurfaceView 的帧号停在 67。解码线程空闲在自己的消息循环里，`/dev/video2` 还开着。播放线程、视频 `CodecLooper`、`MediaCodec_loop` 都在等消息，没有人堵在 flush 里。
+
+视频组件没有换。还是 22:37:28 创建的 `c2.v4l2.avc.decoder#699`。快进对它做了两次 flush：22:37:31.400 `last flush index = 105, frameIndex = 105`，22:37:31.770 `last flush index = 132, frameIndex = 132`，两次归还都被记成过期回调丢掉。音频解码器被拆掉重建了（`#846` 换成 `#787`）。这次换上去的库已经在跑，`flush_sm` 会把 work 放进返回列表，但是 `CCodecBufferChannel::flush` 先把 flush 序号抬高，并不根据这份列表清输入槽。槽位仍要等 `onInputBufferDone`，而这个回调已经晚于 flush 序号，直接丢掉，也不会再通知播放器有空槽。105 那次之后播放器还送进了 106 到 132，所以单次过期回调没有把池子抽空。
+
+把画面停住的是提取线程。`ExoPlayer:Loader` 停在 `ProgressiveMediaPeriod$ExtractingLoadable.load` 里的 `ConditionVariable.block`。Media3 1.11.1 每读完一段就把 `loadCondition` 关上，等播放线程 `continueLoading` 再打开。`seekToUs` 在加载还没结束时只调用 `loader.cancelLoading()`，那个调用只把取消标志置上，不打开 `loadCondition`。加载函数要被唤醒才会看见取消并退出，退出之后 `onLoadCanceled` 才会从新位置重新加载。条件变量没人打开，加载函数不返回，样本队列是空的，解码器也就没有新数据。退到后台再回来会 `Release` 整个 ExoPlayer 再 `Init`，所以能绕过这次卡住的加载线程。
+
+## 2026-11-02 flush 之后把输入槽交还
+
+`CCodecBufferChannel::flush` 现在先按 work 里的输入缓冲序号从 pipeline watcher 取出缓冲，清掉槽位上的 `compBuffer`，再丢掉这一帧。`onInputBufferDone` 即使晚于 flush 序号，也照样清槽；清成功才通知客户端有空槽。改动在 `patches/frameworks_av_ccodec_flush_input.patch`。编 Gru 之前，`--reverse` 会把这份拿掉。
+
+23:01 编出 `libsfplugin_ccodec.so`，1045352 字节，sha256 `81b1b96bf265724a0d2097a01243362fcbed23c678e5ece7a1a601c9d38f5f4a`。bind 到 `/system/lib64/libsfplugin_ccodec.so`，来源 `/data/local/tmp/libsfplugin_ccodec.so`，inode 10083。这份库被 zygote 预加载，只 bind 在 init 的挂载空间里时，应用继承的仍是 erofs 原件（inode 16282917）。重启了 zygote 之后，新的 zygote 映射的是 10083。这不是整机重启，解码服务仍是进程 598，上一节那对 v4l2 库也还在。创建 `c2.v4l2.avc.decoder` 的 configure 和 start 都返回成功。
+
+Just Player 里的 `loadCondition.open()` 改不进已安装的包。换成改过的 apk 再 bind，包管理器在这次 zygote 重启时验签失败，把原安装目录标成 deleted。已经用原来的 apk 重新安装，签名还是 `44d535cc`，应用数据按覆盖安装保留。正在跑的 `com.brouken.player`（进程 2924）映射的是新的 `libsfplugin_ccodec.so`（inode 10083）和重新安装的原 apk。用户看过这版：快进仍然停住。
+
+## 2026-11-02 把 flush 写进 U 盘 super
+
+同一份源码重新编了 super。`system.img` 里的 `libsfplugin_ccodec.so` 是 1045352 字节，时间 23:01:38。`vendor.img` 里的 `libv4l2_codec2_components.so` 是 271136 字节，`libv4l2_codec2_v4l2.so` 是 251464 字节。展开后的 raw 是 `work/phase4/super.flush.raw`，正好 8589934592 字节，sha256 `83b02d95709cc04b47943791aa46c28ac37846b9d9d07ed49522a16b12f1bbeb`。
+
+只写入序列号 `20120501030900000` 的 USB SD/MMC 的 super。读回和源一致。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。内核槽开头仍是 `6db5dfcb4c03938b7972d73de32c245874e3e300fba7032af4563332d187dd35`。盘已卸载。eMMC 没写。还没有这次 Ctrl+U。Just Player 自己的 `loadCondition` 仍在应用里，这张 super 改不到它。
+
+## 2026-11-02 装进 eMMC 之后快进和全屏仍停
+
+用户用这张 super 装进了 eMMC。`ro.boot.boot_devices` 是 `soc/11230000.mmc`。`libsfplugin_ccodec.so` 1045352 字节，`libv4l2_codec2_components.so` 271136 字节，`libv4l2_codec2_v4l2.so` 251464 字节，都是这份镜像里的。
+
+Just Player 快进仍停在 BUFFERING。`ExoPlayer:Loader` 还是停在 `ExtractingLoadable.load` 的 `ConditionVariable.block`。同一条片的 `c2.v4l2.avc.decoder` 在快进里连续 flush，每次归还都被记成 `stale input buffer done after flush`，序号从 63 一直加到 406，之后解码器不再有新日志。画面要等这个解码器被拆掉重建才回来。
+
+PipePipe 全屏的选项是表面变化时释放并重新创建解码器，而不是 `setOutputSurface`。打开之后全屏可以播。这和快进是同一类现象：换表面或 flush 之后，原来的解码器实例不再出画，新建一个就可以。
+
+## 2026-11-03 flush 之后 H.264 一直在等 SPS
+
+用 NDK 写了一个复现程序 `kukui-seek-test`：`AMediaExtractor` 读用户的 mp4，`AImageReader` 当两块输出表面，异步回调送入和取出。进程里要先开 binder 线程池，不然组件的回调进不来，所有阶段都是 0 帧。开了之后，`c2.v4l2.avc.decoder` 顺播 90 帧，第一次 flush 加 seek 之后 0 帧，之后的连续 scrub、换表面也都是 0 帧。每次 flush 只有第一块输入回来，然后没有任何输出。同一程序用 `c2.android.avc.decoder` 每个阶段都出 60 帧。
+
+原因在 `system_cros_codecs.patch` 早先的 seek 修改。V4L2 后端在 flush 时会关掉队列，解码器进入 `Reset`，`backend_reset` 为真，要等下一个 SPS 才重新 `new_sequence`。这一段只看 SPS，切片一律跳过。mp4 和 mkv 的 SPS/PPS 只在 csd 里，configure 时送一次，seek 之后关键帧前面没有 SPS，所以解码器一直跳过切片，不出画。新建解码器会重新送 csd，所以 PipePipe 那个"表面变化时重建解码器"的选项和 Just Player 退到后台再回来都能恢复。
+
+现在 `Reset` 加 `backend_reset` 时，遇到 IDR 切片或 I 切片，就从切片的 PPS 取出解析器保存的 SPS，按原来的路径重新开序列。尺寸变了照旧走格式协商。改动只在 `libcros_codecs_ffi.so`，两份 v4l2 codec2 库不变。
+
+00:17 编出的 `libcros_codecs_ffi.so` 是 698792 字节，sha256 `c7187ca33d361c6a50871259cec7b966057576a134e4d28119b4a87d2fa5063d`。bind 到 `/vendor/lib64/libcros_codecs_ffi.so`，来源 `/data/local/tmp/libcros_codecs_ffi.so`，重启 `android-hardware-media-c2-v4l2-hal`。复现程序在硬解上：顺播 90 帧，seek 之后 60 帧，第一帧 330 s；8 次 scrub 之后 60 帧；换表面 60 帧；flush 加换表面 60 帧。只换表面、不 flush 的四次来回，在新旧库上都各出 60 帧，所以全屏停住要和一次 flush 一起出现才会发生。
+
+Just Player 在这份库上横划快进到 544500 ms，就是之前停住的位置，之后进度从 544.5 s 走到 550.7 s，状态是 PLAYING。来回划了四次，每次之后进度都在走，日志没有 `Decode error` 或 `Decoder stuck`。PipePipe 关掉那个选项之后的全屏还没看。
+
+这个 bind 重启就没了。同一份源码重新编了 super，raw 是 `work/phase4/super.sps.raw`，正好 8589934592 字节，sha256 `409c69b6ed07f7b37d0cc9df17cf06a890e8c7707db3c15bbfec03c438e5dc64`。里面 vendor 分区的 `libcros_codecs_ffi.so` 和上面那份一致，两份 v4l2 codec2 库和现在 eMMC 上的一致。这张 super 还没写到 U 盘，也没写 eMMC。

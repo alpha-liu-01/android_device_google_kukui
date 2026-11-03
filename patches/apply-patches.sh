@@ -220,6 +220,9 @@ if [[ $REVERSE -eq 1 ]]; then
     reverse_or_skip "${LINEAGE_ROOT}/system/core" \
         "${REPO_ROOT}/patches/system_core_healthd_supply.patch" \
         "healthd supply fallbacks"
+    reverse_or_skip "${LINEAGE_ROOT}/frameworks/av" \
+        "${REPO_ROOT}/patches/frameworks_av_ccodec_flush_input.patch" \
+        "codec2 flush returns input slots"
     exit 0
 fi
 
@@ -238,6 +241,9 @@ apply_or_skip "${LINEAGE_ROOT}/system/core" \
 apply_or_skip "${LINEAGE_ROOT}/frameworks/av" \
     "${REPO_ROOT}/patches/frameworks_av_codec2_ion_fallback.patch" \
     "codec2 IConfigurable"
+apply_or_skip "${LINEAGE_ROOT}/frameworks/av" \
+    "${REPO_ROOT}/patches/frameworks_av_ccodec_flush_input.patch" \
+    "codec2 flush returns input slots"
 apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
     "${REPO_ROOT}/patches/frameworks_base_brightness_and_media.patch" \
     "brightness property and media null checks"

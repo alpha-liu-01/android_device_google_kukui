@@ -32,7 +32,7 @@ index ecb5fed..9d96ba1 100644
          "libstagefright_foundation",
          "libui",
 diff --git a/components/DecodeComponent.cpp b/components/DecodeComponent.cpp
-index 00880d7..6465f9f 100644
+index 00880d7..7eaa97f 100644
 --- a/components/DecodeComponent.cpp
 +++ b/components/DecodeComponent.cpp
 @@ -485,8 +485,9 @@ void DecodeComponent::onDecodeDone(int32_t bitstreamId, VideoDecoder::DecodeStat
@@ -80,6 +80,136 @@ index 00880d7..6465f9f 100644
      C2ConstGraphicBlock constBlock = std::move(frame)->getGraphicBlock();
      std::shared_ptr<C2Buffer> buffer = C2Buffer::CreateGraphicBuffer(std::move(constBlock));
      if (mPendingColorAspectsChange &&
+@@ -612,7 +631,7 @@ bool DecodeComponent::reportWorkIfFinished(int32_t bitstreamId) {
+     std::unique_ptr<C2Work> work = std::move(it->second);
+     mWorksAtDecoder.erase(it);
+ 
+-    work->result = C2_OK;
++    work->result = mFlushSink ? C2_NOT_FOUND : C2_OK;
+     work->workletsProcessed = static_cast<uint32_t>(work->worklets.size());
+     // A work with neither flags nor output buffer would be treated as no-corresponding
+     // output by C2 framework, and regain pipeline capacity immediately.
+@@ -671,6 +690,14 @@ bool DecodeComponent::reportWork(std::unique_ptr<C2Work> work) {
+         const std::string atraceLabel = ::base::StringPrintf("#%u C2Work", mDebugStreamId);
+         ATRACE_ASYNC_END(atraceLabel.c_str(), work->input.ordinal.frameIndex.peekull());
+     }
++    // A flush has to hand the works back through flush_sm's out-list. Delivering
++    // them on the listener races the client's flush index: the input buffer is
++    // then dropped as stale and that slot never returns to the player.
++    if (mFlushSink) {
++        if (!work->input.buffers.empty()) work->input.buffers.front().reset();
++        mFlushSink->emplace_back(std::move(work));
++        return true;
++    }
+     std::list<std::unique_ptr<C2Work>> finishedWorks;
+     finishedWorks.emplace_back(std::move(work));
+     mListener->onWorkDone_nb(weak_from_this(), std::move(finishedWorks));
+@@ -678,7 +705,7 @@ bool DecodeComponent::reportWork(std::unique_ptr<C2Work> work) {
+ }
+ 
+ c2_status_t DecodeComponent::flush_sm(flush_mode_t mode,
+-                                      std::list<std::unique_ptr<C2Work>>* const /* flushedWork */) {
++                                      std::list<std::unique_ptr<C2Work>>* const flushedWork) {
+     ATRACE_CALL();
+     ALOGV("%s()", __func__);
+ 
+@@ -691,21 +718,36 @@ c2_status_t DecodeComponent::flush_sm(flush_mode_t mode,
+         return C2_OMITTED;  // Tunneling is not supported by now
+     }
+ 
+-    mDecoderTaskRunner->PostTask(FROM_HERE,
+-                                 ::base::BindOnce(&DecodeComponent::flushTask, mWeakThis));
++    // flush_sm may block. Return only after the decoder thread has dropped every
++    // input buffer, so the client's following start() can queue again.
++    std::list<std::unique_ptr<C2Work>> local;
++    std::list<std::unique_ptr<C2Work>>* sink = flushedWork ? flushedWork : &local;
++    if (mDecoderTaskRunner->RunsTasksInCurrentSequence()) {
++        flushTask(sink, nullptr);
++        return C2_OK;
++    }
++    ::base::WaitableEvent done;
++    mDecoderTaskRunner->PostTask(
++            FROM_HERE, ::base::BindOnce(&DecodeComponent::flushTask, mWeakThis, sink,
++                                        ::base::Unretained(&done)));
++    done.Wait();
+     return C2_OK;
+ }
+ 
+-void DecodeComponent::flushTask() {
++void DecodeComponent::flushTask(std::list<std::unique_ptr<C2Work>>* flushedWork,
++                                ::base::WaitableEvent* done) {
+     ATRACE_CALL();
+     ALOGV("%s()", __func__);
+     ALOG_ASSERT(mDecoderTaskRunner->RunsTasksInCurrentSequence());
+ 
++    mFlushSink = flushedWork;
+     mDecoder->flush();
+     reportAbandonedWorks();
++    mFlushSink = nullptr;
+ 
+     // Pending EOS work will be abandoned here due to component flush if any.
+     mIsDraining = false;
++    if (done) done->Signal();
+ }
+ 
+ void DecodeComponent::reportAbandonedWorks() {
+@@ -735,13 +777,16 @@ void DecodeComponent::reportAbandonedWorks() {
+             ATRACE_ASYNC_END(atraceLabel.c_str(), work->input.ordinal.frameIndex.peekull());
+         }
+     }
+-    if (!abandonedWorks.empty()) {
+-        if (!mListener) {
+-            ALOGE("mListener is nullptr, setListener_vb() not called?");
+-            return;
+-        }
+-        mListener->onWorkDone_nb(weak_from_this(), std::move(abandonedWorks));
++    if (abandonedWorks.empty()) return;
++    if (mFlushSink) {
++        mFlushSink->splice(mFlushSink->end(), abandonedWorks);
++        return;
++    }
++    if (!mListener) {
++        ALOGE("mListener is nullptr, setListener_vb() not called?");
++        return;
+     }
++    mListener->onWorkDone_nb(weak_from_this(), std::move(abandonedWorks));
+ }
+ 
+ c2_status_t DecodeComponent::drain_nb(drain_mode_t mode) {
+diff --git a/components/include/v4l2_codec2/components/DecodeComponent.h b/components/include/v4l2_codec2/components/DecodeComponent.h
+index 27905c7..78a93cf 100644
+--- a/components/include/v4l2_codec2/components/DecodeComponent.h
++++ b/components/include/v4l2_codec2/components/DecodeComponent.h
+@@ -6,6 +6,7 @@
+ #define ANDROID_V4L2_CODEC2_COMPONENTS_DECODE_COMPONENT_H
+ 
+ #include <atomic>
++#include <list>
+ #include <memory>
+ 
+ #include <C2Component.h>
+@@ -58,7 +59,10 @@ protected:
+     void stopTask();
+     void releaseTask();
+     void queueTask(std::unique_ptr<C2Work> work);
+-    void flushTask();
++    // |flushedWork| collects every work abandoned by this flush. The caller
++    // blocks until that list is complete so the client can take its input
++    // buffers back before it treats later releases as stale.
++    void flushTask(std::list<std::unique_ptr<C2Work>>* flushedWork, ::base::WaitableEvent* done);
+     void drainTask();
+     void setListenerTask(const std::shared_ptr<Listener>& listener, ::base::WaitableEvent* done);
+ 
+@@ -120,6 +124,9 @@ protected:
+     // the drain request, and unset either after reportEOSWork() (EOS is outputted), or
+     // reportAbandonedWorks() (drain is cancelled and works are abandoned).
+     bool mIsDraining = false;
++    // Non-null only while flushTask() is on the decoder thread. Finished works are
++    // appended here instead of delivered through the listener.
++    std::list<std::unique_ptr<C2Work>>* mFlushSink = nullptr;
+ 
+     // The mutex lock to synchronize start/stop/reset/release calls.
+     std::mutex mStartStopLock;
 diff --git a/components/DecodeInterface.cpp b/components/DecodeInterface.cpp
 index 558c0ea..31be487 100644
 --- a/components/DecodeInterface.cpp
