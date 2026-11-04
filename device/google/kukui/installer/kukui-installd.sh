@@ -138,6 +138,9 @@ read_tune() {
 plan_dual() {
     local used_blocks per_mib used_mib need_mib min_gib disk overhead room max_gib gib
     local free_after data_sectors
+    # Refuse before any size math. A disk that is not this postmarketOS
+    # layout must not be shrunk.
+    require_linux_layout
     read_tune
     per_mib=$((1048576 / BLOCK_SIZE))
     [ "$per_mib" -gt 0 ] || fail bad_block_size
@@ -313,10 +316,39 @@ set_kernel_attr_off() {
     done
 }
 
-check_payload() {
+require_linux_layout() {
+    local fstype
+    [ "$(part_name mmcblk0p1)" = pmOS_kernel ] || fail not_pmos_layout
+    [ "$(part_name mmcblk0p2)" = pmOS_boot ] || fail not_pmos_layout
+    [ "$(part_name mmcblk0p3)" = pmOS_root ] || fail not_pmos_layout
+    [ "$(cat /sys/class/block/mmcblk0p1/start)" = 8192 ] || fail not_pmos_layout
+    [ "$(cat /sys/class/block/mmcblk0p2/start)" = 73728 ] || fail not_pmos_layout
+    [ "$(cat /sys/class/block/mmcblk0p3/start)" = 1122304 ] || fail not_pmos_layout
+    fstype=$(blkid -s TYPE -o value /dev/block/mmcblk0p2 2>/dev/null || true)
+    [ "$fstype" = ext4 ] || fail linux_boot_not_ext4 "fstype=${fstype:-unread}"
+}
+
+check_android_kpart() {
+    local bytes
     [ -f "$PAYLOAD/kukui-install/android.kpart" ] || fail missing_android_kpart
-    [ -f "$PAYLOAD/kukui-install/android/Image" ] || fail missing_android_image
-    [ -f "$PAYLOAD/kukui-install/android/cmdline" ] || fail missing_android_cmdline
+    grep -a -q 'androidboot.boot_devices=soc/11230000.mmc' \
+        "$PAYLOAD/kukui-install/android.kpart" || \
+        fail android_kpart_not_emmc
+    if grep -a -q '11201000.usb' "$PAYLOAD/kukui-install/android.kpart"; then
+        fail android_kpart_not_emmc
+    fi
+    bytes=$(stat -c %s "$PAYLOAD/kukui-install/android.kpart")
+    # The eMMC kernel slot is 32 MiB. 33554432 fits in signed 32-bit.
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le 33554432 ] || fail android_kernel_too_small
+}
+
+check_menu_kpart() {
+    local bytes
+    [ -f "$PAYLOAD/kukui-install/menu.kpart" ] || fail missing_menu
+    grep -a -q 'console=ttynull' "$PAYLOAD/kukui-install/menu.kpart" || \
+        fail menu_cmdline_mismatch
+    bytes=$(stat -c %s "$PAYLOAD/kukui-install/menu.kpart")
+    [ "$bytes" -gt 0 ] && [ "$bytes" -le 33554432 ] || fail menu_kernel_too_small
 }
 
 hash_file() {
@@ -337,7 +369,7 @@ hash_super() {
 
 install_android_only() {
     local src_hash got
-    check_payload
+    check_android_kpart
     plan_android
     refuse_mounted_emmc
     write_status "state=running" "percent=5" "code=backing_up_kernel"
@@ -380,19 +412,12 @@ install_android_only() {
 }
 
 install_dual() {
-    local end src_hash got expect live fit_bytes ec current args n
+    local end src_hash got ec current args n
     local menu_start menu_end android_start android_end menu_files_start menu_files_end
     local super_start super_end meta_start meta_end misc_start misc_end data_start
-    check_payload
-    [ -f "$PAYLOAD/kukui-install/menu.kpart" ] || fail missing_menu
-    [ -f "$PAYLOAD/kukui-install/linux/Image" ] || fail missing_linux_image
-    [ -f "$PAYLOAD/kukui-install/linux.kpart.sha256" ] || fail missing_linux_hash
-    [ -f "$PAYLOAD/kukui-install/linux/kernel.bytes" ] || fail missing_linux_bytes
+    check_android_kpart
+    check_menu_kpart
     plan_dual
-    expect=$(tr -d ' \n' < "$PAYLOAD/kukui-install/linux.kpart.sha256")
-    fit_bytes=$(tr -d ' \n' < "$PAYLOAD/kukui-install/linux/kernel.bytes")
-    live=$(hash_part /dev/block/mmcblk0p1 "$fit_bytes")
-    [ "$live" = "$expect" ] || fail linux_kernel_mismatch
     refuse_mounted_emmc
     write_status "state=running" "percent=5" "code=backing_up_kernel"
     backup_kernel
@@ -489,27 +514,10 @@ install_dual() {
     src_hash=$(hash_file "$PAYLOAD/kukui-install/android.kpart")
     got=$(hash_part /dev/block/mmcblk0p5 "$(stat -c %s "$PAYLOAD/kukui-install/android.kpart")")
     [ "$src_hash" = "$got" ] || fail android_kernel_hash_mismatch
+    # The menu mounts this partition and does not read anything inside it.
+    # Leave pmOS_boot alone so the existing Linux initramfs stays there.
     write_status "state=running" "percent=65" "code=writing_menu_files"
     mke2fs -t ext4 -F -L bootmenu /dev/block/mmcblk0p6 || fail format_bootmenu_failed
-    mkdir -p /mnt/kukui-bootmenu
-    mount -t ext4 /dev/block/mmcblk0p6 /mnt/kukui-bootmenu || fail mount_bootmenu_failed
-    mkdir -p /mnt/kukui-bootmenu/android /mnt/kukui-bootmenu/linux
-    cp "$PAYLOAD/kukui-install/android/Image" /mnt/kukui-bootmenu/android/Image
-    cp "$PAYLOAD/kukui-install/android/cmdline" /mnt/kukui-bootmenu/android/cmdline
-    cp "$PAYLOAD/kukui-install/linux/Image" /mnt/kukui-bootmenu/linux/Image
-    cp "$PAYLOAD/kukui-install/linux/cmdline" /mnt/kukui-bootmenu/linux/cmdline
-    sync
-    umount /mnt/kukui-bootmenu
-    # The menu partition is full once both Images are on it. Android's
-    # initrd goes on the Linux boot partition, next to the initramfs
-    # that is already there.
-    [ -f "$PAYLOAD/kukui-install/android/initrd" ] || fail missing_initrd
-    expect_part mmcblk0p2 pmOS_boot
-    mkdir -p /mnt/kukui-pmosboot
-    mount -t ext4 -o rw /dev/block/mmcblk0p2 /mnt/kukui-pmosboot || fail mount_linux_boot_failed
-    cp "$PAYLOAD/kukui-install/android/initrd" /mnt/kukui-pmosboot/kukui-android.initrd
-    sync
-    umount /mnt/kukui-pmosboot
     write_status "state=running" "percent=75" "code=copying_super"
     dd if="$(super_source /dev/block/mmcblk0p7)" of=/dev/block/mmcblk0p7 bs=1048576 conv=fsync || fail copy_super_failed
     got=$(hash_super /dev/block/mmcblk0p7)

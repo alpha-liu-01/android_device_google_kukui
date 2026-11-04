@@ -179,3 +179,15 @@ recovery 也能做，形态是菜单里的第三项，或者一个平时 priorit
 `work/release/kukui-usb-20261103.zip`，8625370686 字节，sha256 `83763c0cef8ef430f4ec92bca00137230b206df29ad7997fffe625c828729bcc`。`flash-usb.sh` 在包里是 755。镜像不压缩。
 
 `images/super.img` 是 `work/phase4/super.bigcore.raw`，8589934592 字节，sha256 `c6befdef9a2e0a45cd0b253775ba7ab68c5322f6132a47643d5969aa2bf0eb9d`。这就是写进序列号 `20120501030900000` 那张 U 盘、再由「更新系统」装进 eMMC、用户确认解码正常的那一份。`kernel.kpart` 开头 1 MiB 是 `6db5dfcb4c03938b7972d73de32c245874e3e300fba7032af4563332d187dd35`，和这张 U 盘的内核槽一致。`android.kpart` 12505088 字节，`menu.kpart` 10383360 字节，命令行仍分别是 `soc/11230000.mmc` 和 `console=ttynull`。内核这次没有重新编。
+
+## 2026-11-03 ReSukiSU 和去掉调试之后的磁盘镜像包
+
+当天已经发出的 `lineage-23.2-kukui-20261103.zip` 没有覆盖。新包是 `work/release/lineage-23.2-kukui-20261103b.zip`，1110373465 字节，sha256 `d07a61517a02efc316108c3ad0aefc2404a11c77bd3db4e23983ab419a0542f8`。里面只有 `lineage-23.2-kukui-20261103b.img`，11756634112 字节，deflate 后 1110373143 字节。分区布局和内核槽属性与上一份相同：`pmOS_kernel` 32 MiB、`pmOS_boot` 512 MiB、`super` 正好 8 GiB、`metadata` 16 MiB、`misc` 4 MiB、`userdata` 2.4 GiB，内核槽属性 `0x01ff000000000000`。`userdata` 不会在开机时扩到整张盘。
+
+`super` 是 `work/resukisu/super.raw`，8589934592 字节，sha256 `9af6829df5b902e9dd41df8c93813d2a12423535b8c80730492ba4d68593c4a1`。`android.kpart` 12500992 字节，sha256 `b57b401b133fd6015081336b037cf4a19a60c76bddc556eebc44e2f72272fbca`，命令行是 `loglevel=4`、`androidboot.boot_devices=soc/11230000.mmc`，没有 `printk.devkmsg`。`menu.kpart` 仍是 `bc28358a4f965cc4f1cf0da1ff84d42814cacabdd2dff4d8509b5822945b84a6`，`console=ttynull`。U 盘启动用的 `kernel.kpart` 是同一份内核 lzma（crc32 `2aa7b1b9`）和同一份 dtb，ramdisk 里的 `/init` 是 USB 版 `kukui-keep`，命令行是 `loglevel=4`、`androidboot.boot_devices=soc/11201000.usb/11200000.usb`，sha256 `6f91284270a41eae5e21707140d5545756420222edcdef9d21c03542e84f687a`。SELinux 仍是 permissive。这张镜像没有写到盘上，也没有用 Rufus 试过。正在使用的安装 U 盘内核槽仍是旧的 `2c52f071bdd707b2078e1e30aeb344b645a3a64f51e7e9d233e53f50f64a5512`，整盘写入这张 zip 之后 Ctrl+U 才会用这份新内核。
+
+## 2026-11-04 全新安装不再要旧内核文件
+
+`work/release/lineage-23.2-kukui-20261104.zip`，1110366362 字节，sha256 `f4c20440484d27ed05a8ca577f44c7a13ba32918e11eeaf01b9083ec0c985a7e`。里面只有 `lineage-23.2-kukui-20261104.img`，11756634112 字节，deflate 后 1110366042 字节。分区布局和内核槽属性与上一份相同。前两份 zip 没有覆盖。
+
+`super` 展开后 8589934592 字节，sha256 `20b27983225fc857edbfd5c63cd777d14307c72da654f6661c598c5eea13f10c`。两份 kpart 和 U 盘启动内核与 `20261103b` 相同。安装器在这份 super 里。「只装 Android」只核对 `android.kpart` 的 eMMC 命令行。「Android 和 Linux」再核对 `menu.kpart` 的 `console=ttynull`，并要求 eMMC 上已有 `pmOS_kernel`、`pmOS_boot`、`pmOS_root`，起点分别是 8192、73728、1122304，`pmOS_boot` 是 ext4。它不再要求 `android/Image`、`cmdline`、`initrd` 或 Linux 内核副本。`bootmenu` 只格式化成空的 ext4，`pmOS_boot` 不改。这张镜像没有写到盘上，也没有用 Rufus 试过，平板上也没有跑过这两条安装。

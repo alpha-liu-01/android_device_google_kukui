@@ -115,7 +115,9 @@
     <string name="code_shrinking_linux_root">正在缩小 Linux 根分区。这一步可能要几分钟，百分比会停在这里。</string>
     <string name="code_adjusting_gpt">正在调整分区表。</string>
     <string name="code_writing_kernel_slots">正在写入两个内核槽。</string>
-    <string name="code_writing_menu_files">写入启动菜单文件。</string>
+    <string name="code_writing_menu_files">格式化启动菜单分区。</string>
+    <string name="code_not_pmos_layout">eMMC 上不是预期的 postmarketOS 分区。Android 和 Linux 需要 pmOS_kernel、pmOS_boot 和 pmOS_root。</string>
+    <string name="code_linux_boot_not_ext4">Linux 启动分区不是 ext4。菜单必须能挂上它。</string>
     <string name="code_switching_boot">切换默认启动项。</string>
     <string name="code_writing_android_and_menu">写入 Android 内核和菜单。</string>
     <string name="code_confirm_android">eMMC 上的 postmarketOS 会被删掉。Android 数据分区约 %1$s GiB。</string>
