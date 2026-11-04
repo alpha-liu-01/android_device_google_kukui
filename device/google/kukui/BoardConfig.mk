@@ -43,7 +43,7 @@ BUILD_BROKEN_ELF_PREBUILT_PRODUCT_COPY_FILES := true
 # xHCI name. init only creates /dev/block/by-name for an exact match.
 # selinux must come before bpf. bpf's procattr hook returns EINVAL and
 # is the first match, so setexeccon never reaches SELinux.
-BOARD_KERNEL_CMDLINE := lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=7 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11201000.usb/11200000.usb printk.devkmsg=on
+BOARD_KERNEL_CMDLINE := lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=4 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11201000.usb/11200000.usb
 BOARD_BOOTCONFIG :=
 
 DEVICE_MANIFEST_FILE := $(DEVICE_PATH)/manifest.xml

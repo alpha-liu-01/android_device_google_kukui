@@ -1,14 +1,8 @@
 /*
- * PID 1 until Android init. Load usb-storage, wait for the USB disk,
- * copy kmsg onto pmOS_boot, then exec Android's init.
+ * PID 1 until Android init. Load usb-storage, wait until the boot and
+ * super partitions are visible, then exec Android's init.
  *
- * One child reads kmsg. Another writes the file and fsyncs. The reader
- * must not fsync: the same USB stick is busy during format, and a stalled
- * fsync used to stop consuming the ring. There is no watchdog feeder.
- *
- * pmOS_boot has a journal. Force power-off used to corrupt the ext2
- * bitmap, the writer stalled, and the printk ring dropped the abort.
- * The previous boot's log is renamed to kukui-phase3.log.prev.
+ * There is no watchdog feeder. kmsg is not copied onto pmOS_boot.
  *
  * A child feeds /kukui-wifi-reprobe.sh to sh after Android has mounted
  * vendor. The first ath10k probe can time out while userdata is being
@@ -17,7 +11,6 @@
  */
 #include <errno.h>
 #include <fcntl.h>
-#include <poll.h>
 #include <sched.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +31,6 @@ struct linux_dirent64 {
 
 #define RELEASE "6.18.28-mt81-kukui2"
 #define USB_STORAGE "/lib/modules/" RELEASE "/usb-storage.ko"
-#define LOG_PATH "/bootlog/kukui-phase3.log"
-#define LOG_PREV "/bootlog/kukui-phase3.log.prev"
 /* sysfs is mounted here, not on /sys. /sys stays empty until Android init. */
 #define SYSFS "/kukui-sys"
 #define WIFI_SCRIPT "/kukui-wifi-reprobe.sh"
@@ -165,64 +156,6 @@ static int load_usb_storage(void) {
     return 0;
 }
 #endif
-
-/* Keep the previous boot. A new boot used to truncate the only copy
- * before any new line was durable. */
-static void rotate_log(void) {
-    unlink(LOG_PREV);
-    if (rename(LOG_PATH, LOG_PREV) != 0 && errno != ENOENT)
-        kmsg("kukui-android phase3 log rotate failed\n");
-}
-
-static void fsync_dir(const char *path) {
-    int fd = open(path, O_RDONLY | O_DIRECTORY | O_CLOEXEC);
-    if (fd >= 0) {
-        fsync(fd);
-        close(fd);
-    }
-}
-
-/* Writer only. A stalled fsync must not stop the kmsg reader. */
-static void write_log(int pipefd, int logfd) {
-    char buf[4096];
-    for (;;) {
-        ssize_t n = read(pipefd, buf, sizeof(buf));
-        if (n > 0) {
-            write_all(logfd, buf, (size_t)n);
-            fsync(logfd);
-        } else if (n == 0) {
-            sleep(1);
-        } else if (errno != EINTR) {
-            sleep(1);
-        }
-    }
-}
-
-/* Reader only. Drain /proc/kmsg into the pipe and never touch the disk. */
-static void read_kmsg(int kfd, int pipefd) {
-    char buf[4096];
-    struct pollfd pfd;
-
-    pfd.fd = kfd;
-    pfd.events = POLLIN;
-    for (;;) {
-        int pr = poll(&pfd, 1, 1000);
-        if (pr < 0) {
-            if (errno != EINTR)
-                sleep(1);
-            continue;
-        }
-        if (pr == 0)
-            continue;
-        for (;;) {
-            ssize_t n = read(kfd, buf, sizeof(buf));
-            if (n > 0)
-                write_all(pipefd, buf, (size_t)n);
-            else
-                break;
-        }
-    }
-}
 
 static int read_alloc(const char *path, char **out, size_t *out_len) {
     int fd;
@@ -461,14 +394,12 @@ static void start_wifi_reprobe(void) {
 
 int main(void) {
     char boot[64], super[64];
-    int waited, kfd, logfd, pipes[2], reader, writer;
-    const char *header = "kukui-android phase3\n";
+    int waited;
 
     mkdir("/dev", 0755);
     mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
     mkdir("/kukui-proc", 0755);
     mkdir("/kukui-sys", 0755);
-    mkdir("/bootlog", 0755);
     mount("proc", "/kukui-proc", "proc", 0, NULL);
     mount("sysfs", "/kukui-sys", "sysfs", 0, NULL);
     kmsg("kukui-android phase3\n");
@@ -497,60 +428,8 @@ int main(void) {
             sleep(3600);
     }
 
-    if (mount(boot, "/bootlog", "ext4", 0, NULL) != 0)
-        kmsg("kukui-android phase3 bootlog mount failed\n");
-    rotate_log();
-    fsync_dir("/bootlog");
-    logfd = open(LOG_PATH, O_WRONLY | O_CREAT | O_TRUNC | O_CLOEXEC, 0644);
-    if (logfd >= 0) {
-        write_all(logfd, header, strlen(header));
-        fsync(logfd);
-        fsync_dir("/bootlog");
-    }
-
-    kfd = open("/kukui-proc/kmsg", O_RDONLY | O_NONBLOCK | O_CLOEXEC);
-    if (kfd >= 0 && logfd >= 0 && pipe(pipes) == 0) {
-        /* Default pipe-max-size is 1 MiB. A journal commit on a slow
-         * stick can take longer than that once logcat is also in kmsg. */
-        {
-            int pmax = open("/kukui-proc/sys/fs/pipe-max-size", O_WRONLY | O_CLOEXEC);
-            if (pmax >= 0) {
-                write_all(pmax, "4194304", 7);
-                close(pmax);
-            }
-        }
-        if (fcntl(pipes[0], F_SETPIPE_SZ, 4 << 20) < 0 ||
-            fcntl(pipes[1], F_SETPIPE_SZ, 4 << 20) < 0)
-            kmsg("kukui-android phase3 pipe size unchanged\n");
-        reader = fork();
-        if (reader == 0) {
-            close(pipes[0]);
-            close(logfd);
-            read_kmsg(kfd, pipes[1]);
-            for (;;)
-                sleep(3600);
-        }
-        writer = fork();
-        if (writer == 0) {
-            close(pipes[1]);
-            close(kfd);
-            write_log(pipes[0], logfd);
-            for (;;)
-                sleep(3600);
-        }
-        close(pipes[0]);
-        close(pipes[1]);
-        if (reader < 0 || writer < 0)
-            kmsg("kukui-android phase3 log fork failed\n");
-    }
-    if (kfd >= 0)
-        close(kfd);
-    if (logfd >= 0)
-        close(logfd);
-
     start_wifi_reprobe();
 
-    umount2("/bootlog", MNT_DETACH);
     umount2("/kukui-proc", MNT_DETACH);
     umount2("/kukui-sys", MNT_DETACH);
     umount2("/dev", MNT_DETACH);
