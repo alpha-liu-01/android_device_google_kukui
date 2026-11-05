@@ -85,3 +85,7 @@ ReSukiSU 闪退不是预期。崩溃是 `UnsatisfiedLinkError: library "libkerne
 2026-11-04 21:07 用户指出官方 postmarketOS 的 boot 是 ext2。这台 eMMC 上 `mmcblk0p2` 的 `PARTNAME` 是 `pmOS_boot`，起点 73728，`blkid` 是 ext2；`pmOS_kernel` 起点 8192，`pmOS_root` 起点 1122304，根是 40 GiB 的 ext4。上一份安装器在这里报 `linux_boot_not_ext4`。菜单挂载时指定的类型是 ext4，而且是只读。内核配置是 `CONFIG_EXT4_FS=y`、`CONFIG_EXT4_USE_FOR_EXT2=y`，只读挂载不要求 journal，所以 ext2 能挂上。安装器改为接受 ext2、ext3、ext4。工作站上假分区测试：ext2 通过，vfat 拒绝。
 
 新 super 8589934592 字节，sha256 `360a0f6b092e7d0070d9c52360448770eed1d88dcc47a0b195dd4825dabb84c2`。super 里的 vendor 分区和编出来的 `vendor.img` 逐字节相同，里面有 “Official postmarketOS formats … as ext2”。zip 是 `work/release/lineage-23.2-kukui-20261104b.zip`，1110373933 字节，sha256 `3daed0fad2897913310b5723227764a81619923831b87cd168bc1d7130893437`。没有写盘。
+
+2026-11-04 21:25 用户说解锁图案和密码无法设置，只有「无」和「滑动」。`ChooseLockGenericController` 在 `hasSecureLockScreen()` 为假时隐藏图案、PIN 和密码。`LockSettingsService` 用系统功能 `android.software.secure_lock_screen` 决定这个值。当前 product 的 system 和 vendor 权限目录里没有这份声明。软件 Gatekeeper 已经在镜像里。`device.mk` 增加 `android.software.secure_lock_screen.xml`。
+
+新 super 8589934592 字节，sha256 `a4d0f147010a4406ec36e88dfc74e2b8240269897eb0b4183c4f32db432ae0ba`。vendor 分区和 `vendor.img` 一致，里面能搜到 `android.software.secure_lock_screen`。zip 是 `work/release/lineage-23.2-kukui-20261104c.zip`，1110377750 字节，sha256 `7667a5978f6cbd6bcbdd85eb0e17e7443d1322d66e6490d01d10a6366420316f`。没有写盘，也没有在平板上设过密码。

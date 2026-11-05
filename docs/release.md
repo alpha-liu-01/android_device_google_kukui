@@ -197,3 +197,9 @@ recovery 也能做，形态是菜单里的第三项，或者一个平时 priorit
 `20261104` 那份安装器把 `pmOS_boot` 限制成 ext4。官方 postmarketOS 的这块分区是 ext2。这台机器上 `mmcblk0p2` 是 ext2，起点 73728，名字是 `pmOS_boot`；`pmOS_kernel` 和 `pmOS_root` 的起点分别是 8192 和 1122304。菜单用 ext4 类型只读挂载它。这份内核的 ext4 驱动可以只读挂 ext2，所以安装器改为接受 ext2、ext3 和 ext4。
 
 `work/release/lineage-23.2-kukui-20261104b.zip`，1110373933 字节，sha256 `3daed0fad2897913310b5723227764a81619923831b87cd168bc1d7130893437`。`super` 8589934592 字节，sha256 `360a0f6b092e7d0070d9c52360448770eed1d88dcc47a0b195dd4825dabb84c2`。内核三份和上一份相同。`20261104` 没有覆盖。没有写盘。
+
+## 2026-11-04 锁屏可以设置图案和密码
+
+设置里只有「无」和「滑动」，是因为 `LockSettingsService.hasSecureLockScreen()` 看 `android.software.secure_lock_screen`。这份镜像的 system 和 vendor 权限里都没有这个功能，所以图案、PIN 和密码被藏起来，`setLockCredential` 也会拒绝。软件版 Gatekeeper 已经在 `com.android.hardware.gatekeeper.nonsecure` 里。`device.mk` 把 `frameworks/native/data/etc/android.software.secure_lock_screen.xml` 装进 vendor。userdata 仍然没有 fileencryption。
+
+`work/release/lineage-23.2-kukui-20261104c.zip`，1110377750 字节，sha256 `7667a5978f6cbd6bcbdd85eb0e17e7443d1322d66e6490d01d10a6366420316f`。`super` 8589934592 字节，sha256 `a4d0f147010a4406ec36e88dfc74e2b8240269897eb0b4183c4f32db432ae0ba`。super 里的 vendor 和编出来的 `vendor.img` 一致，里面有这个功能声明。内核三份和上一份相同。没有写盘，平板上也没有设过密码。
