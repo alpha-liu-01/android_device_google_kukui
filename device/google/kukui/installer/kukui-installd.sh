@@ -324,8 +324,13 @@ require_linux_layout() {
     [ "$(cat /sys/class/block/mmcblk0p1/start)" = 8192 ] || fail not_pmos_layout
     [ "$(cat /sys/class/block/mmcblk0p2/start)" = 73728 ] || fail not_pmos_layout
     [ "$(cat /sys/class/block/mmcblk0p3/start)" = 1122304 ] || fail not_pmos_layout
+    # Official postmarketOS formats pmOS_boot as ext2. The menu mounts it
+    # read-only with type ext4. This kernel's ext4 driver accepts that.
     fstype=$(blkid -s TYPE -o value /dev/block/mmcblk0p2 2>/dev/null || true)
-    [ "$fstype" = ext4 ] || fail linux_boot_not_ext4 "fstype=${fstype:-unread}"
+    case "$fstype" in
+        ext2|ext3|ext4) ;;
+        *) fail linux_boot_not_ext4 "fstype=${fstype:-unread}" ;;
+    esac
 }
 
 check_android_kpart() {

@@ -191,3 +191,9 @@ recovery 也能做，形态是菜单里的第三项，或者一个平时 priorit
 `work/release/lineage-23.2-kukui-20261104.zip`，1110366362 字节，sha256 `f4c20440484d27ed05a8ca577f44c7a13ba32918e11eeaf01b9083ec0c985a7e`。里面只有 `lineage-23.2-kukui-20261104.img`，11756634112 字节，deflate 后 1110366042 字节。分区布局和内核槽属性与上一份相同。前两份 zip 没有覆盖。
 
 `super` 展开后 8589934592 字节，sha256 `20b27983225fc857edbfd5c63cd777d14307c72da654f6661c598c5eea13f10c`。两份 kpart 和 U 盘启动内核与 `20261103b` 相同。安装器在这份 super 里。「只装 Android」只核对 `android.kpart` 的 eMMC 命令行。「Android 和 Linux」再核对 `menu.kpart` 的 `console=ttynull`，并要求 eMMC 上已有 `pmOS_kernel`、`pmOS_boot`、`pmOS_root`，起点分别是 8192、73728、1122304，`pmOS_boot` 是 ext4。它不再要求 `android/Image`、`cmdline`、`initrd` 或 Linux 内核副本。`bootmenu` 只格式化成空的 ext4，`pmOS_boot` 不改。这张镜像没有写到盘上，也没有用 Rufus 试过，平板上也没有跑过这两条安装。
+
+## 2026-11-04 接受官方 postmarketOS 的 ext2 启动分区
+
+`20261104` 那份安装器把 `pmOS_boot` 限制成 ext4。官方 postmarketOS 的这块分区是 ext2。这台机器上 `mmcblk0p2` 是 ext2，起点 73728，名字是 `pmOS_boot`；`pmOS_kernel` 和 `pmOS_root` 的起点分别是 8192 和 1122304。菜单用 ext4 类型只读挂载它。这份内核的 ext4 驱动可以只读挂 ext2，所以安装器改为接受 ext2、ext3 和 ext4。
+
+`work/release/lineage-23.2-kukui-20261104b.zip`，1110373933 字节，sha256 `3daed0fad2897913310b5723227764a81619923831b87cd168bc1d7130893437`。`super` 8589934592 字节，sha256 `360a0f6b092e7d0070d9c52360448770eed1d88dcc47a0b195dd4825dabb84c2`。内核三份和上一份相同。`20261104` 没有覆盖。没有写盘。

@@ -81,3 +81,7 @@ ReSukiSU 闪退不是预期。崩溃是 `UnsatisfiedLinkError: library "libkerne
 2026-11-04 02:37 安装器改为只认 kpart。只装 Android 核对 `android.kpart` 含 `soc/11230000.mmc` 且不含 `11201000.usb`。Android 和 Linux 再核对 `menu.kpart` 含 `console=ttynull`，并要求 eMMC 的 `pmOS_kernel`、`pmOS_boot`、`pmOS_root` 起点是 8192、73728、1122304，`pmOS_boot` 是 ext4。不再拷贝 Image、cmdline 或 initrd。`bootmenu` 格式化成空的 ext4。工作站上用假的分区名跑过这两项检查：名字不对报 `not_pmos_layout`，启动分区不是 ext4 报 `linux_boot_not_ext4`，没有 `android/Image` 时 kpart 检查通过。没有在平板上安装。
 
 新 super 展开后 8589934592 字节，sha256 `20b27983225fc857edbfd5c63cd777d14307c72da654f6661c598c5eea13f10c`。展开后的 super 里能搜到 `require_linux_layout`。zip 是 `work/release/lineage-23.2-kukui-20261104.zip`，1110366362 字节，sha256 `f4c20440484d27ed05a8ca577f44c7a13ba32918e11eeaf01b9083ec0c985a7e`。内核三份和 `20261103b` 相同。没有写盘。
+
+2026-11-04 21:07 用户指出官方 postmarketOS 的 boot 是 ext2。这台 eMMC 上 `mmcblk0p2` 的 `PARTNAME` 是 `pmOS_boot`，起点 73728，`blkid` 是 ext2；`pmOS_kernel` 起点 8192，`pmOS_root` 起点 1122304，根是 40 GiB 的 ext4。上一份安装器在这里报 `linux_boot_not_ext4`。菜单挂载时指定的类型是 ext4，而且是只读。内核配置是 `CONFIG_EXT4_FS=y`、`CONFIG_EXT4_USE_FOR_EXT2=y`，只读挂载不要求 journal，所以 ext2 能挂上。安装器改为接受 ext2、ext3、ext4。工作站上假分区测试：ext2 通过，vfat 拒绝。
+
+新 super 8589934592 字节，sha256 `360a0f6b092e7d0070d9c52360448770eed1d88dcc47a0b195dd4825dabb84c2`。super 里的 vendor 分区和编出来的 `vendor.img` 逐字节相同，里面有 “Official postmarketOS formats … as ext2”。zip 是 `work/release/lineage-23.2-kukui-20261104b.zip`，1110373933 字节，sha256 `3daed0fad2897913310b5723227764a81619923831b87cd168bc1d7130893437`。没有写盘。
