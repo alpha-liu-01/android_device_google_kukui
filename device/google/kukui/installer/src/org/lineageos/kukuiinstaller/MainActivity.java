@@ -32,11 +32,15 @@ public class MainActivity extends AppCompatActivity {
     private TextInputLayout rootSizeLayout;
     private TextInputEditText rootSize;
     private MaterialButton androidOnly;
+    private MaterialButton checkAndroid;
     private MaterialButton dual;
+    private MaterialButton checkDual;
     private MaterialButton updateSystem;
+    private MaterialButton checkUpdate;
     private MaterialButton calculate;
     private MaterialButton install;
     private MaterialButton cancel;
+    private TextView logView;
     private String bootName = "";
     private String bootPath = "";
     private String targetPath = "";
@@ -45,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
     private String pendingMode = "";
     private String probedGib = "";
     private String seenStatus = "";
+    private String seenLog = "";
     private boolean installStarted;
 
     @Override
@@ -68,14 +73,21 @@ public class MainActivity extends AppCompatActivity {
         rootSizeLayout = findViewById(R.id.root_size_layout);
         rootSize = findViewById(R.id.root_size);
         androidOnly = findViewById(R.id.android_only);
+        checkAndroid = findViewById(R.id.check_android);
         dual = findViewById(R.id.dual);
+        checkDual = findViewById(R.id.check_dual);
         updateSystem = findViewById(R.id.update_system);
+        checkUpdate = findViewById(R.id.check_update);
         calculate = findViewById(R.id.calculate);
         install = findViewById(R.id.install);
         cancel = findViewById(R.id.cancel);
+        logView = findViewById(R.id.log);
         androidOnly.setOnClickListener(v -> ask("android"));
+        checkAndroid.setOnClickListener(v -> dry("android"));
         dual.setOnClickListener(v -> ask("dual"));
+        checkDual.setOnClickListener(v -> dry("dual"));
         updateSystem.setOnClickListener(v -> ask("update"));
+        checkUpdate.setOnClickListener(v -> dry("update"));
         calculate.setOnClickListener(v -> probeDual());
         install.setOnClickListener(v -> startInstall());
         cancel.setOnClickListener(v -> {
@@ -99,16 +111,22 @@ public class MainActivity extends AppCompatActivity {
         install.setVisibility(View.GONE);
         cancel.setVisibility(View.GONE);
         androidOnly.setVisibility(View.VISIBLE);
+        checkAndroid.setVisibility(View.VISIBLE);
         dual.setVisibility(View.VISIBLE);
+        checkDual.setVisibility(View.VISIBLE);
         updateSystem.setVisibility(View.VISIBLE);
+        checkUpdate.setVisibility(View.VISIBLE);
         install.setText(R.string.install);
         body.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
     }
 
     private void showWorking(String message) {
         androidOnly.setVisibility(View.GONE);
+        checkAndroid.setVisibility(View.GONE);
         dual.setVisibility(View.GONE);
+        checkDual.setVisibility(View.GONE);
         updateSystem.setVisibility(View.GONE);
+        checkUpdate.setVisibility(View.GONE);
         detail.setVisibility(View.GONE);
         rootSizeLayout.setVisibility(View.GONE);
         calculate.setVisibility(View.GONE);
@@ -169,8 +187,11 @@ public class MainActivity extends AppCompatActivity {
         text.append(getString(identityOk ? R.string.identity_ok : R.string.identity_bad));
         body.setText(text.toString());
         androidOnly.setEnabled(identityOk);
+        checkAndroid.setEnabled(identityOk);
         dual.setEnabled(identityOk);
+        checkDual.setEnabled(identityOk);
         updateSystem.setEnabled(identityOk);
+        checkUpdate.setEnabled(identityOk);
         calculate.setEnabled(identityOk);
         install.setEnabled(identityOk);
         cancel.setEnabled(true);
@@ -182,12 +203,28 @@ public class MainActivity extends AppCompatActivity {
         showWorking(getString(R.string.calculating));
     }
 
+    private void dry(String mode) {
+        pendingMode = mode;
+        String request = "op=dry\nmode=" + mode + "\nconfirm=no\n";
+        if ("dual".equals(mode) && rootSize.getText() != null) {
+            String typed = rootSize.getText().toString().trim();
+            if (!typed.isEmpty()) {
+                request = request + "root_gib=" + typed + "\n";
+            }
+        }
+        writeRequest(request);
+        showWorking(getString(R.string.checking));
+    }
+
     private void showAndroidConfirm(String status) {
         showChoices();
         body.setText(R.string.title);
         androidOnly.setVisibility(View.GONE);
+        checkAndroid.setVisibility(View.GONE);
         dual.setVisibility(View.GONE);
+        checkDual.setVisibility(View.GONE);
         updateSystem.setVisibility(View.GONE);
+        checkUpdate.setVisibility(View.GONE);
         detail.setVisibility(View.VISIBLE);
         install.setVisibility(View.VISIBLE);
         cancel.setVisibility(View.VISIBLE);
@@ -199,8 +236,11 @@ public class MainActivity extends AppCompatActivity {
         showChoices();
         body.setText(R.string.title_update);
         androidOnly.setVisibility(View.GONE);
+        checkAndroid.setVisibility(View.GONE);
         dual.setVisibility(View.GONE);
+        checkDual.setVisibility(View.GONE);
         updateSystem.setVisibility(View.GONE);
+        checkUpdate.setVisibility(View.GONE);
         detail.setVisibility(View.VISIBLE);
         install.setVisibility(View.VISIBLE);
         install.setText(R.string.update);
@@ -215,8 +255,11 @@ public class MainActivity extends AppCompatActivity {
         showChoices();
         body.setText(R.string.title);
         androidOnly.setVisibility(View.GONE);
+        checkAndroid.setVisibility(View.GONE);
         dual.setVisibility(View.GONE);
+        checkDual.setVisibility(View.GONE);
         updateSystem.setVisibility(View.GONE);
+        checkUpdate.setVisibility(View.GONE);
         detail.setVisibility(View.VISIBLE);
         rootSizeLayout.setVisibility(View.VISIBLE);
         calculate.setVisibility(View.VISIBLE);
@@ -269,6 +312,12 @@ public class MainActivity extends AppCompatActivity {
                 seenStatus = text;
                 applyStatus(text);
             }
+            File log = new File(filesDir(), "log");
+            String logText = log.isFile() ? readText(log.getPath()) : "";
+            if (!logText.equals(seenLog)) {
+                seenLog = logText;
+                logView.setText(logText.isEmpty() ? "" : logText);
+            }
             handler.postDelayed(this, 500);
         }
     };
@@ -295,6 +344,10 @@ public class MainActivity extends AppCompatActivity {
                 line = line + "\n\n" + percent + "%";
             }
             showWorking(line + "\n\n" + getString(R.string.stay_on));
+        } else if ("dry_ok".equals(state)) {
+            installStarted = false;
+            showChoices();
+            body.setText(localize(text));
         } else if ("ready_reboot".equals(state)) {
             showWorking(message + "\n\n" + getString(R.string.ready_suffix));
         } else if ("failed".equals(state)) {
@@ -340,6 +393,13 @@ public class MainActivity extends AppCompatActivity {
             case "confirm_dual" -> getString(R.string.code_confirm_dual,
                     value(status, "root_gib"), value(status, "min_gib"),
                     value(status, "max_gib"), value(status, "data_gib"));
+            case "dry_android" -> "copy".equals(value(status, "backup"))
+                    ? getString(R.string.code_dry_android_copy, value(status, "data_gib"))
+                    : getString(R.string.code_dry_android_skip, value(status, "data_gib"));
+            case "dry_dual" -> getString(R.string.code_dry_dual,
+                    value(status, "root_gib"), value(status, "data_gib"),
+                    value(status, "e2fsck"));
+            case "dry_update" -> getString(R.string.code_dry_update, value(status, "parent"));
             default -> {
                 int id = getResources().getIdentifier("code_" + code, "string", getPackageName());
                 yield id == 0 ? code : getString(id);

@@ -89,3 +89,11 @@ ReSukiSU 闪退不是预期。崩溃是 `UnsatisfiedLinkError: library "libkerne
 2026-11-04 21:25 用户说解锁图案和密码无法设置，只有「无」和「滑动」。`ChooseLockGenericController` 在 `hasSecureLockScreen()` 为假时隐藏图案、PIN 和密码。`LockSettingsService` 用系统功能 `android.software.secure_lock_screen` 决定这个值。当前 product 的 system 和 vendor 权限目录里没有这份声明。软件 Gatekeeper 已经在镜像里。`device.mk` 增加 `android.software.secure_lock_screen.xml`。
 
 新 super 8589934592 字节，sha256 `a4d0f147010a4406ec36e88dfc74e2b8240269897eb0b4183c4f32db432ae0ba`。vendor 分区和 `vendor.img` 一致，里面能搜到 `android.software.secure_lock_screen`。zip 是 `work/release/lineage-23.2-kukui-20261104c.zip`，1110377750 字节，sha256 `7667a5978f6cbd6bcbdd85eb0e17e7443d1322d66e6490d01d10a6366420316f`。没有写盘，也没有在平板上设过密码。
+
+2026-11-05 用户说只装 Android 在内置盘仍是 ChromeOS、没装过 postmarketOS 时会显示 “Could not back up the kernel slot.”。这条路径在抹掉分区表之前，把 `mmcblk0p1` 整份复制到 U 盘 512 MiB 的 `pmOS_boot`。ChromeOS 的第一分区是 STATE，远大于这块空间，复制写满就失败。只装 Android 实际要的是：U 盘上的 `android.kpart` 含 `soc/11230000.mmc` 且不含 `11201000.usb`，eMMC 能放下 8 GiB 的 super 和 userdata，并且 eMMC 上没有已挂载的分区。它不看分区名，也不要求 ext2 或 ext4。
+
+备份改为始终保存 GPT。第一分区只在 1 到 65536 扇区（最多 32 MiB，也就是内核槽）时才复制。更大、为 0、读不到或不是数字时跳过，然后继续抹盘。扇区数超过五位时先按位数跳过，避免 toybox 的 32 位有符号比较溢出。工作站上 65536 扇区会复制，65537、268435456 和 0 会跳过。`sh -n` 通过。
+
+三个模式各加了一个不写盘的检查。只装 Android 做上面的检查，并说明会不会备份第一分区。Android 和 Linux 仍要求现有的 postmarketOS 布局，并对根分区做 `e2fsck -n`，退出码不大于 4 算通过。更新系统只做原来的布局检查。界面下方增加安装器日志。只装 Android 的确认文案改为 eMMC 上的内容会被删掉。
+
+新 super 8589934592 字节，sha256 `2d138070f0370c8f589b1b49ec4f4c8103e45c1cfa001b0df8e49dd8bdaaf0ea`。展开后的 vendor 分区和 `vendor.img` 逐字节相同，解出来的 `kukui-installd` 含有 “not a 32 MiB kernel slot” 和 `state=dry_ok`。`KukuiInstall.apk` 里有 “Check Android only” 和 “检查仅安装 Android”。zip 是 `work/release/lineage-23.2-kukui-20261105.zip`，1110350719 字节，sha256 `d95aac1a88439325667ea047e4512c231b709a5acbe3ffab9e368e09a8598ce9`。内核三份和 `20261104c` 相同。没有写盘，也没有在 ChromeOS 盘上跑过这条路径。

@@ -203,3 +203,9 @@ recovery 也能做，形态是菜单里的第三项，或者一个平时 priorit
 设置里只有「无」和「滑动」，是因为 `LockSettingsService.hasSecureLockScreen()` 看 `android.software.secure_lock_screen`。这份镜像的 system 和 vendor 权限里都没有这个功能，所以图案、PIN 和密码被藏起来，`setLockCredential` 也会拒绝。软件版 Gatekeeper 已经在 `com.android.hardware.gatekeeper.nonsecure` 里。`device.mk` 把 `frameworks/native/data/etc/android.software.secure_lock_screen.xml` 装进 vendor。userdata 仍然没有 fileencryption。
 
 `work/release/lineage-23.2-kukui-20261104c.zip`，1110377750 字节，sha256 `7667a5978f6cbd6bcbdd85eb0e17e7443d1322d66e6490d01d10a6366420316f`。`super` 8589934592 字节，sha256 `a4d0f147010a4406ec36e88dfc74e2b8240269897eb0b4183c4f32db432ae0ba`。super 里的 vendor 和编出来的 `vendor.img` 一致，里面有这个功能声明。内核三份和上一份相同。没有写盘，平板上也没有设过密码。
+
+## 2026-11-05 只装 Android 可以抹掉 ChromeOS 盘
+
+`20261104c` 的只装 Android 在抹盘前把第一分区整份复制到 U 盘的 `pmOS_boot`。ChromeOS 的第一分区是很大的 STATE，复制写满，界面显示 “Could not back up the kernel slot.”。这条路径本来就会清掉整张盘，不需要 postmarketOS 的分区名。现在 GPT 仍会备份，第一分区只在不超过 32 MiB 时才复制，更大就跳过。三个模式各有一个不写盘的检查按钮，界面下方显示安装器日志。Android 和 Linux、更新系统的写入条件没有放宽。
+
+`work/release/lineage-23.2-kukui-20261105.zip`，1110350719 字节，sha256 `d95aac1a88439325667ea047e4512c231b709a5acbe3ffab9e368e09a8598ce9`。里面只有 `lineage-23.2-kukui-20261105.img`，11756634112 字节，deflate 后 1110350399 字节。分区布局和内核槽属性与上一份相同。`super` 8589934592 字节，sha256 `2d138070f0370c8f589b1b49ec4f4c8103e45c1cfa001b0df8e49dd8bdaaf0ea`。内核三份和 `20261104c` 相同。`20261104c` 没有覆盖。没有写盘，也没有在 ChromeOS 盘上跑过。

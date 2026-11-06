@@ -8,6 +8,11 @@
     <string name="install">安装</string>
     <string name="update">更新</string>
     <string name="cancel">取消</string>
+    <string name="check_android">检查仅安装 Android</string>
+    <string name="check_dual">检查 Android 和 Linux</string>
+    <string name="check_update">检查更新</string>
+    <string name="checking">正在检查，不会写入。\n\n下方日志会跟着更新。检查 Linux 根分区可能要几分钟。</string>
+    <string name="log_label">安装器日志</string>
     <string name="root_size_hint">Linux 根分区 GiB</string>
     <string name="title_update">更新 eMMC 上的系统</string>
     <string name="boot_missing">启动盘: 没有找到</string>
@@ -120,7 +125,11 @@
     <string name="code_linux_boot_not_ext4">Linux 启动分区不是 ext2 或 ext4。菜单必须能挂上它。</string>
     <string name="code_switching_boot">切换默认启动项。</string>
     <string name="code_writing_android_and_menu">写入 Android 内核和菜单。</string>
-    <string name="code_confirm_android">eMMC 上的 postmarketOS 会被删掉。Android 数据分区约 %1$s GiB。</string>
+    <string name="code_confirm_android">eMMC 上的内容会被删掉。Android 数据分区约 %1$s GiB。</string>
     <string name="code_confirm_update">父设备：%1$s。将写入分区：super、android_kernel、menu_kernel。不格式化 userdata。不改分区表，不改启动优先级。Linux 根分区和 metadata 不动。</string>
     <string name="code_confirm_dual">Linux 根分区 %1$s GiB，可填 %2$s 到 %3$s。Android 数据分区约 %4$s GiB。</string>
+    <string name="code_dry_android_copy">仅安装 Android 可以执行。eMMC 会被清空。Android 数据分区约 %1$s GiB。第一分区是内核槽，写入前会备份。</string>
+    <string name="code_dry_android_skip">仅安装 Android 可以执行。eMMC 会被清空。Android 数据分区约 %1$s GiB。第一分区大于内核槽，不会备份。</string>
+    <string name="code_dry_dual">Android 和 Linux 可以执行。Linux 根分区 %1$s GiB。Android 数据分区约 %2$s GiB。只读检查退出码 %3$s。</string>
+    <string name="code_dry_update">更新可以执行。父设备：%1$s。不格式化 userdata。</string>
 </resources>

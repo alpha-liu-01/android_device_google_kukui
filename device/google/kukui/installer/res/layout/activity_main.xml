@@ -31,6 +31,14 @@
             android:text="@string/android_only" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/check_android"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/check_android" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/dual"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
@@ -39,12 +47,28 @@
             android:text="@string/dual" />
 
         <com.google.android.material.button.MaterialButton
+            android:id="@+id/check_dual"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/check_dual" />
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/update_system"
             style="@style/Widget.Material3.Button.OutlinedButton"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:text="@string/update_system" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/check_update"
+            style="@style/Widget.Material3.Button.TonalButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="@string/check_update" />
 
         <TextView
             android:id="@+id/detail"
@@ -97,5 +121,27 @@
             android:layout_marginTop="8dp"
             android:text="@string/cancel"
             android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/log_label"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="24dp"
+            android:text="@string/log_label"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="?attr/colorOnSurface" />
+
+        <TextView
+            android:id="@+id/log"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:background="?attr/colorSurfaceVariant"
+            android:fontFamily="monospace"
+            android:minLines="6"
+            android:padding="12dp"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:textIsSelectable="true"
+            android:textSize="12sp" />
     </LinearLayout>
 </ScrollView>

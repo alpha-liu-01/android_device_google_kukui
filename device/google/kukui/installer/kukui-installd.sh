@@ -285,18 +285,46 @@ reread() {
     sleep 2
 }
 
-backup_kernel() {
-    mkdir -p "$PAYLOAD/kukui-install/backup"
-    if [ -f "$PAYLOAD/kukui-install/backup/mmcblk0.gpt" ] && \
-        [ -f "$PAYLOAD/kukui-install/backup/mmcblk0p1.kpart" ]; then
-        log "keeping existing kernel and gpt backup"
-        return 0
+# copy: partition 1 is at most 32 MiB, the kernel slot this installer writes.
+# skip: it is missing or larger. ChromeOS puts the large STATE filesystem
+# there. Android-only erases the disk anyway, and that filesystem does not
+# fit on the USB boot partition.
+describe_kernel_backup() {
+    local sectors
+    sectors=$(cat /sys/class/block/mmcblk0p1/size 2>/dev/null || echo 0)
+    case "$sectors" in
+        ''|*[!0-9]*) printf 'skip\n'; return ;;
+    esac
+    # More than five digits is already past 32 MiB. Avoid a 32-bit overflow.
+    if [ "${#sectors}" -gt 5 ] || [ "$sectors" -eq 0 ] || [ "$sectors" -gt 65536 ]; then
+        printf 'skip\n'
+        return
     fi
-    log "backing up mmcblk0p1 and gpt"
-    dd if=/dev/block/mmcblk0p1 of="$PAYLOAD/kukui-install/backup/mmcblk0p1.kpart" bs=1048576 conv=fsync || \
-        fail backup_kernel_failed
-    sgdisk --backup="$PAYLOAD/kukui-install/backup/mmcblk0.gpt" /dev/block/mmcblk0 || \
-        fail backup_gpt_failed
+    printf 'copy\n'
+}
+
+backup_kernel() {
+    local action
+    mkdir -p "$PAYLOAD/kukui-install/backup"
+    action=$(describe_kernel_backup)
+    if [ ! -f "$PAYLOAD/kukui-install/backup/mmcblk0.gpt" ]; then
+        log "backing up gpt"
+        sgdisk --backup="$PAYLOAD/kukui-install/backup/mmcblk0.gpt" /dev/block/mmcblk0 || \
+            fail backup_gpt_failed
+    else
+        log "keeping existing gpt backup"
+    fi
+    if [ "$action" = copy ]; then
+        if [ -f "$PAYLOAD/kukui-install/backup/mmcblk0p1.kpart" ]; then
+            log "keeping existing kernel backup"
+        else
+            log "backing up mmcblk0p1"
+            dd if=/dev/block/mmcblk0p1 of="$PAYLOAD/kukui-install/backup/mmcblk0p1.kpart" \
+                bs=1048576 conv=fsync || fail backup_kernel_failed
+        fi
+    else
+        log "mmcblk0p1 is not a 32 MiB kernel slot; not copying it"
+    fi
     sync
 }
 
@@ -607,7 +635,7 @@ install_update() {
 }
 
 handle() {
-    local dir="$1" op mode confirm resume
+    local dir="$1" op mode confirm resume ec action
     STATUS_DIR=$dir
     op=$(sed -n 's/^op=//p' "$dir/request" | head -n 1)
     mode=$(sed -n 's/^mode=//p' "$dir/request" | head -n 1)
@@ -649,6 +677,35 @@ handle() {
                 install_android_only
             elif [ "$mode" = update ]; then
                 install_update
+            else
+                fail unknown_mode "mode=$mode"
+            fi
+            ;;
+        dry)
+            if [ "$mode" = dual ]; then
+                check_android_kpart
+                check_menu_kpart
+                plan_dual || return 0
+                refuse_mounted_emmc
+                log "e2fsck -n /dev/block/mmcblk0p3"
+                e2fsck -n /dev/block/mmcblk0p3 >> "$STATUS_DIR/log" 2>&1
+                ec=$?
+                log "e2fsck -n exit $ec"
+                [ "$ec" -le 4 ] || fail e2fsck_failed "exit_code=$ec"
+                write_status "state=dry_ok" "mode=dual" "code=dry_dual" \
+                    "root_gib=$ROOT_GIB" "data_gib=$DATA_GIB" "e2fsck=$ec"
+            elif [ "$mode" = update ]; then
+                require_update_layout || return 0
+                write_status "state=dry_ok" "mode=update" "code=dry_update" \
+                    "parent=$TARGET_PATH"
+            elif [ "$mode" = android ]; then
+                check_android_kpart
+                plan_android || return 0
+                refuse_mounted_emmc
+                action=$(describe_kernel_backup)
+                log "kernel backup $action"
+                write_status "state=dry_ok" "mode=android" "code=dry_android" \
+                    "data_gib=$DATA_GIB" "backup=$action"
             else
                 fail unknown_mode "mode=$mode"
             fi

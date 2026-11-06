@@ -8,6 +8,11 @@
     <string name="install">Install</string>
     <string name="update">Update</string>
     <string name="cancel">Cancel</string>
+    <string name="check_android">Check Android only</string>
+    <string name="check_dual">Check Android and Linux</string>
+    <string name="check_update">Check update</string>
+    <string name="checking">Checking without writing.\n\nThe log below updates while this runs. The Linux check can take several minutes.</string>
+    <string name="log_label">Installer log</string>
     <string name="root_size_hint">Linux root, GiB</string>
     <string name="title_update">Update the system on eMMC</string>
     <string name="boot_missing">Boot disk: not found</string>
@@ -120,7 +125,11 @@
     <string name="code_linux_boot_not_ext4">The Linux boot partition is not ext2 or ext4. The menu has to mount it.</string>
     <string name="code_switching_boot">Switching the default boot entry.</string>
     <string name="code_writing_android_and_menu">Writing the Android kernel and the menu.</string>
-    <string name="code_confirm_android">postmarketOS on eMMC will be erased. The Android data partition is about %1$s GiB.</string>
+    <string name="code_confirm_android">The internal disk will be erased. The Android data partition is about %1$s GiB.</string>
     <string name="code_confirm_update">Parent device: %1$s. Partitions to write: super, android_kernel, menu_kernel. userdata will not be formatted. The partition table and boot priorities stay as they are. The Linux root and metadata stay as they are.</string>
     <string name="code_confirm_dual">Linux root %1$s GiB, from %2$s to %3$s allowed. Android data is about %4$s GiB.</string>
+    <string name="code_dry_android_copy">Android only can run. The internal disk will be erased. Android data is about %1$s GiB. The first partition is a kernel slot and will be backed up.</string>
+    <string name="code_dry_android_skip">Android only can run. The internal disk will be erased. Android data is about %1$s GiB. The first partition is larger than a kernel slot, so it will not be backed up.</string>
+    <string name="code_dry_dual">Android and Linux can run. Linux root %1$s GiB. Android data is about %2$s GiB. The read-only filesystem check exited %3$s.</string>
+    <string name="code_dry_update">Update can run. Parent device: %1$s. userdata will not be formatted.</string>
 </resources>
