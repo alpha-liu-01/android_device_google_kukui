@@ -9,22 +9,67 @@ KEEP="${2:?need kukui-keep-emmc}"
 MENU="${3:?need kukui-menu}"
 MOD="$ROOT/device/google/kukui/prebuilt/6.18.28-mt81-kukui2"
 DEVKEYS=/usr/share/vboot/devkeys
-CAMERA="$ROOT/work/phase4/kernel.kpart.camera"
-PMOS="$ROOT/work/phase1/pmos-vmlinuz.kpart"
+# FIT that supplies the shared kernel and ramdisk. The board DTB is
+# replaced below, so this only has to match the kernel build.
+KERNEL_FIT="${KUKUI_KERNEL_FIT:-$ROOT/work/phase4/kernel.kpart.camera}"
+# Optional postmarketOS FIT for the legacy kexec/Linux payload (Krane only).
+PMOS="${KUKUI_PMOS_FIT:-$ROOT/work/phase1/pmos-vmlinuz.kpart}"
+
+if [[ -n "${KUKUI_DTB:-}" && -z "${KUKUI_BOARD:-}" ]]; then
+    BOARD="$(basename "$KUKUI_DTB" .dtb)"
+else
+    BOARD="${KUKUI_BOARD:-krane}"
+fi
+[[ "$BOARD" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+    echo "invalid KUKUI_BOARD: $BOARD" >&2
+    exit 1
+}
+DTB="${KUKUI_DTB:-}"
+DTB_DESC="${KUKUI_DTB_DESC:-}"
+DTB_COMPAT="${KUKUI_DTB_COMPAT:-}"
+
+command -v dtc >/dev/null || { echo "dtc is required" >&2; exit 1; }
+[[ -f "$KERNEL_FIT" ]] || {
+    echo "missing KUKUI_KERNEL_FIT: $KERNEL_FIT" >&2
+    exit 1
+}
 
 mkdir -p "$OUT"
 work=$(mktemp -d /tmp/kukui-pack.XXXXXX)
 trap 'rm -rf "$work"' EXIT
 
 fit=$(mktemp)
-futility vbutil_kernel --get-vmlinuz "$CAMERA" --vmlinuz-out "$fit"
+futility vbutil_kernel --get-vmlinuz "$KERNEL_FIT" --vmlinuz-out "$fit"
 dumpimage -T flat_dt -p 0 -o "$work/kernel.lzma" "$fit"
-dumpimage -T flat_dt -p 1 -o "$work/krane.dtb" "$fit"
+dumpimage -T flat_dt -p 1 -o "$work/board.dtb" "$fit"
 dumpimage -T flat_dt -p 2 -o "$work/ramdisk.gz" "$fit"
 lzma -dc "$work/kernel.lzma" > "$work/Image"
-test "$(stat -c %s "$work/krane.dtb")" = 65144
 
-# eMMC ramdisk: the camera ramdisk with only /init replaced.
+if [[ -n "$DTB" ]]; then
+    [[ -f "$DTB" ]] || { echo "missing KUKUI_DTB: $DTB" >&2; exit 1; }
+    cp -f "$DTB" "$work/board.dtb"
+    DTB_DESC="${DTB_DESC:-$(basename "$DTB" .dtb)}"
+else
+    DTB_DESC="${DTB_DESC:-mt8183-kukui-krane-sku176}"
+    DTB_COMPAT="${DTB_COMPAT:-google,krane-sku176}"
+fi
+[[ -n "$DTB_DESC" ]] || {
+    echo "empty DTB description" >&2
+    exit 1
+}
+if [[ -n "$DTB_COMPAT" ]]; then
+    dtc -I dtb -O dts "$work/board.dtb" 2>/dev/null | grep -q -F "$DTB_COMPAT" || {
+        echo "$work/board.dtb does not contain $DTB_COMPAT" >&2
+        exit 1
+    }
+else
+    dtc -I dtb -O dts "$work/board.dtb" 2>/dev/null | grep -q -F 'google,' || {
+        echo "$work/board.dtb does not look like a Kukui DTB" >&2
+        exit 1
+    }
+fi
+
+# eMMC ramdisk: the kernel FIT ramdisk with only /init replaced.
 mkdir -p "$work/rd"
 # Device nodes need root. devtmpfs covers /dev before init runs.
 gzip -dc "$work/ramdisk.gz" | (cd "$work/rd" && cpio -id --quiet) || true
@@ -78,8 +123,8 @@ pack_one() {
             hash-1 { algo = "crc32"; };
         };
         fdt-1 {
-            description = "mt8183-kukui-krane-sku176";
-            data = /incbin/("krane.dtb");
+            description = "${DTB_DESC}";
+            data = /incbin/("board.dtb");
             type = "flat_dt";
             arch = "arm64";
             compression = "none";
@@ -98,7 +143,7 @@ pack_one() {
     configurations {
         default = "conf-1";
         conf-1 {
-            description = "mt8183-kukui-krane-sku176";
+            description = "${DTB_DESC}";
             kernel = "kernel-1";
             fdt = "fdt-1";
             ramdisk = "ramdisk-1";
@@ -133,23 +178,29 @@ if [[ "${MENU_ONLY:-}" == 1 ]]; then
     exit 0
 fi
 
-mkdir -p "$OUT/android" "$OUT/linux"
+mkdir -p "$OUT/android"
 cp "$work/Image" "$OUT/android/Image"
-cp "$work/krane.dtb" "$OUT/android/krane.dtb"
+cp "$work/board.dtb" "$OUT/android/${BOARD}.dtb"
 # kexec does not expand kern_guid=%U. The rest matches the eMMC FIT.
 sed 's/^kern_guid=%U //' "$work/android-cmd.txt" > "$OUT/android/cmdline"
 
-pmos=$(mktemp)
-futility vbutil_kernel --get-vmlinuz "$PMOS" --vmlinuz-out "$pmos"
-dumpimage -T flat_dt -p 0 -o "$work/pmos.lzma" "$pmos"
-dumpimage -T flat_dt -p 27 -o "$OUT/linux/krane.dtb" "$pmos"
-lzma -dc "$work/pmos.lzma" > "$OUT/linux/Image"
-# Image 27 is mt8183-kukui-krane-sku176 in the postmarketOS FIT.
-test "$(stat -c %s "$OUT/linux/krane.dtb")" = 61542
-futility dump_kernel_config "$PMOS" | sed 's/^kern_guid=%U //' > "$OUT/linux/cmdline"
-stat -c %s "$PMOS" > "$OUT/linux/kernel.bytes"
-sha256sum "$PMOS" | awk '{print $1}' > "$OUT/linux.kpart.sha256"
-rm -f "$pmos" "$fit"
+if [[ "$BOARD" == "krane" ]]; then
+    mkdir -p "$OUT/linux"
+    pmos=$(mktemp)
+    futility vbutil_kernel --get-vmlinuz "$PMOS" --vmlinuz-out "$pmos"
+    dumpimage -T flat_dt -p 0 -o "$work/pmos.lzma" "$pmos"
+    dumpimage -T flat_dt -p 27 -o "$OUT/linux/krane.dtb" "$pmos"
+    lzma -dc "$work/pmos.lzma" > "$OUT/linux/Image"
+    # Image 27 is mt8183-kukui-krane-sku176 in the postmarketOS FIT.
+    test "$(stat -c %s "$OUT/linux/krane.dtb")" = 61542
+    futility dump_kernel_config "$PMOS" | sed 's/^kern_guid=%U //' > "$OUT/linux/cmdline"
+    stat -c %s "$PMOS" > "$OUT/linux/kernel.bytes"
+    sha256sum "$PMOS" | awk '{print $1}' > "$OUT/linux.kpart.sha256"
+    rm -f "$pmos"
+else
+    echo "Skipping legacy Linux/kexec payload for $BOARD (Android-only bring-up)" >&2
+fi
+rm -f "$fit"
 
 echo "android.kpart $(stat -c %s "$OUT/android.kpart") $(sha256sum "$OUT/android.kpart" | awk '{print $1}')"
 echo "menu.kpart $(stat -c %s "$OUT/menu.kpart") $(sha256sum "$OUT/menu.kpart" | awk '{print $1}')"

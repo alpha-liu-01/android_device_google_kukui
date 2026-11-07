@@ -9,10 +9,16 @@ and fastboot are not the install path. The kernel keeps the USB
 controller in host mode so the stick can be the boot disk, which means
 the tablet cannot also present itself as a USB gadget for sideload.
 
-This was tested on one Lenovo IdeaPad Duet, Google Krane sku176, with
-the factory depthcharge firmware. Developer mode and USB boot are
-already enabled on a machine that boots postmarketOS from USB. This
-does not flash UEFI and does not replace the read-only firmware.
+This was tested on one Lenovo IdeaPad Duet, Google Krane sku176, and
+one Google Kodama sku16, with the factory depthcharge firmware.
+Developer mode and USB boot are already enabled on a machine that boots
+postmarketOS from USB. This does not flash UEFI and does not replace
+the read-only firmware.
+
+The USB image is board-specific: the DTB inside `kernel.kpart` and
+`android.kpart` must match the tablet. A Krane image is not expected to
+boot correctly on Kodama and vice versa. The Kodama camera is not
+supported; see [docs/kodama.md](kodama.md).
 
 ## What you need
 
@@ -86,6 +92,10 @@ The labels follow the system language. English and Chinese are included.
 | Android only | Replaces the internal disk with Android. An existing Linux installation on that disk is erased. |
 | Android and Linux | Shrinks an existing Linux root and adds Android beside it. The screen asks for the Linux root size in GiB. Calculate, then install. |
 | Update system | Replaces `super`, the Android kernel, and the boot menu with the copies on the USB stick. It does not format userdata, does not change the partition table, and does not change boot priority. |
+
+On Kodama sku16 use **Android only**. The Android-and-Linux path
+expects a postmarketOS partition layout and does not apply to a Debian
+install.
 
 Nothing is written until the confirm button is pressed. The confirm
 text names the target device. For an update it also says that userdata
