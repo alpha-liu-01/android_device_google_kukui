@@ -107,6 +107,7 @@
     <string name="code_menu_attr_changed">The menu_kernel boot priority changed.</string>
     <string name="code_android_attr_changed">The android_kernel boot priority changed.</string>
     <string name="code_ready_update">Unplug the USB disk, then power on. The menu still appears. userdata was not formatted.</string>
+    <string name="code_ready_update_android">Unplug the USB disk, then power on. Ctrl+D boots Android on eMMC. userdata was not formatted.</string>
     <string name="code_no_confirm">There was no confirmation.</string>
     <string name="code_missing_root_gib">The Linux root size is missing.</string>
     <string name="code_unknown_mode">Unknown mode %1$s.</string>
@@ -132,4 +133,6 @@
     <string name="code_dry_android_skip">Android only can run. The internal disk will be erased. Android data is about %1$s GiB. The first partition is larger than a kernel slot, so it will not be backed up.</string>
     <string name="code_dry_dual">Android and Linux can run. Linux root %1$s GiB. Android data is about %2$s GiB. The read-only filesystem check exited %3$s.</string>
     <string name="code_dry_update">Update can run. Parent device: %1$s. userdata will not be formatted.</string>
+    <string name="code_confirm_update_android">Parent device: %1$s. eMMC has the Android only layout. Partitions to write: super and pmOS_kernel (the Android kernel slot). userdata will not be formatted. The partition table, boot priority and metadata stay as they are.</string>
+    <string name="code_dry_update_android">Update can run. Parent device: %1$s. eMMC has the Android only layout: super and pmOS_kernel are written. userdata will not be formatted.</string>
 </resources>

@@ -572,15 +572,34 @@ install_dual() {
 require_update_layout() {
     local bytes need fstype
     [ -f "$PAYLOAD/kukui-install/android.kpart" ] || fail missing_android_kpart
-    [ -f "$PAYLOAD/kukui-install/menu.kpart" ] || fail missing_menu
     grep -a -q 'androidboot.boot_devices=soc/11230000.mmc' \
         "$PAYLOAD/kukui-install/android.kpart" || \
         fail android_kpart_not_emmc
-    grep -a -q 'console=ttynull' "$PAYLOAD/kukui-install/menu.kpart" || \
-        fail menu_cmdline_mismatch
     SUPER_PART=$(part_by_name super) || fail no_super_partition
-    ANDROID_PART=$(part_by_name android_kernel) || fail no_android_kernel_partition
-    MENU_PART=$(part_by_name menu_kernel) || fail no_menu_kernel_partition
+    if ANDROID_PART=$(part_by_name android_kernel); then
+        # Android and Linux: separate android_kernel and menu_kernel slots.
+        UPDATE_LAYOUT=dual
+        [ -f "$PAYLOAD/kukui-install/menu.kpart" ] || fail missing_menu
+        grep -a -q 'console=ttynull' "$PAYLOAD/kukui-install/menu.kpart" || \
+            fail menu_cmdline_mismatch
+        MENU_PART=$(part_by_name menu_kernel) || fail no_menu_kernel_partition
+    elif [ "$(part_name mmcblk0p1 2>/dev/null)" = pmOS_kernel ] && \
+         [ "$(part_name mmcblk0p3 2>/dev/null)" = super ] && \
+         [ "$(part_name mmcblk0p6 2>/dev/null)" = userdata ] && \
+         ! part_by_name pmOS_root > /dev/null; then
+        # Android only (install_android_only): Android's kernel is in
+        # pmOS_kernel (p1) and there is no menu. Only touch p1 if it
+        # already holds an eMMC Android kernel.
+        UPDATE_LAYOUT=android
+        ANDROID_PART=mmcblk0p1
+        MENU_PART=
+        dd if=/dev/block/mmcblk0p1 bs=1048576 count=32 status=none | \
+            grep -a -q 'androidboot.boot_devices=soc/11230000.mmc' || \
+            fail no_android_kernel_partition
+    else
+        fail no_android_kernel_partition
+    fi
+    log "update layout $UPDATE_LAYOUT"
     DATA_PART=$(part_by_name userdata) || fail no_userdata_partition
     [ "$(cat "/sys/class/block/$SUPER_PART/size")" = 16777216 ] || \
         fail super_not_8gib
@@ -588,18 +607,23 @@ require_update_layout() {
     need=$(((bytes + 511) / 512))
     [ "$(cat "/sys/class/block/$ANDROID_PART/size")" -ge "$need" ] || \
         fail android_kernel_too_small
-    bytes=$(stat -c %s "$PAYLOAD/kukui-install/menu.kpart")
-    need=$(((bytes + 511) / 512))
-    [ "$(cat "/sys/class/block/$MENU_PART/size")" -ge "$need" ] || \
-        fail menu_kernel_too_small
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        bytes=$(stat -c %s "$PAYLOAD/kukui-install/menu.kpart")
+        need=$(((bytes + 511) / 512))
+        [ "$(cat "/sys/class/block/$MENU_PART/size")" -ge "$need" ] || \
+            fail menu_kernel_too_small
+    fi
     fstype=$(blkid -s TYPE -o value "/dev/block/$DATA_PART" 2>/dev/null || true)
     [ "$fstype" = f2fs ] || fail userdata_not_f2fs "fstype=${fstype:-unread}"
     log "userdata $(blkid -s UUID -o value "/dev/block/$DATA_PART" 2>/dev/null || true)"
-    MENU_ATTR=$(attr_flags "$MENU_PART")
     ANDROID_ATTR=$(attr_flags "$ANDROID_PART")
-    [ -n "$MENU_ATTR" ] && [ -n "$ANDROID_ATTR" ] || fail no_kernel_attrs
-    log "menu_kernel $MENU_ATTR"
-    log "android_kernel $ANDROID_ATTR"
+    [ -n "$ANDROID_ATTR" ] || fail no_kernel_attrs
+    log "android kernel $ANDROID_PART $ANDROID_ATTR"
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        MENU_ATTR=$(attr_flags "$MENU_PART")
+        [ -n "$MENU_ATTR" ] || fail no_kernel_attrs
+        log "menu_kernel $MENU_ATTR"
+    fi
 }
 
 install_update() {
@@ -613,25 +637,37 @@ install_update() {
     got=$(hash_super "$dest")
     src_hash=$(hash_super "$src")
     [ "$src_hash" = "$got" ] || fail super_hash_mismatch
-    write_status "state=running" "percent=80" "code=writing_android_and_menu"
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        write_status "state=running" "percent=80" "code=writing_android_and_menu"
+    else
+        write_status "state=running" "percent=80" "code=writing_android_kernel"
+    fi
     dd if="$PAYLOAD/kukui-install/android.kpart" of="/dev/block/$ANDROID_PART" \
         bs=1048576 conv=fsync || fail write_android_kernel_failed
-    dd if="$PAYLOAD/kukui-install/menu.kpart" of="/dev/block/$MENU_PART" \
-        bs=1048576 conv=fsync || fail write_menu_failed
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        dd if="$PAYLOAD/kukui-install/menu.kpart" of="/dev/block/$MENU_PART" \
+            bs=1048576 conv=fsync || fail write_menu_failed
+    fi
     src_hash=$(hash_file "$PAYLOAD/kukui-install/android.kpart")
     got=$(hash_part "/dev/block/$ANDROID_PART" \
         "$(stat -c %s "$PAYLOAD/kukui-install/android.kpart")")
     [ "$src_hash" = "$got" ] || fail android_kernel_hash_mismatch
-    src_hash=$(hash_file "$PAYLOAD/kukui-install/menu.kpart")
-    got=$(hash_part "/dev/block/$MENU_PART" \
-        "$(stat -c %s "$PAYLOAD/kukui-install/menu.kpart")")
-    [ "$src_hash" = "$got" ] || fail menu_hash_mismatch
-    menu_now=$(attr_flags "$MENU_PART")
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        src_hash=$(hash_file "$PAYLOAD/kukui-install/menu.kpart")
+        got=$(hash_part "/dev/block/$MENU_PART" \
+            "$(stat -c %s "$PAYLOAD/kukui-install/menu.kpart")")
+        [ "$src_hash" = "$got" ] || fail menu_hash_mismatch
+        menu_now=$(attr_flags "$MENU_PART")
+        [ "$menu_now" = "$MENU_ATTR" ] || fail menu_attr_changed
+    fi
     android_now=$(attr_flags "$ANDROID_PART")
-    [ "$menu_now" = "$MENU_ATTR" ] || fail menu_attr_changed
     [ "$android_now" = "$ANDROID_ATTR" ] || fail android_attr_changed
     sync
-    write_status "state=ready_reboot" "percent=100" "code=ready_update"
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        write_status "state=ready_reboot" "percent=100" "code=ready_update"
+    else
+        write_status "state=ready_reboot" "percent=100" "code=ready_update_android"
+    fi
 }
 
 handle() {
@@ -658,10 +694,17 @@ handle() {
                     "min_gib=$MIN_GIB" "max_gib=$MAX_GIB" "resume=$resume"
             elif [ "$mode" = update ]; then
                 require_update_layout || return 0
-                write_status "state=confirm" "mode=update" "code=confirm_update" \
-                    "format_userdata=no" \
-                    "parent=$TARGET_PATH" \
-                    "partitions=super android_kernel menu_kernel"
+                if [ "$UPDATE_LAYOUT" = dual ]; then
+                    write_status "state=confirm" "mode=update" "code=confirm_update" \
+                        "format_userdata=no" \
+                        "parent=$TARGET_PATH" \
+                        "partitions=super android_kernel menu_kernel"
+                else
+                    write_status "state=confirm" "mode=update" "code=confirm_update_android" \
+                        "format_userdata=no" \
+                        "parent=$TARGET_PATH" \
+                        "partitions=super pmOS_kernel"
+                fi
             else
                 plan_android || return 0
                 write_status "state=confirm" "mode=android" "code=confirm_android" \
@@ -696,8 +739,13 @@ handle() {
                     "root_gib=$ROOT_GIB" "data_gib=$DATA_GIB" "e2fsck=$ec"
             elif [ "$mode" = update ]; then
                 require_update_layout || return 0
-                write_status "state=dry_ok" "mode=update" "code=dry_update" \
-                    "parent=$TARGET_PATH"
+                if [ "$UPDATE_LAYOUT" = dual ]; then
+                    write_status "state=dry_ok" "mode=update" "code=dry_update" \
+                        "parent=$TARGET_PATH"
+                else
+                    write_status "state=dry_ok" "mode=update" "code=dry_update_android" \
+                        "parent=$TARGET_PATH"
+                fi
             elif [ "$mode" = android ]; then
                 check_android_kpart
                 plan_android || return 0

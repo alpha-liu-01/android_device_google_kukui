@@ -390,6 +390,8 @@ public class MainActivity extends AppCompatActivity {
                     value(status, "data_gib"));
             case "confirm_update" -> getString(R.string.code_confirm_update,
                     value(status, "parent"));
+            case "confirm_update_android" -> getString(R.string.code_confirm_update_android,
+                    value(status, "parent"));
             case "confirm_dual" -> getString(R.string.code_confirm_dual,
                     value(status, "root_gib"), value(status, "min_gib"),
                     value(status, "max_gib"), value(status, "data_gib"));
@@ -400,6 +402,8 @@ public class MainActivity extends AppCompatActivity {
                     value(status, "root_gib"), value(status, "data_gib"),
                     value(status, "e2fsck"));
             case "dry_update" -> getString(R.string.code_dry_update, value(status, "parent"));
+            case "dry_update_android" -> getString(R.string.code_dry_update_android,
+                    value(status, "parent"));
             default -> {
                 int id = getResources().getIdentifier("code_" + code, "string", getPackageName());
                 yield id == 0 ? code : getString(id);

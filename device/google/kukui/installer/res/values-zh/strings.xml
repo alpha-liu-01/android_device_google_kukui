@@ -107,6 +107,7 @@
     <string name="code_menu_attr_changed">menu_kernel 的启动优先级变了。</string>
     <string name="code_android_attr_changed">android_kernel 的启动优先级变了。</string>
     <string name="code_ready_update">拔掉 U 盘，再开机。菜单仍会出现。userdata 没有格式化。</string>
+    <string name="code_ready_update_android">拔掉 U 盘，再开机。Ctrl+D 进入 eMMC 上的 Android。userdata 没有格式化。</string>
     <string name="code_no_confirm">没有确认。</string>
     <string name="code_missing_root_gib">没有 Linux 根分区的大小。</string>
     <string name="code_unknown_mode">未知模式 %1$s。</string>
@@ -132,4 +133,6 @@
     <string name="code_dry_android_skip">仅安装 Android 可以执行。eMMC 会被清空。Android 数据分区约 %1$s GiB。第一分区大于内核槽，不会备份。</string>
     <string name="code_dry_dual">Android 和 Linux 可以执行。Linux 根分区 %1$s GiB。Android 数据分区约 %2$s GiB。只读检查退出码 %3$s。</string>
     <string name="code_dry_update">更新可以执行。父设备：%1$s。不格式化 userdata。</string>
+    <string name="code_confirm_update_android">父设备：%1$s。eMMC 上是仅安装 Android 的分区布局。将写入分区：super、pmOS_kernel（Android 内核槽）。不格式化 userdata。不改分区表，不改启动优先级，metadata 不动。</string>
+    <string name="code_dry_update_android">更新可以执行。父设备：%1$s。eMMC 上是仅安装 Android 的分区布局：写入 super 和 pmOS_kernel。不格式化 userdata。</string>
 </resources>
