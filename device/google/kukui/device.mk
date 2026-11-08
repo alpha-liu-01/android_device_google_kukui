@@ -84,6 +84,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E30_Stylus.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E30_Stylus.idc \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E31.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E31.idc \
     $(LOCAL_PATH)/idc/hid-over-i2c_27C6_0E31_Stylus.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_27C6_0E31_Stylus.idc \
+    $(LOCAL_PATH)/idc/hid-over-i2c_04F3_2ABE.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_04F3_2ABE.idc \
+    $(LOCAL_PATH)/idc/hid-over-i2c_04F3_2ABE_Stylus.idc:$(TARGET_COPY_OUT_VENDOR)/usr/idc/hid-over-i2c_04F3_2ABE_Stylus.idc \
     $(LOCAL_PATH)/keylayout/Vendor_18d1_Product_503c.kl:$(TARGET_COPY_OUT_VENDOR)/usr/keylayout/Vendor_18d1_Product_503c.kl \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_RAMDISK)/fstab.kukui \
     $(LOCAL_PATH)/fstab.kukui:$(TARGET_COPY_OUT_VENDOR)/etc/fstab.kukui \

@@ -1,7 +1,9 @@
-# LineageOS 23.2 for Google Kukui (Krane)
+# LineageOS 23.2 for Google Kukui (Krane and Kodama)
 
-LineageOS 23.2, Android 16, for the Lenovo IdeaPad Duet (Google Krane,
-sku176). The bootloader stays the factory ChromeOS depthcharge. The image
+LineageOS 23.2, Android 16, for MT8183 Kukui boards. Tested on the
+Lenovo IdeaPad Duet (Google Krane, sku176 and sku0) and the Lenovo 10e
+Chromebook Tablet (Google Kodama, sku16).
+The bootloader stays the factory ChromeOS depthcharge. The image
 boots from a USB stick with Ctrl+U, and an installer in that system can
 copy it onto the internal eMMC.
 
@@ -12,17 +14,25 @@ Android data partition.
 
 ## Status
 
-Tested on one Krane sku176. Krane sku0 (AUO kd101n80-45na panel, Goodix
-27C6:0E31 touchscreen) was tested from USB with the sku0 FIT entry and
-the 0E31 touch configuration. Other Kukui boards are not tested.
+Tested on one Krane sku176, one Krane sku0, and one Kodama sku16.
+Other Kukui boards are not tested.
 
+Krane sku0 (AUO kd101n80-45na panel, Goodix 27C6:0E31 touchscreen) was
+tested from USB with the sku0 FIT entry and the 0E31 touch configuration.
 `cat /proc/device-tree/model` under ChromeOS names the SKU.
 
 The current image reaches the desktop from USB and from the internal
-disk. The keyboard, touchscreen, stylus, Wi-Fi, Bluetooth HID, cameras,
-battery, and sensors work on this machine. Video playback uses the
-hardware H.264 decoder. SELinux is permissive. An external display is
-not implemented.
+disk. On Krane, the keyboard, touchscreen, stylus, Wi-Fi, Bluetooth HID,
+cameras, battery, and sensors work. On Kodama, display, touch, stylus,
+Wi-Fi, audio, keyboard, battery, and sensors work, but the camera does
+not: `dumpsys media.camera` reports 0 devices because the
+camera HAL and devicetree in this tree are Krane/OV8856-specific and
+Kodama uses an OV5695 sensor. Video playback uses the hardware H.264
+decoder. SELinux is permissive. An external display is not implemented.
+
+See [docs/kodama.md](docs/kodama.md) for the Kodama test matrix and
+limitations, and [docs/adapting-boards.md](docs/adapting-boards.md) for
+adding another Kukui board.
 
 The engineering notes under `docs/` are in Chinese. The build and
 install instructions below are the ones to follow.
@@ -52,6 +62,7 @@ Lunch target: `lineage_kukui-trunk_staging-userdebug`.
 | `local_manifests/kukui.xml` | LineageOS 23.2 projects this build needs beyond the default manifest. |
 | `patches/` | Changes to the Lineage tree. They are not Gru patches. |
 | `bringup/release/` | Builds the USB zip and writes a USB stick. |
+| `bringup/boards/` | Board DTB build helper (`build-dtb.sh`). |
 | `bringup/kernel/`, `bringup/camera/` | Kernel and camera patches on top of Linux 6.18.28-mt81. |
 
 ## License

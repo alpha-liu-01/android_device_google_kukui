@@ -19,6 +19,42 @@ A USB image needs four pieces:
 the kernel build. `bringup/release/build-images.sh` only checks and
 copies them. It does not compile either tree.
 
+## Board DTB
+
+The DTB inside the FITs is board-specific. Krane is the default:
+running `pack-install-fits.sh` without extra variables keeps the Krane
+FIT, including both the sku176 and sku0 configurations. `build-images.sh`
+requires those two names only when the FIT is a Krane FIT.
+
+For another Kukui board, build its DTB from the same Linux 6.18.28 tree:
+
+```
+LINUX_SRC=/path/to/linux-6.18.28 \
+KUKUI_COMPAT=google,kodama-sku16 \
+  bringup/boards/build-dtb.sh /tmp/kodama-dtb
+```
+
+Then repack the FITs with the board DTB and a FIT that contains the
+shared kernel and ramdisk:
+
+```
+KUKUI_BOARD=kodama \
+KUKUI_DTB=/tmp/kodama-dtb/mt8183-kukui-kodama-sku16.dtb \
+KUKUI_KERNEL_FIT=/path/to/kernel.kpart \
+  bringup/phase4/pack-install-fits.sh \
+    /tmp/kodama-payload \
+    /path/to/kukui-keep-emmc \
+    /path/to/kukui-menu
+```
+
+`pack-install-fits.sh` validates the DTB compatible string, keeps the
+USB and eMMC command lines unchanged, and uses the same DTB for
+`android.kpart` and `menu.kpart`. Non-Krane boards skip the legacy
+Linux/kexec payload.
+
+See [docs/kodama.md](kodama.md) for the tested Kodama configuration and
+[docs/adapting-boards.md](adapting-boards.md) for another board.
+
 ## Lineage tree
 
 The extra projects are in `local_manifests/kukui.xml`. They are upstream

@@ -32,13 +32,19 @@ require_token() {
 }
 
 # Krane ships with two panels. A FIT without the sku0 entry boots the
-# sku176 DTB on an AUO panel and the screen stays black.
+# sku176 DTB on an AUO panel and the screen stays black. A Kodama FIT
+# has neither name and is not checked here.
 require_skus() {
-    local fit
+    local fit listed
     fit=$(mktemp)
     futility vbutil_kernel --get-vmlinuz "$1" --vmlinuz-out "$fit"
+    listed=$(dumpimage -l "$fit")
+    if ! grep -q 'mt8183-kukui-krane-' <<<"$listed"; then
+        rm -f "$fit"
+        return 0
+    fi
     for sku in sku176 sku0; do
-        dumpimage -l "$fit" | grep -q "mt8183-kukui-krane-$sku\$" || {
+        grep -q "mt8183-kukui-krane-$sku\$" <<<"$listed" || {
             echo "$1 has no krane $sku configuration" >&2
             rm -f "$fit"
             exit 1
