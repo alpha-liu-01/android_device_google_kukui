@@ -6,6 +6,29 @@ It is Linux 6.18.28 from `linux-postmarketos-mediatek-mt81`, plus
 and `bringup/camera/`. The FIT images and kernel modules in this
 repository are from that build. `LOCALVERSION` is `-mt81-kukui2`.
 
+Some kernel patches depend on each other. Apply them to the 6.18.28
+tree in this order:
+
+1. The `linux-postmarketos-mediatek-mt81` patches.
+2. `bringup/camera/isp/` copied to `drivers/media/platform/mediatek/isp`,
+   then `bringup/camera/kernel-camera.patch`.
+3. `bringup/kernel/pm-set-mem-sleep.patch`. It adds the
+   `pm_set_mem_sleep()` helper that the next patch calls.
+4. `bringup/kernel/mt8183-usb-suspend-power.patch`
+5. `bringup/kernel/mtk-vcodec-enc-data-offset.patch`
+6. `bringup/kernel/drm-setmaster-takeover.patch`. Without it,
+   drm_hwcomposer cannot become DRM master and the panel stays dark.
+7. `bringup/kernel/cgroup-v1-cap-sys-nice.patch`
+8. `bringup/kernel/auxadc-thermal-sensor-zones.patch`
+9. `bringup/kernel/mtk-cci-devfreq-opp-disable.patch`
+10. `bringup/kernel/panfrost-devfreq-opp-notifier.patch`
+
+Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
+also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from
+`bringup/phase2/config.fragment`. The configuration is the postmarketOS
+mt81 config merged with `bringup/phase2/config.fragment`,
+`bringup/camera/config.fragment`, and `bringup/kernel/resukisu.fragment`.
+
 A USB image needs four pieces:
 
 | File | Role |
