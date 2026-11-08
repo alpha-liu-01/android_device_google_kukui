@@ -1,0 +1,46 @@
+Subject: [PATCH] drm: let SET_MASTER take master over from another opener
+
+docs/phase-3.md (ninth to tenth Ctrl+U) records this kernel change, but
+the patch itself was never added to the repository. Without it
+drm_hwcomposer, which runs as system without CAP_SYS_ADMIN, cannot
+become DRM master once the minigbm allocator has opened /dev/dri/card0
+first. It logs "DRM/KMS master access required", SurfaceFlinger never
+gets a display, and the panel stays dark.
+
+SET_MASTER is no longer gated on CAP_SYS_ADMIN, and it takes master over
+from the current holder instead of returning -EBUSY. Access to the node
+is still limited by its mode (0660 system graphics) and SELinux.
+
+--- a/drivers/gpu/drm/drm_auth.c
++++ b/drivers/gpu/drm/drm_auth.c
+@@ -249,15 +249,25 @@
+ 
+ 	guard(mutex)(&dev->master_mutex);
+ 
+-	ret = drm_master_check_perm(dev, file_priv);
+-	if (ret)
+-		return ret;
++	/*
++	 * Kukui: drm_hwcomposer runs as system without CAP_SYS_ADMIN, and
++	 * the minigbm allocator opens the same primary node. Whichever opens
++	 * it first becomes master, so the composer could end up without it
++	 * and only ever create a null display. Access to the node is already
++	 * limited by its mode and SELinux, so SET_MASTER is not gated on
++	 * CAP_SYS_ADMIN, and a caller takes master over from the current
++	 * holder instead of getting -EBUSY.
++	 */
++	ret = 0;
+ 
+ 	if (drm_is_current_master_locked(file_priv))
+ 		return ret;
+ 
+-	if (dev->master)
+-		return -EBUSY;
++	if (dev->master) {
++		drm_info(dev, "SET_MASTER taken over by %s[%d]\n",
++			 current->comm, task_tgid_nr(current));
++		drm_master_put(&dev->master);
++	}
+ 
+ 	if (!file_priv->master)
+ 		return -EINVAL;
