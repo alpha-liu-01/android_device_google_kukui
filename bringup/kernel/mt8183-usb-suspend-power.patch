@@ -25,7 +25,7 @@ the session. suspend_power_off defaults to 0.
   * @fifo_seg_size: it is roundup_pow_of_two(@maxp)
 --- a/drivers/usb/mtu3/mtu3_plat.c
 +++ b/drivers/usb/mtu3/mtu3_plat.c
-@@ -12,13 +12,106 @@
+@@ -12,13 +12,137 @@
  #include <linux/of_address.h>
  #include <linux/of_irq.h>
  #include <linux/platform_device.h>
@@ -163,7 +163,7 @@ the session. suspend_power_off defaults to 0.
  /* u2-port0 should be powered on and enabled; */
  int ssusb_check_clocks(struct ssusb_mtk *ssusb, u32 ex_clks)
  {
-@@ -389,6 +482,7 @@
+@@ -389,6 +513,7 @@
  
  	/* default as host */
  	ssusb->is_host = !(ssusb->dr_mode == USB_DR_MODE_PERIPHERAL);
@@ -171,7 +171,7 @@ the session. suspend_power_off defaults to 0.
  
  	switch (ssusb->dr_mode) {
  	case USB_DR_MODE_PERIPHERAL:
-@@ -435,6 +529,11 @@
+@@ -435,6 +560,11 @@
  	pm_runtime_put_autosuspend(dev);
  	pm_runtime_forbid(dev);
  
@@ -183,7 +183,7 @@ the session. suspend_power_off defaults to 0.
  	return 0;
  
  host_exit:
-@@ -442,6 +541,7 @@
+@@ -442,6 +572,7 @@
  gadget_exit:
  	ssusb_gadget_exit(ssusb);
  comm_exit:
@@ -191,7 +191,7 @@ the session. suspend_power_off defaults to 0.
  	ssusb_rscs_exit(ssusb);
  comm_init_err:
  	pm_runtime_put_noidle(dev);
-@@ -455,6 +555,8 @@
+@@ -455,6 +586,8 @@
  {
  	struct ssusb_mtk *ssusb = platform_get_drvdata(pdev);
  
@@ -200,7 +200,7 @@ the session. suspend_power_off defaults to 0.
  	pm_runtime_get_sync(&pdev->dev);
  
  	switch (ssusb->dr_mode) {
-@@ -510,11 +612,50 @@
+@@ -510,11 +643,50 @@
  	return 0;
  }
  
@@ -251,7 +251,7 @@ the session. suspend_power_off defaults to 0.
  	dev_dbg(dev, "%s\n", __func__);
  
  	switch (ssusb->dr_mode) {
-@@ -545,7 +686,8 @@
+@@ -545,6 +717,7 @@
  	ssusb_phy_power_off(ssusb);
  	clk_bulk_disable_unprepare(BULK_CLKS_CNT, ssusb->clks);
 -	ssusb_wakeup_set(ssusb, true);
@@ -260,7 +260,7 @@ the session. suspend_power_off defaults to 0.
  	return 0;
  
  sleep_err:
-@@ -559,6 +700,9 @@
+@@ -559,6 +731,9 @@
  	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
  	int ret;
  
@@ -320,7 +320,7 @@ the session. suspend_power_off defaults to 0.
  	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
  	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
  	timer_delete_sync(&hcd->rh_timer);
-@@ -766,7 +800,8 @@
+@@ -766,5 +800,6 @@
  	clk_bulk_disable_unprepare(BULK_CLKS_NUM, mtk->clks);
 -	usb_wakeup_set(mtk, true);
 +	/* Already asleep: arming IP-sleep wakeup would resume immediately. */
@@ -338,7 +338,7 @@ the session. suspend_power_off defaults to 0.
  	usb_wakeup_set(mtk, false);
  	ret = clk_bulk_prepare_enable(BULK_CLKS_NUM, mtk->clks);
  	if (ret)
-@@ -808,7 +845,7 @@
+@@ -808,6 +845,6 @@
  	clk_bulk_disable_unprepare(BULK_CLKS_NUM, mtk->clks);
  enable_wakeup:
 -	usb_wakeup_set(mtk, true);
