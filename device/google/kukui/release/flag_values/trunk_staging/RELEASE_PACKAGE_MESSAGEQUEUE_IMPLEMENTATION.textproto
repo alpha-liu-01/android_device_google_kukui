@@ -1,0 +1,10 @@
+# trunk_staging selects CombinedDeliMessageQueue, whose next() carries no
+# @UnsupportedAppUsage, so ART blocks it for every app. GeckoView (Firefox)
+# looks MessageQueue.next() up over JNI when Gecko starts, gets
+# NoSuchMethodError and its engine never runs. The shipping Android 16
+# CombinedMessageQueue limits next() to targetSdk <= 36, and Firefox 159
+# targets 37. Use the queue that the flag declaration defaults to.
+name: "RELEASE_PACKAGE_MESSAGEQUEUE_IMPLEMENTATION"
+value {
+  string_value: "LegacyMessageQueue/MessageQueue.java"
+}

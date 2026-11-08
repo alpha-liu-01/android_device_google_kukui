@@ -1,0 +1,5 @@
+# Kukui overrides for the trunk_staging release config that this tree lunches.
+default_containers: "product"
+default_containers: "system"
+default_containers: "system_ext"
+default_containers: "vendor"
