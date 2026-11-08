@@ -39,6 +39,10 @@ $(call inherit-product, $(SRC_TARGET_DIR)/product/full_base.mk)
 $(call inherit-product, device/mainline/common/mainline_common.mk)
 
 PRODUCT_USE_DYNAMIC_PARTITIONS := true
+# Ship APEXes uncompressed. A compressed APEX is unpacked into /data on the
+# first boot; from a USB 2.0 stick that alone takes about two minutes. The
+# uncompressed set is about 42 MiB larger and still fits super easily.
+PRODUCT_COMPRESSED_APEX := false
 PRODUCT_SHIPPING_API_LEVEL := 36
 PRODUCT_OTA_ENFORCE_VINTF_KERNEL_REQUIREMENTS := false
 PRODUCT_CHARACTERISTICS := tablet
