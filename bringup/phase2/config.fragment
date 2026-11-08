@@ -29,3 +29,6 @@ CONFIG_NET_KEY=m
 # netd opens NETLINK_NFLOG. The quota socket is allowed to fail, but the
 # strict-socket unbind then returns EINVAL on every start.
 CONFIG_NETFILTER_NETLINK_LOG=m
+# CCI devfreq. mtk-svs needs the CCI OPP table for its third bank; without
+# this driver it stays in deferred probe and no SVS voltages are applied.
+CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y
