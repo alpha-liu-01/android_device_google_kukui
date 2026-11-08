@@ -57,6 +57,9 @@ SensorBase::SensorBase(int32_t sensorHandle, ISensorsEventCallback* callback, Se
         case SensorType::GYROSCOPE:
             mSensorInfo.typeAsString = SENSOR_STRING_TYPE_GYROSCOPE;
             break;
+        case SensorType::LIGHT:
+            mSensorInfo.typeAsString = SENSOR_STRING_TYPE_LIGHT;
+            break;
         default:
             ALOGE("unsupported sensor type %d", type);
             break;
