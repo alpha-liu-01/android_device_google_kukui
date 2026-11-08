@@ -235,6 +235,14 @@ PRODUCT_PRODUCT_PROPERTIES += \
     bluetooth.profile.hap.client.enabled=false \
     bluetooth.profile.vcp.controller.enabled=false
 
+# The MT8183 OVL planes cannot scale. drm_hwcomposer assumes a plane that
+# lists YUV formats has a scaler, and OVL lists YUYV and UYVY. It then puts
+# the scaled wallpaper on a plane, the test commit fails with ERANGE, and
+# the whole frame falls back to the GPU. With this property only the
+# scaled layer goes to the GPU.
+PRODUCT_VENDOR_PROPERTIES += \
+    vendor.hwc.drm.scale_with_gpu=true
+
 PRODUCT_VENDOR_PROPERTIES += \
     vendor.hwc.drm.device=/dev/dri/card0 \
     vendor.hwc.drm.internal_display_names=DSI-1 \
