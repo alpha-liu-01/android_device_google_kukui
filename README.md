@@ -12,7 +12,11 @@ Android data partition.
 
 ## Status
 
-Tested on one Krane sku176. Other Kukui boards are not tested.
+Tested on one Krane sku176. Krane sku0 (AUO kd101n80-45na panel, Goodix
+27C6:0E31 touchscreen) was tested from USB with the sku0 FIT entry and
+the 0E31 touch configuration. Other Kukui boards are not tested.
+
+`cat /proc/device-tree/model` under ChromeOS names the SKU.
 
 The current image reaches the desktop from USB and from the internal
 disk. The keyboard, touchscreen, stylus, Wi-Fi, Bluetooth HID, cameras,

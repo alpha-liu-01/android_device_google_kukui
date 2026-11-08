@@ -23,6 +23,8 @@ dumpimage -T flat_dt -p 1 -o "$work/krane.dtb" "$fit"
 dumpimage -T flat_dt -p 2 -o "$work/ramdisk.gz" "$fit"
 lzma -dc "$work/kernel.lzma" > "$work/Image"
 test "$(stat -c %s "$work/krane.dtb")" = 65144
+# Same DTB with the sku0 panel and compatible. See krane-sku0-dtb.sh.
+"$ROOT/bringup/kernel/krane-sku0-dtb.sh" "$work/krane.dtb" "$work/krane-sku0.dtb"
 
 # eMMC ramdisk: the camera ramdisk with only /init replaced.
 mkdir -p "$work/rd"
@@ -85,6 +87,14 @@ pack_one() {
             compression = "none";
             hash-1 { algo = "crc32"; };
         };
+        fdt-2 {
+            description = "mt8183-kukui-krane-sku0";
+            data = /incbin/("krane-sku0.dtb");
+            type = "flat_dt";
+            arch = "arm64";
+            compression = "none";
+            hash-1 { algo = "crc32"; };
+        };
         ramdisk-1 {
             description = "unavailable";
             data = /incbin/("${ramdisk}");
@@ -101,6 +111,13 @@ pack_one() {
             description = "mt8183-kukui-krane-sku176";
             kernel = "kernel-1";
             fdt = "fdt-1";
+            ramdisk = "ramdisk-1";
+            loadables = "kernel-1";
+        };
+        conf-2 {
+            description = "mt8183-kukui-krane-sku0";
+            kernel = "kernel-1";
+            fdt = "fdt-2";
             ramdisk = "ramdisk-1";
             loadables = "kernel-1";
         };

@@ -31,6 +31,22 @@ require_token() {
     }
 }
 
+# Krane ships with two panels. A FIT without the sku0 entry boots the
+# sku176 DTB on an AUO panel and the screen stays black.
+require_skus() {
+    local fit
+    fit=$(mktemp)
+    futility vbutil_kernel --get-vmlinuz "$1" --vmlinuz-out "$fit"
+    for sku in sku176 sku0; do
+        dumpimage -l "$fit" | grep -q "mt8183-kukui-krane-$sku\$" || {
+            echo "$1 has no krane $sku configuration" >&2
+            rm -f "$fit"
+            exit 1
+        }
+    done
+    rm -f "$fit"
+}
+
 for f in "$USB_KPART" "$ANDROID_KPART" "$MENU_KPART" "$SUPER_SRC"; do
     [[ -f "$f" ]] || { echo "missing $f" >&2; exit 1; }
 done
@@ -40,6 +56,9 @@ futility vbutil_kernel --verify "$MENU_KPART" >/dev/null
 require_token "$USB_KPART" "androidboot.boot_devices=soc/11201000.usb/11200000.usb"
 require_token "$ANDROID_KPART" "androidboot.boot_devices=soc/11230000.mmc"
 require_token "$MENU_KPART" "console=ttynull"
+require_skus "$USB_KPART"
+require_skus "$ANDROID_KPART"
+require_skus "$MENU_KPART"
 if cmdline_of "$ANDROID_KPART" | grep -q -F 'androidboot.boot_devices=11230000.mmc'; then
     echo "android.kpart boot_devices is missing the soc/ prefix" >&2
     exit 1
