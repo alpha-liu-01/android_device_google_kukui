@@ -22,6 +22,14 @@ on early-init
     export PAN_I_WANT_A_BROKEN_VULKAN_DRIVER 1
     setprop debug.renderengine.backend skiaglthreaded
     setprop debug.hwui.renderer skiagl
+    # The panel scans out portrait and the UI is landscape (ORIENTATION_270).
+    # The OVL planes cannot rotate by 90, and HWUI's GL path does not
+    # pre-rotate on its own, so every layer went to GPU composition. With
+    # patches/frameworks_base_hwui_gl_prerotation.patch applied, this makes
+    # apps render in panel orientation so drm_hwcomposer can scan them out.
+    # skiavk would pre-rotate too, but HWUI needs Vulkan 1.1 and panvk on
+    # Bifrost reports 1.0.
+    setprop debug.hwui.gl_prerotation true
     # The tenth boot got past HWC hotplug (ctl.start bootanim) and then
     # SIGABRT about 160ms later, on the RenderEngine thread. That thread
     # is priming the shader cache. Skip it so the first frames are the

@@ -33,6 +33,12 @@
 #   external_drm_hwcomposer_dsi_crtc.patch
 #     DSI prefers the CRTC with more planes. The property defaults on,
 #     which is the RK3399 big VOP. Krane has one DSI CRTC.
+#   frameworks_base_hwui_gl_prerotation.patch
+#     HWUI's GL pipeline follows the window transform hint the way the
+#     Vulkan one does: buffers in panel orientation, drawn through a
+#     pre-rotation matrix, one extra buffer while planes hold the last
+#     one. Off unless debug.hwui.gl_prerotation is set; init.kukui.rc
+#     sets it. --reverse leaves it.
 #   external_minigbm*.patch
 #     NV12 decoder stride and an HWC fallback that drops scanout when the
 #     display cannot take the format. The Rockchip AFBC dumb backend is
@@ -247,6 +253,9 @@ apply_or_skip "${LINEAGE_ROOT}/frameworks/av" \
 apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
     "${REPO_ROOT}/patches/frameworks_base_brightness_and_media.patch" \
     "brightness property and media null checks"
+apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
+    "${REPO_ROOT}/patches/frameworks_base_hwui_gl_prerotation.patch" \
+    "HWUI GL pre-rotation"
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_mesa_board_mk.patch" \
     "mesa 25 board.mk"
