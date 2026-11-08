@@ -40,9 +40,24 @@ trap 'rm -rf "$work"' EXIT
 
 fit=$(mktemp)
 futility vbutil_kernel --get-vmlinuz "$KERNEL_FIT" --vmlinuz-out "$fit"
-dumpimage -T flat_dt -p 0 -o "$work/kernel.lzma" "$fit"
-dumpimage -T flat_dt -p 1 -o "$work/board.dtb" "$fit"
-dumpimage -T flat_dt -p 2 -o "$work/ramdisk.gz" "$fit"
+# A Krane FIT can carry sku176 and sku0 before the ramdisk. Take the
+# first image of each type instead of assuming three fixed indexes.
+fit_index() {
+    dumpimage -l "$1" | awk -v want="$2" '
+        /^ Image / { idx=$2 }
+        $0 ~ want && found == "" { found=idx }
+        END {
+            if (found == "") exit 1
+            print found
+        }
+    '
+}
+dumpimage -T flat_dt -p "$(fit_index "$fit" "Type:[[:space:]]+Kernel Image")" \
+    -o "$work/kernel.lzma" "$fit"
+dumpimage -T flat_dt -p "$(fit_index "$fit" "Type:[[:space:]]+Flat Device Tree")" \
+    -o "$work/board.dtb" "$fit"
+dumpimage -T flat_dt -p "$(fit_index "$fit" "Type:[[:space:]]+RAMDisk")" \
+    -o "$work/ramdisk.gz" "$fit"
 lzma -dc "$work/kernel.lzma" > "$work/Image"
 
 if [[ -n "$DTB" ]]; then
@@ -57,16 +72,48 @@ fi
     echo "empty DTB description" >&2
     exit 1
 }
+# grep -q under pipefail reports failure when dtc is closed early.
+board_text=$(dtc -I dtb -O dts "$work/board.dtb" 2>/dev/null || true)
 if [[ -n "$DTB_COMPAT" ]]; then
-    dtc -I dtb -O dts "$work/board.dtb" 2>/dev/null | grep -q -F "$DTB_COMPAT" || {
+    grep -q -F -- "$DTB_COMPAT" <<<"$board_text" || {
         echo "$work/board.dtb does not contain $DTB_COMPAT" >&2
         exit 1
     }
 else
-    dtc -I dtb -O dts "$work/board.dtb" 2>/dev/null | grep -q -F 'google,' || {
+    grep -q -F -- 'google,' <<<"$board_text" || {
         echo "$work/board.dtb does not look like a Kukui DTB" >&2
         exit 1
     }
+fi
+# Krane sku0 is the same sku176 DTB with the AUO panel. Other boards,
+# including Kodama, keep the single DTB that was selected above.
+command -v fdtget >/dev/null || { echo "fdtget is required" >&2; exit 1; }
+board_compat=$(fdtget "$work/board.dtb" / compatible)
+case " $board_compat " in
+    *" google,krane-sku176 "*)
+        "$ROOT/bringup/kernel/krane-sku0-dtb.sh" "$work/board.dtb" "$work/krane-sku0.dtb"
+        ;;
+esac
+sku0_images=""
+sku0_confs=""
+if [[ -f "$work/krane-sku0.dtb" ]]; then
+    sku0_images='
+        fdt-2 {
+            description = "mt8183-kukui-krane-sku0";
+            data = /incbin/("krane-sku0.dtb");
+            type = "flat_dt";
+            arch = "arm64";
+            compression = "none";
+            hash-1 { algo = "crc32"; };
+        };'
+    sku0_confs='
+        conf-2 {
+            description = "mt8183-kukui-krane-sku0";
+            kernel = "kernel-1";
+            fdt = "fdt-2";
+            ramdisk = "ramdisk-1";
+            loadables = "kernel-1";
+        };'
 fi
 
 # eMMC ramdisk: the kernel FIT ramdisk with only /init replaced.
@@ -130,6 +177,7 @@ pack_one() {
             compression = "none";
             hash-1 { algo = "crc32"; };
         };
+${sku0_images}
         ramdisk-1 {
             description = "unavailable";
             data = /incbin/("${ramdisk}");
@@ -149,6 +197,7 @@ pack_one() {
             ramdisk = "ramdisk-1";
             loadables = "kernel-1";
         };
+${sku0_confs}
     };
 };
 EOF

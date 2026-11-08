@@ -37,13 +37,16 @@ cpp -nostdinc \
     -o "$work/$name.dts" "$DTS"
 dtc -I dts -O dtb -o "$OUT/$name.dtb" "$work/$name.dts"
 
-if ! dtc -I dtb -O dts "$OUT/$name.dtb" 2>/dev/null | grep -q -F "$COMPAT"; then
+# grep -q under pipefail reports failure when dtc is closed early with
+# SIGPIPE, even though the string was found. Read the text first.
+text=$(dtc -I dtb -O dts "$OUT/$name.dtb" 2>/dev/null || true)
+grep -q -F -- "$COMPAT" <<<"$text" || {
     echo "$OUT/$name.dtb does not contain $COMPAT" >&2
     exit 1
-fi
-if ! dtc -I dtb -O dts "$OUT/$name.dtb" 2>/dev/null | grep -q -F 'mediatek,mt8183'; then
+}
+grep -q -F -- 'mediatek,mt8183' <<<"$text" || {
     echo "$OUT/$name.dtb does not contain mediatek,mt8183" >&2
     exit 1
-fi
+}
 
 echo "$OUT/$name.dtb $(stat -c %s "$OUT/$name.dtb") $(sha256sum "$OUT/$name.dtb" | awk '{print $1}')"

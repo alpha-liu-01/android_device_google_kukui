@@ -21,9 +21,10 @@ copies them. It does not compile either tree.
 
 ## Board DTB
 
-The DTB inside the FITs is board-specific. Krane sku176 is the default:
-running `pack-install-fits.sh` without extra variables keeps the
-existing Krane behavior.
+The DTB inside the FITs is board-specific. Krane is the default:
+running `pack-install-fits.sh` without extra variables keeps the Krane
+FIT, including both the sku176 and sku0 configurations. `build-images.sh`
+requires those two names only when the FIT is a Krane FIT.
 
 For another Kukui board, build its DTB from the same Linux 6.18.28 tree:
 

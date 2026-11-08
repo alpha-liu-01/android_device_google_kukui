@@ -84,7 +84,8 @@ KUKUI_KERNEL_FIT=/path/to/kernel.kpart \
     /path/to/kukui-menu
 ```
 
-`pack-install-fits.sh` defaults to Krane. For a new board it:
+`pack-install-fits.sh` defaults to Krane and, for that board, also adds
+the sku0 panel configuration. For a new board it:
 
 - replaces the FIT DTB;
 - verifies the compatible string;

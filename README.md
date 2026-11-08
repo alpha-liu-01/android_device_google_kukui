@@ -1,7 +1,8 @@
 # LineageOS 23.2 for Google Kukui (Krane and Kodama)
 
 LineageOS 23.2, Android 16, for MT8183 Kukui boards. Tested on the
-Lenovo IdeaPad Duet (Google Krane, sku176) and Google Kodama (sku16).
+Lenovo IdeaPad Duet (Google Krane, sku176 and sku0) and the Lenovo 10e
+Chromebook Tablet (Google Kodama, sku16).
 The bootloader stays the factory ChromeOS depthcharge. The image
 boots from a USB stick with Ctrl+U, and an installer in that system can
 copy it onto the internal eMMC.
@@ -13,8 +14,12 @@ Android data partition.
 
 ## Status
 
-Tested on one Krane sku176 and one Kodama sku16. Other Kukui boards are
-not tested.
+Tested on one Krane sku176, one Krane sku0, and one Kodama sku16.
+Other Kukui boards are not tested.
+
+Krane sku0 (AUO kd101n80-45na panel, Goodix 27C6:0E31 touchscreen) was
+tested from USB with the sku0 FIT entry and the 0E31 touch configuration.
+`cat /proc/device-tree/model` under ChromeOS names the SKU.
 
 The current image reaches the desktop from USB and from the internal
 disk. On Krane, the keyboard, touchscreen, stylus, Wi-Fi, Bluetooth HID,

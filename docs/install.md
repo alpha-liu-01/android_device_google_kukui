@@ -9,8 +9,9 @@ and fastboot are not the install path. The kernel keeps the USB
 controller in host mode so the stick can be the boot disk, which means
 the tablet cannot also present itself as a USB gadget for sideload.
 
-This was tested on one Lenovo IdeaPad Duet, Google Krane sku176, and
-one Google Kodama sku16, with the factory depthcharge firmware.
+This was tested on one Lenovo IdeaPad Duet (Google Krane sku176), one
+Krane sku0 from USB, and one Lenovo 10e Chromebook Tablet (Google
+Kodama sku16), with the factory depthcharge firmware.
 Developer mode and USB boot are already enabled on a machine that boots
 postmarketOS from USB. This does not flash UEFI and does not replace
 the read-only firmware.
