@@ -1,7 +1,8 @@
 #!/bin/bash
 # Add a Krane sku0 configuration to an existing kernel partition image
 # (for example work/phase4/kernel.kpart.usb) that only carries sku176.
-# The kernel, sku176 dtb, ramdisk and command line are reused unchanged.
+# The sku176 dtb, ramdisk and command line are reused. Set KUKUI_IMAGE to
+# replace the kernel with a new Image; otherwise the kernel is reused.
 # Does not write a disk.
 set -euo pipefail
 
@@ -20,6 +21,10 @@ if dumpimage -l "$work/fit" | grep -q 'mt8183-kukui-krane-sku0'; then
     exit 1
 fi
 dumpimage -T flat_dt -p 0 -o "$work/kernel.lzma" "$work/fit"
+if [[ -n "${KUKUI_IMAGE:-}" ]]; then
+    [[ -f "$KUKUI_IMAGE" ]] || { echo "missing KUKUI_IMAGE: $KUKUI_IMAGE" >&2; exit 1; }
+    lzma -9 -c "$KUKUI_IMAGE" > "$work/kernel.lzma"
+fi
 dumpimage -T flat_dt -p 1 -o "$work/krane.dtb" "$work/fit"
 dumpimage -T flat_dt -p 2 -o "$work/ramdisk" "$work/fit"
 "$ROOT/bringup/kernel/krane-sku0-dtb.sh" "$work/krane.dtb" "$work/krane-sku0.dtb"

@@ -70,27 +70,59 @@ the session. suspend_power_off defaults to 0.
 +
 +	if (!udev_on_this_ssusb(udev))
 +		return 0;
++	/*
++	 * Enabling wakeup here makes the hub or the keyboard cover abort
++	 * deep suspend as soon as the bus goes to U3, so the port is powered
++	 * again before the light can stay off. Both policies leave wakeup
++	 * disabled. The powered-on policy also forbids runtime suspend so a
++	 * USB boot disk is not dropped while the system is awake.
++	 */
++	device_wakeup_disable(&udev->dev);
 +	if (power_off) {
 +		if (!udev->dev.power.runtime_auto)
 +			pm_runtime_allow(&udev->dev);
-+		device_wakeup_enable(&udev->dev);
-+	} else {
-+		device_wakeup_disable(&udev->dev);
-+		if (udev->dev.power.runtime_auto)
-+			pm_runtime_forbid(&udev->dev);
++	} else if (udev->dev.power.runtime_auto) {
++		pm_runtime_forbid(&udev->dev);
 +	}
++	return 0;
++}
++
++static int set_child_wakeup(struct device *child, void *data)
++{
++	bool enable = *(bool *)data;
++
++	if (enable)
++		device_wakeup_enable(child);
++	else
++		device_wakeup_disable(child);
 +	return 0;
 +}
 +
 +static void apply_usb_sleep_policy(struct device *dev, bool power_off)
 +{
++	bool controller_wake = !power_off;
++
 +	if (power_off)
 +		pm_set_mem_sleep(PM_SUSPEND_MEM);
 +	else
 +		pm_set_mem_sleep(PM_SUSPEND_TO_IDLE);
 +	usb_for_each_dev(&power_off, keep_usb_device);
-+	dev_info(dev, "suspend_power_off=%d, mem_sleep=%s\n", power_off,
-+		 power_off ? "deep" : "s2idle");
++	/*
++	 * The hub and the keyboard are not the only wake sources. The
++	 * controller's own IRQ is armed from device_may_wakeup(), and the
++	 * suspend path used to enable the IP-sleep interrupt after the IP
++	 * was already asleep. That pending condition brings the CPUs back
++	 * in about 20 ms, so the port is powered again. Powering the port
++	 * off leaves the controller unable to wake the system. The power
++	 * button and the lid remain wake sources.
++	 */
++	if (controller_wake)
++		device_wakeup_enable(dev);
++	else
++		device_wakeup_disable(dev);
++	device_for_each_child(dev, &controller_wake, set_child_wakeup);
++	dev_info(dev, "suspend_power_off=%d, mem_sleep=%s, usb wakeup off\n",
++		 power_off, power_off ? "deep" : "s2idle");
 +}
 +
 +static int usb_policy_notify(struct notifier_block *nb, unsigned long action,
@@ -102,8 +134,7 @@ the session. suspend_power_off defaults to 0.
 +	if (action != USB_DEVICE_ADD || !ssusb_policy_dev)
 +		return NOTIFY_DONE;
 +	power_off = mtu3_suspend_powers_off(ssusb_policy_dev);
-+	if (!power_off)
-+		keep_usb_device(udev, &power_off);
++	keep_usb_device(udev, &power_off);
 +	return NOTIFY_OK;
 +}
 +
@@ -220,6 +251,15 @@ the session. suspend_power_off defaults to 0.
  	dev_dbg(dev, "%s\n", __func__);
  
  	switch (ssusb->dr_mode) {
+@@ -545,7 +686,8 @@
+ 	ssusb_phy_power_off(ssusb);
+ 	clk_bulk_disable_unprepare(BULK_CLKS_CNT, ssusb->clks);
+-	ssusb_wakeup_set(ssusb, true);
++	/* Already asleep: arming IP-sleep wakeup would resume immediately. */
++	ssusb_wakeup_set(ssusb, false);
+ 	return 0;
+ 
+ sleep_err:
 @@ -559,6 +700,9 @@
  	struct ssusb_mtk *ssusb = dev_get_drvdata(dev);
  	int ret;
@@ -280,6 +320,14 @@ the session. suspend_power_off defaults to 0.
  	xhci_dbg(xhci, "%s: stop port polling\n", __func__);
  	clear_bit(HCD_FLAG_POLL_RH, &hcd->flags);
  	timer_delete_sync(&hcd->rh_timer);
+@@ -766,7 +800,8 @@
+ 	clk_bulk_disable_unprepare(BULK_CLKS_NUM, mtk->clks);
+-	usb_wakeup_set(mtk, true);
++	/* Already asleep: arming IP-sleep wakeup would resume immediately. */
++	usb_wakeup_set(mtk, false);
+ 	return 0;
+ 
+ restart_poll_rh:
 @@ -779,6 +813,9 @@
  	struct usb_hcd *shared_hcd = xhci->shared_hcd;
  	int ret;
@@ -290,6 +338,14 @@ the session. suspend_power_off defaults to 0.
  	usb_wakeup_set(mtk, false);
  	ret = clk_bulk_prepare_enable(BULK_CLKS_NUM, mtk->clks);
  	if (ret)
+@@ -808,7 +845,7 @@
+ 	clk_bulk_disable_unprepare(BULK_CLKS_NUM, mtk->clks);
+ enable_wakeup:
+-	usb_wakeup_set(mtk, true);
++	usb_wakeup_set(mtk, false);
+ 	return ret;
+ }
+ 
 @@ -864,6 +901,8 @@
  static int __init xhci_mtk_init(void)
  {

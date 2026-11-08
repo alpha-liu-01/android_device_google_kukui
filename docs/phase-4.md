@@ -268,6 +268,10 @@ DA7219 的板是另一颗 codec：damu、fennel sku1/sku6、fennel14、makomo-sk
 10. zram。内核里已经有 `zram0`，算法可以选 zstd，但这台机器上交换区是 0。`fstab` 写了 `zramsize=50%`，`swapon_all` 仍会去打开 `/sys/block/zram0/max_comp_streams`。6.18 没有这个文件，所以在写入 `disksize` 之前就失败了。Android 16 改由 `mmd` 在开机完成时设置。`mmd.zram.enabled=true`，压缩算法 zstd，大小是内存的 50%。这次开机已经执行 `mmd --setup-zram`。fstab 里的 zram 行已去掉。2026-11-01 只把这份 super 写进 SanDisk（序列号 `000000002959`）。大小 `8589934592`。读回 sha256 `5446e0dc0fd2dcf64b404044a59fec9e8344e739b21419b2bc0bb44b577d7b34`。内核槽、pmOS_boot、metadata、misc、userdata 的开头 1 MiB 没有变。卡未挂载。还没有这次 Ctrl+U。
 11. 休眠和唤醒。开关为关时走 `s2idle`，USB 保持供电。2026-10-31 这次 Ctrl+U 已确认：读卡器灯常亮，`suspend_stats` `success=3`，日志有 `PM: suspend entry (s2idle)`，唤醒后仍是同一次启动。每次停留大约 1 秒，EC 计到的睡眠切换是 0。不预先喂看门狗。
 
+2026-11-08 合上键盘盖不睡眠。`cros_ec_buttons` 有 `SW_LID`，开盖时 Android 本来就会亮屏。`Settings.Global.lid_behavior` 是 0，`PhoneWindowManager` 收到合盖后不调用睡眠。框架默认 `config_lidControlsSleep` 是 false，而且只在设置第一次建立时抄进这个值。overlay 改为 true。已有 userdata 由 `kukui-lid.sh` 在开机后写一次 `lid_behavior=1`，之后不再覆盖。这次没有换镜像，先在正在跑的系统上把这个值写成 1，`getLidBehavior` 变成 `LID_BEHAVIOR_SLEEP`。用户合盖、开盖通过。
+
+这次启动仍是 `androidboot.boot_devices=soc/11230000.mmc`，运行时间大约 96189 秒，没有重启。`/sys/power/mem_sleep` 当时是 `s2idle [deep]`。00:36:32 合盖，`Sleeping ... reason=lid_switch`，`lidState=0`。内核 `PM: suspend entry (deep)` 之后马上 `suspend exit`，接着再次 `suspend entry (deep)`。00:36:38 开盖，`Waking up from Asleep ... reason=WAKE_REASON_LID`。00:36:49 再合盖，同是 `lid_switch`。00:37:23 开盖，再次 `WAKE_REASON_LID`，`PM: suspend exit`，亮屏用了 361 毫秒。第二次合盖到开盖大约 34 秒，中间没有提前唤醒。`suspend-service` 读不到 wakeup reason，resume 时有 `rpm_suspend` 警告，屏幕仍然亮起。当时整次启动的 `suspend_stats` 是 `success=7`、`fail=10`，失败都在 freeze，`errno=-16`。内核环形日志停在启动后 1539 秒，这两次睡眠只在 logcat 里。
+
 ## 完成标准
 
 在 4 GB 内存上完成一次「开机、联网、打开网页、安装应用、睡眠、唤醒」。唤醒后仍是同一次启动。网页不是黑的。

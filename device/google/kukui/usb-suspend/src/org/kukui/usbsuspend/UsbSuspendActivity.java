@@ -1,22 +1,19 @@
 package org.kukui.usbsuspend;
 
+import android.net.Uri;
 import android.os.Bundle;
+import android.view.WindowInsets;
 import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.materialswitch.MaterialSwitch;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.nio.charset.StandardCharsets;
-
 public class UsbSuspendActivity extends AppCompatActivity {
-    private static final String NODE =
-            "/sys/devices/platform/soc/11201000.usb/suspend_power_off";
-    private static final String CHOICE = "/data/system/kukui_usb_suspend_power_off";
+    private static final Uri CHECKED = Uri.parse(
+            "content://org.kukui.usbsuspend/isChecked/kukui_usb_suspend");
 
     private boolean ready;
 
@@ -25,53 +22,46 @@ public class UsbSuspendActivity extends AppCompatActivity {
         DynamicColors.applyToActivityIfAvailable(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_usb_suspend);
+        findViewById(R.id.root).setOnApplyWindowInsetsListener((view, insets) -> {
+            android.graphics.Insets bars = insets.getInsets(
+                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            view.setPadding(bars.left, bars.top, bars.right, bars.bottom);
+            return WindowInsets.CONSUMED;
+        });
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle(R.string.title);
+        }
+
         MaterialSwitch powerOff = findViewById(R.id.power_off);
         TextView status = findViewById(R.id.status);
-        String current = readText(NODE);
-        if (current == null) {
+        if (!UsbSuspendStore.nodePresent()) {
             powerOff.setEnabled(false);
             status.setText(R.string.missing);
             return;
         }
-        powerOff.setChecked(current.trim().startsWith("1"));
+        powerOff.setChecked(UsbSuspendStore.isPowerOff());
         ready = true;
         powerOff.setOnCheckedChangeListener((button, checked) -> {
             if (!ready)
                 return;
-            String value = checked ? "1" : "0";
-            String previous = checked ? "0" : "1";
-            if (!writeText(NODE, value) || !writeText(CHOICE, value)) {
-                writeText(NODE, previous);
-                writeText(CHOICE, previous);
+            if (!UsbSuspendStore.setPowerOff(checked)) {
                 ready = false;
-                button.setChecked(!checked);
+                button.setChecked(UsbSuspendStore.isPowerOff());
                 ready = true;
                 status.setText(R.string.write_failed);
             } else {
                 status.setText("");
+                getContentResolver().notifyChange(CHECKED, null);
             }
         });
     }
 
-    private static String readText(String path) {
-        try (FileInputStream in = new FileInputStream(path)) {
-            byte[] buf = in.readNBytes(16);
-            return new String(buf, StandardCharsets.UTF_8);
-        } catch (Exception ignored) {
-            return null;
-        }
-    }
-
-    private static boolean writeText(String path, String value) {
-        File file = new File(path);
-        File parent = file.getParentFile();
-        if (parent != null && !parent.isDirectory() && !parent.mkdirs())
-            return false;
-        try (FileOutputStream out = new FileOutputStream(file)) {
-            out.write((value + "\n").getBytes(StandardCharsets.UTF_8));
-            return true;
-        } catch (Exception ignored) {
-            return false;
-        }
+    @Override
+    public boolean onSupportNavigateUp() {
+        finish();
+        return true;
     }
 }

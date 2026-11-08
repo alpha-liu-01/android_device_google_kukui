@@ -71,6 +71,7 @@ on post-fs-data
 
 on property:sys.boot_completed=1
     start kukui-wifi-reprobe
+    start kukui-lid
 
 service kukui-usb-suspend /system/bin/sh /vendor/bin/kukui-usb-suspend.sh
     disabled
@@ -85,4 +86,12 @@ service kukui-wifi-reprobe /system/bin/sh /vendor/bin/kukui-wifi-reprobe.sh
     disabled
     user root
     group root
+    oneshot
+
+# Existing data partitions already stored lid_behavior=0. The overlay
+# default applies only when settings are created.
+service kukui-lid /system/bin/sh /vendor/bin/kukui-lid.sh
+    disabled
+    user root
+    group root system
     oneshot

@@ -4,7 +4,10 @@ android_app {
     resource_dirs: ["res"],
     manifest: "AndroidManifest.xml",
     certificate: "platform",
-    static_libs: ["com.google.android.material_material"],
+    static_libs: [
+        "com.google.android.material_material",
+        "SettingsLibTile",
+    ],
     privileged: true,
     platform_apis: true,
     system_ext_specific: true,

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Settings draws this activity under its own bar, so this theme has none. -->
+    <!-- Opened from the System settings row. The toolbar is the back bar. -->
     <style name="Theme.KukuiUsbSuspend" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>

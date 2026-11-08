@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="title">USB power during sleep</string>
+    <string name="title">USB sleep power</string>
     <string name="summary">Whether sleep turns USB power off</string>
     <string name="switch_label">Turn USB power off during sleep</string>
     <string name="detail">When this is off, the USB host stays powered during sleep, so a system started from a USB disk can continue the same boot after waking. When this is on, sleep turns the USB port and PHY off. If the system disk is on that USB port, its light goes out and that boot cannot continue after wake.</string>
