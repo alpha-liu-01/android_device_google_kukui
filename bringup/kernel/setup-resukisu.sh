@@ -1,11 +1,11 @@
 #!/bin/bash
-# Pin ReSukiSU v4.2.0-rc3 into the 6.18.28 tree and apply the manual hooks.
+# Pin ReSukiSU v4.2.0-rc3 into the 6.18.62 tree and apply the manual hooks.
 # The version code is 30000 + git commit count + 700. A full clone of this
 # tag has 4471 commits, which is the 35171 the arm64 manager APK was built with.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
-KERNEL="${1:-$ROOT/work/phase2/linux-6.18.28}"
+KERNEL="${1:-$ROOT/work/phase2/linux-6.18.62}"
 TAG=v4.2.0-rc3
 SRC="$KERNEL/KernelSU"
 

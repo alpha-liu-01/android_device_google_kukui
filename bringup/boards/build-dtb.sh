@@ -1,8 +1,8 @@
 #!/bin/bash
-# Build a Kukui board DTB from a Linux 6.18.28 source tree.
+# Build a Kukui board DTB from a Linux 6.18.62 source tree.
 #
 # Required:
-#   LINUX_SRC   Path to a linux-6.18.28 source tree.
+#   LINUX_SRC   Path to a linux-6.18.62 source tree.
 #
 # Optional:
 #   DTS         DTS file to build. Defaults to Kodama sku16.
@@ -10,11 +10,11 @@
 #                Defaults to "google," so any Kukui DTB is accepted.
 #
 # Usage:
-#   LINUX_SRC=/path/to/linux-6.18.28 \
+#   LINUX_SRC=/path/to/linux-6.18.62 \
 #     bringup/boards/build-dtb.sh /path/to/output
 set -euo pipefail
 
-LINUX_SRC="${LINUX_SRC:?set LINUX_SRC to a linux-6.18.28 source tree}"
+LINUX_SRC="${LINUX_SRC:?set LINUX_SRC to a linux-6.18.62 source tree}"
 OUT="${1:?need an output directory}"
 DTS="${DTS:-$LINUX_SRC/arch/arm64/boot/dts/mediatek/mt8183-kukui-kodama-sku16.dts}"
 COMPAT="${KUKUI_COMPAT:-google,}"

@@ -29,7 +29,7 @@ struct linux_dirent64 {
     char d_name[];
 };
 
-#define RELEASE "6.18.28-mt81-kukui2"
+#define RELEASE "6.18.62-mt81-kukui2"
 #define USB_STORAGE "/lib/modules/" RELEASE "/usb-storage.ko"
 /* sysfs is mounted here, not on /sys. /sys stays empty until Android init. */
 #define SYSFS "/kukui-sys"

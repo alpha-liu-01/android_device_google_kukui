@@ -10,10 +10,10 @@ Device tree, installer, and scripts
 Kernel modules, kernel patches, and the boot menu
   GNU General Public License, version 2 only.
   This covers device/google/kukui/modules/*.ko,
-  device/google/kukui/prebuilt/6.18.28-mt81-kukui2/*.ko,
+  device/google/kukui/prebuilt/6.18.62-mt81-kukui2/*.ko,
   bringup/kernel/, bringup/camera/*.patch, bringup/camera/isp/,
   and device/google/kukui/kukui-menu.c.
-  The modules were built from Linux 6.18.28 as packaged by
+  The modules were built from Linux 6.18.62 with the patches and config of
   linux-postmarketos-mediatek-mt81, plus the config fragment and patches
   in bringup/. That kernel source is not vendored in this repository.
 

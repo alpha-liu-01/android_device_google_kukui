@@ -7,7 +7,7 @@ PRODUCT_OUT=${PRODUCT_OUT:-$BUILD_TOP/out/target/product/kukui}
 RAMDISK=${1:-$PRODUCT_OUT/ramdisk.img}
 WORKDIR=${2:-/tmp/kukui-ramdisk}
 KEEP=$PRODUCT_OUT/system/bin/kukui-keep
-MODS=$ROOT/prebuilt/6.18.28-mt81-kukui2
+MODS=$ROOT/prebuilt/6.18.62-mt81-kukui2
 rm -rf "$WORKDIR"
 mkdir -p "$WORKDIR/root"
 cd "$WORKDIR"
@@ -34,8 +34,8 @@ mv init init.android
 cp "$KEEP" init
 cp "$ROOT/kukui-wifi-reprobe.sh" kukui-wifi-reprobe.sh
 chmod 755 kukui-wifi-reprobe.sh
-mkdir -p lib/modules/6.18.28-mt81-kukui2
-cp "$MODS/"*.ko "$MODS/modules.dep" "$MODS/modules.load" lib/modules/6.18.28-mt81-kukui2/
+mkdir -p lib/modules/6.18.62-mt81-kukui2
+cp "$MODS/"*.ko "$MODS/modules.dep" "$MODS/modules.load" lib/modules/6.18.62-mt81-kukui2/
 chmod 755 init init.android
 find . -print0 | cpio --null -o -H newc > "$WORKDIR/ramdisk-wrapped.cpio"
 echo "$WORKDIR/ramdisk-wrapped.cpio"

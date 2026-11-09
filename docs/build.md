@@ -1,12 +1,15 @@
 # Building
 
 The Android tree is LineageOS 23.2. The kernel is not built by `lunch`.
-It is Linux 6.18.28 from `linux-postmarketos-mediatek-mt81`, plus
+It is the kernel.org Linux 6.18.62 stable release with the patches and
+config of `linux-postmarketos-mediatek-mt81` (packaged there for
+6.18.28; all of them apply to 6.18.62), plus
 `bringup/phase2/config.fragment` and the patches under `bringup/kernel/`
 and `bringup/camera/`. The FIT images and kernel modules in this
-repository are from that build. `LOCALVERSION` is `-mt81-kukui2`.
+repository are from that build. `LOCALVERSION` is `-mt81-kukui2`, so the
+release string and the module directory are `6.18.62-mt81-kukui2`.
 
-Some kernel patches depend on each other. Apply them to the 6.18.28
+Some kernel patches depend on each other. Apply them to the 6.18.62
 tree in this order:
 
 1. The `linux-postmarketos-mediatek-mt81` patches.
@@ -52,10 +55,10 @@ running `pack-install-fits.sh` without extra variables keeps the Krane
 FIT, including both the sku176 and sku0 configurations. `build-images.sh`
 requires those two names only when the FIT is a Krane FIT.
 
-For another Kukui board, build its DTB from the same Linux 6.18.28 tree:
+For another Kukui board, build its DTB from the same Linux 6.18.62 tree:
 
 ```
-LINUX_SRC=/path/to/linux-6.18.28 \
+LINUX_SRC=/path/to/linux-6.18.62 \
 KUKUI_COMPAT=google,kodama-sku16 \
   bringup/boards/build-dtb.sh /tmp/kodama-dtb
 ```

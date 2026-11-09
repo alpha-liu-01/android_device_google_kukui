@@ -20,7 +20,7 @@
 #include <sys/syscall.h>
 #include <unistd.h>
 
-#define RELEASE "6.18.28-mt81-kukui2"
+#define RELEASE "6.18.62-mt81-kukui2"
 #define MODDIR "/lib/modules/" RELEASE
 
 static void kmsg(const char *text) {
