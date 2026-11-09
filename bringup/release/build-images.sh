@@ -31,11 +31,11 @@ require_token() {
     }
 }
 
-# Krane ships with two panels. A FIT without the sku0 entry boots the
-# sku176 DTB on an AUO panel and the screen stays black. A Kodama FIT
-# has neither name and is not checked here.
+# A Krane FIT carries both Krane panels and Kodama sku16. depthcharge
+# picks the configuration whose DTB compatible matches the board. A FIT
+# with neither Krane name is a single-board image and is not checked.
 require_skus() {
-    local fit listed
+    local fit listed name
     fit=$(mktemp)
     futility vbutil_kernel --get-vmlinuz "$1" --vmlinuz-out "$fit"
     listed=$(dumpimage -l "$fit")
@@ -43,9 +43,9 @@ require_skus() {
         rm -f "$fit"
         return 0
     fi
-    for sku in sku176 sku0; do
-        grep -q "mt8183-kukui-krane-$sku\$" <<<"$listed" || {
-            echo "$1 has no krane $sku configuration" >&2
+    for name in mt8183-kukui-krane-sku176 mt8183-kukui-krane-sku0 mt8183-kukui-kodama-sku16; do
+        grep -q "${name}\$" <<<"$listed" || {
+            echo "$1 has no $name configuration" >&2
             rm -f "$fit"
             exit 1
         }

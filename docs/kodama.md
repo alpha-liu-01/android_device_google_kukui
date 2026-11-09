@@ -75,6 +75,11 @@ after the input device rather than changing these files.
 
 ## Pack the FITs
 
+A Krane release FIT already includes `mt8183-kukui-kodama-sku16` as
+`conf-3`, next to Krane sku176 and sku0. depthcharge picks it when the
+board compatible is `google,kodama-sku16`. The commands below build a
+Kodama-only FIT instead, replacing the Krane configurations.
+
 Pass the Kodama DTB and a FIT that contains the shared kernel and
 ramdisk:
 
