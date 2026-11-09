@@ -1,0 +1,1012 @@
+diff --git a/Android.bp b/Android.bp
+index 2562fc5..dff0c4b 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -116,6 +116,7 @@ filegroup {
+         "hwc/HwcDisplay.cpp",
+         "hwc/HwcDisplayConfigs.cpp",
+         "hwc/HwcLayer.cpp",
++        "hwc/Mdp3Rotator.cpp",
+ 
+         "stats/CompositionStats.cpp",
+         "stats/CompositionStatsPoller.cpp",
+diff --git a/backend/Backend.cpp b/backend/Backend.cpp
+index 7d93476..0ccf2e2 100644
+--- a/backend/Backend.cpp
++++ b/backend/Backend.cpp
+@@ -153,7 +153,9 @@ bool Backend::IsClientLayer(const HwcDisplay* display, const HwcLayer* layer) {
+   return !HardwareSupportsLayerType(layer->GetSfType()) ||
+          !layer->IsLayerUsableAsDevice() || display->CtmByGpu() ||
+          (layer->GetLayerData().pi.RequireScalingOrPhasing() &&
+-          display->ForcedScalingWithGpu());
++          display->ForcedScalingWithGpu()) ||
++         (layer->GetLayerData().pi.transform.rotate90 &&
++          !display->CanPreRotate(layer));
+ }
+ 
+ bool Backend::HardwareSupportsLayerType(CompositionType comp_type) {
+diff --git a/compositor/LayerData.h b/compositor/LayerData.h
+index 21e7269..a1ec9b0 100644
+--- a/compositor/LayerData.h
++++ b/compositor/LayerData.h
+@@ -20,6 +20,7 @@
+ #include <cstdbool>
+ #include <cstdint>
+ #include <optional>
++#include <utility>
+ #include <vector>
+ 
+ #include "bufferinfo/BufferInfo.h"
+@@ -87,8 +88,12 @@ struct PresentInfo {
+     const auto &src = *source_crop.f_rect;
+     const auto &dst = *display_frame.i_rect;
+ 
+-    const float src_width = src.right - src.left;
+-    const float src_height = src.bottom - src.top;
++    float src_width = src.right - src.left;
++    float src_height = src.bottom - src.top;
++    /* A 90 degree rotation swaps the source dimensions on screen. */
++    if (transform.rotate90) {
++      std::swap(src_width, src_height);
++    }
+ 
+     auto dest_width = float(dst.right - dst.left);
+     auto dest_height = float(dst.bottom - dst.top);
+diff --git a/hwc/HwcDisplay.cpp b/hwc/HwcDisplay.cpp
+index a4f342a..b439fdd 100644
+--- a/hwc/HwcDisplay.cpp
++++ b/hwc/HwcDisplay.cpp
+@@ -411,10 +411,19 @@ auto HwcDisplay::PresentStagedComposition(
+   }
+ 
+   for (auto &l : layers_) {
++    /* A layer rotated by MDP3 in this and the last commit never had its
++     * previous buffer on a plane, and the job that read it has finished
++     * (a new buffer waits for it). Release it now, not a frame later, so
++     * producers that do not add a buffer for scanout are not starved. */
++    if (rotated_now_.count(&l.second) != 0 &&
++        rotated_prev_.count(&l.second) != 0) {
++      continue;
++    }
+     if (l.second.GetPriorBufferScanOutFlag()) {
+       out_release_fences.emplace_back(l.first, out_present_fence);
+     }
+   }
++  rotated_prev_ = rotated_now_;
+ 
+   return true;
+ }
+@@ -552,6 +561,7 @@ void HwcDisplay::Deinit() {
+     GetPipe().atomic_state_manager->ExecuteAtomicCommit(a_args);
+ 
+     current_plan_.reset();
++    rotator_.reset();
+     backend_.reset();
+     if (flatcon_) {
+       flatcon_->StopThread();
+@@ -609,6 +619,9 @@ bool HwcDisplay::Init() {
+ 
+   if (!IsInHeadlessMode() && GetPipe().connector->Get()->IsInternal()) {
+     SetConfigGroupsForActiveConfig();
++    rotator_ = Mdp3Rotator::Create(*GetPipe().device, [this]() {
++      hwc_->SendRefreshEventToClient(handle_);
++    });
+   }
+   return true;
+ }
+@@ -778,7 +791,8 @@ bool HwcDisplay::TestComposition(
+   if (IsInHeadlessMode()) {
+     return true;
+   }
+-  auto a_args = CreateFrameUpdateCommit(composition.composition_types);
++  auto a_args = CreateFrameUpdateCommit(composition.composition_types,
++                                        /*test_only=*/true);
+   if (!a_args) {
+     return false;
+   }
+@@ -792,7 +806,7 @@ bool HwcDisplay::TestComposition(
+ 
+ // NOLINTNEXTLINE(readability-function-cognitive-complexity)
+ std::optional<AtomicCommitArgs> HwcDisplay::CreateFrameUpdateCommit(
+-    const Backend::CompositionTypeMap &composition) const {
++    const Backend::CompositionTypeMap &composition, bool test_only) const {
+   if (IsInHeadlessMode()) {
+     ALOGE("%s: Display is in headless mode, should never reach here", __func__);
+     return AtomicCommitArgs{};
+@@ -876,13 +890,31 @@ std::optional<AtomicCommitArgs> HwcDisplay::CreateFrameUpdateCommit(
+   ALOGW_IF(z_map.empty() && !cursor_layer.has_value(), "Empty composition");
+ 
+   std::vector<LayerData> composition_layers;
++  if (!test_only) {
++    rotated_now_.clear();
++  }
+ 
+   // now that they're ordered by z, add them to the composition
+   for (const auto &[_, layer] : z_map) {
+     if (!layer->IsLayerUsableAsDevice()) {
+       return std::nullopt;
+     }
+-    composition_layers.emplace_back(layer->GetLayerData());
++    const auto &layer_data = layer->GetLayerData();
++    if (rotator_ && layer_data.pi.transform.rotate90 &&
++        rotator_->Accepts(layer_data)) {
++      /* The planes rotate by 0 or 180 only. Put a rotated copy on the plane
++       * instead; a test commit only reserves the buffer. */
++      auto rotated = rotator_->Substitute(layer, layer_data, !test_only);
++      if (!rotated) {
++        return std::nullopt;
++      }
++      composition_layers.emplace_back(std::move(*rotated));
++      if (!test_only) {
++        rotated_now_.insert(layer);
++      }
++      continue;
++    }
++    composition_layers.emplace_back(layer_data);
+   }
+ 
+   a_args.composition = DrmKmsPlan::CreateDrmKmsPlan(GetPipe(),
+@@ -935,6 +967,9 @@ bool HwcDisplay::CommitComposition(
+   }
+   out_present_fence = a_args->out_fence;
+   ApplyCommitChanges(*a_args);
++  if (rotator_) {
++    rotator_->EndFrame();
++  }
+   return true;
+ }
+ 
+@@ -981,6 +1016,10 @@ bool HwcDisplay::ForcedScalingWithGpu() const {
+   return hwc_->GetResMan().ForcedScalingWithGpu();
+ }
+ 
++bool HwcDisplay::CanPreRotate(const HwcLayer *layer) const {
++  return rotator_ && rotator_->Accepts(layer->GetLayerData());
++}
++
+ bool HwcDisplay::IsWritebackSupported() {
+   if (IsInHeadlessMode()) {
+     return false;
+diff --git a/hwc/HwcDisplay.h b/hwc/HwcDisplay.h
+index c6f6c54..f2b498a 100644
+--- a/hwc/HwcDisplay.h
++++ b/hwc/HwcDisplay.h
+@@ -17,6 +17,7 @@
+ #pragma once
+ 
+ #include <optional>
++#include <set>
+ 
+ #include <ui/GraphicTypes.h>
+ 
+@@ -28,6 +29,7 @@
+ #include "compositor/LayerData.h"
+ #include "drm/DrmAtomicStateManager.h"
+ #include "drm/VSyncWorker.h"
++#include "hwc/Mdp3Rotator.h"
+ #include "stats/CompositionStats.h"
+ 
+ namespace android {
+@@ -195,6 +197,9 @@ class HwcDisplay {
+ 
+   bool ForcedScalingWithGpu() const;
+ 
++  /* Whether a layer the planes cannot rotate can be rotated before scanout. */
++  bool CanPreRotate(const HwcLayer *layer) const;
++
+   CompositionStats &total_stats() {
+     return total_stats_;
+   }
+@@ -239,7 +244,8 @@ class HwcDisplay {
+   // The caller must do a test commit on the returned args to ensure that the
+   // hardware can perform the commit.
+   std::optional<AtomicCommitArgs> CreateFrameUpdateCommit(
+-      const Backend::CompositionTypeMap &composition) const;
++      const Backend::CompositionTypeMap &composition,
++      bool test_only = false) const;
+ 
+   bool CommitComposition(const Backend::CompositionTypeMap &composition,
+                          SharedFd &out_present_fence);
+@@ -301,6 +307,13 @@ class HwcDisplay {
+ 
+   std::shared_ptr<DrmKmsPlan> current_plan_;
+ 
++  /* MDP3 rotation of 90/270 degree layers, null when unavailable. */
++  std::unique_ptr<Mdp3Rotator> rotator_;
++  /* Layers whose rotated copy was scanned out in this and the last commit.
++   * Their source buffers only went to MDP3, never to a plane. */
++  mutable std::set<const HwcLayer *> rotated_now_;
++  std::set<const HwcLayer *> rotated_prev_;
++
+   SharedFd writeback_complete_fence_;
+ 
+   uint32_t frame_no_ = 0;
+diff --git a/hwc/Mdp3Rotator.cpp b/hwc/Mdp3Rotator.cpp
+new file mode 100644
+index 0000000..7aca88e
+--- /dev/null
++++ b/hwc/Mdp3Rotator.cpp
+@@ -0,0 +1,592 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#define LOG_TAG "drmhwc"
++#define ATRACE_TAG ATRACE_TAG_GRAPHICS
++
++#include "Mdp3Rotator.h"
++
++#include <dirent.h>
++#include <fcntl.h>
++#include <linux/videodev2.h>
++#include <poll.h>
++#include <sys/ioctl.h>
++#include <unistd.h>
++#include <utils/Trace.h>
++#include <xf86drm.h>
++#include <xf86drmMode.h>
++
++#include <cerrno>
++#include <cinttypes>
++#include <cstring>
++#include <ctime>
++#include <fstream>
++
++#include "drm/DrmDevice.h"
++#include "drm/DrmFbImporter.h"
++#include "utils/log.h"
++#include "utils/properties.h"
++
++namespace android {
++
++namespace {
++
++constexpr const char *kMdp3Name = "mtk-mdp3:m2m";
++constexpr int kFenceTimeoutMs = 1000;
++constexpr int kJobTimeoutMs = 500;
++constexpr int kIdleFramesBeforeFree = 120;
++constexpr uint32_t kMinSize = 16;
++constexpr uint32_t kMaxSize = 4096;
++constexpr uint64_t kStatsEvery = 600;
++
++auto NowMs() -> double {
++  struct timespec ts {};
++  clock_gettime(CLOCK_MONOTONIC, &ts);
++  return double(ts.tv_sec) * 1e3 + double(ts.tv_nsec) / 1e6;
++}
++
++auto Xioctl(int fd, unsigned long req, void *arg) -> int {
++  int ret = 0;
++  do {
++    ret = ioctl(fd, req, arg);
++  } while (ret < 0 && errno == EINTR);
++  return ret;
++}
++
++auto FindMdp3Node() -> std::string {
++  DIR *dir = opendir("/sys/class/video4linux");
++  if (dir == nullptr) {
++    return {};
++  }
++  std::string found;
++  while (struct dirent *ent = readdir(dir)) {
++    if (strncmp(ent->d_name, "video", 5) != 0) {
++      continue;
++    }
++    std::ifstream name_file(std::string("/sys/class/video4linux/") +
++                            ent->d_name + "/name");
++    std::string name;
++    std::getline(name_file, name);
++    if (name == kMdp3Name) {
++      found = std::string("/dev/") + ent->d_name;
++      break;
++    }
++  }
++  closedir(dir);
++  return found;
++}
++
++/* Waits until fd is readable (POLLIN) or writable (POLLOUT). */
++auto WaitFd(int fd, short events, int timeout_ms) -> bool {
++  struct pollfd pfd {
++    .fd = fd, .events = events, .revents = 0
++  };
++  int ret = 0;
++  do {
++    ret = poll(&pfd, 1, timeout_ms);
++  } while (ret < 0 && errno == EINTR);
++  return ret > 0 && (pfd.revents & events) != 0;
++}
++
++/* Dequeues one buffer of the given queue, waiting up to the job timeout. */
++auto Dequeue(int fd, uint32_t type, short events, uint32_t *flags) -> bool {
++  for (int tries = 0; tries < 2; tries++) {
++    struct v4l2_plane plane {};
++    struct v4l2_buffer buf {};
++    buf.type = type;
++    buf.memory = V4L2_MEMORY_DMABUF;
++    buf.m.planes = &plane;
++    buf.length = 1;
++    if (Xioctl(fd, VIDIOC_DQBUF, &buf) == 0) {
++      *flags = buf.flags;
++      return true;
++    }
++    if (errno != EAGAIN || !WaitFd(fd, events, kJobTimeoutMs)) {
++      return false;
++    }
++  }
++  return false;
++}
++
++}  // namespace
++
++auto Mdp3Rotator::Create(DrmDevice &drm, std::function<void()> refresh)
++    -> std::unique_ptr<Mdp3Rotator> {
++  if (!Properties::Mdp3Rotation()) {
++    return {};
++  }
++  auto path = FindMdp3Node();
++  if (path.empty()) {
++    ALOGI("MDP3 rotation: no %s device", kMdp3Name);
++    return {};
++  }
++  auto fd = MakeUniqueFd(open(path.c_str(), O_RDWR | O_CLOEXEC));
++  if (!fd) {
++    ALOGE("MDP3 rotation: cannot open %s: %s", path.c_str(), strerror(errno));
++    return {};
++  }
++  struct v4l2_capability cap {};
++  if (Xioctl(*fd, VIDIOC_QUERYCAP, &cap) != 0 ||
++      (cap.device_caps & V4L2_CAP_VIDEO_M2M_MPLANE) == 0) {
++    ALOGE("MDP3 rotation: %s is not an m2m device", path.c_str());
++    return {};
++  }
++  ALOGI("MDP3 rotation: using %s", path.c_str());
++  // NOLINTNEXTLINE(cppcoreguidelines-owning-memory): private constructor
++  return std::unique_ptr<Mdp3Rotator>(
++      new Mdp3Rotator(drm, path, std::move(refresh)));
++}
++
++Mdp3Rotator::Mdp3Rotator(DrmDevice &drm, std::string path,
++                         std::function<void()> refresh)
++    : drm_(drm), path_(std::move(path)), refresh_(std::move(refresh)) {
++  worker_ = std::thread([this] { WorkerLoop(); });
++}
++
++Mdp3Rotator::~Mdp3Rotator() {
++  {
++    const std::lock_guard lock(mutex_);
++    stop_ = true;
++  }
++  cv_.notify_all();
++  worker_.join();
++}
++
++auto Mdp3Rotator::SameSource(const LayerData &layer,
++                             const std::shared_ptr<DrmFbIdHandle> &fb,
++                             const SharedFd &fence) -> bool {
++  return fb && layer.fb.get() == fb.get() &&
++         layer.acquire_fence.get() == fence.get();
++}
++
++/* LayerTransform flips first, then rotates clockwise. */
++auto Mdp3Rotator::Rotation(const LayerTransform &t) -> int {
++  if (!t.rotate90) {
++    return 0;
++  }
++  if (!t.hflip && !t.vflip) {
++    return 90;
++  }
++  if (t.hflip && t.vflip) {
++    return 270;
++  }
++  return -1;
++}
++
++auto Mdp3Rotator::RotatedInfo(const LayerData &layer, int rotation)
++    -> PresentInfo {
++  PresentInfo pi = layer.pi;
++  pi.transform = {};
++  pi.damage = {};
++  if (pi.source_crop.f_rect) {
++    const auto c = *pi.source_crop.f_rect;
++    const auto w = float(layer.bi->width);
++    const auto h = float(layer.bi->height);
++    SrcRectInfo::FRect r{};
++    if (rotation == 90) {
++      /* (x, y) -> (h - y, x) */
++      r = {h - c.bottom, c.left, h - c.top, c.right};
++    } else {
++      /* (x, y) -> (y, w - x) */
++      r = {c.top, w - c.right, c.bottom, w - c.left};
++    }
++    pi.source_crop.f_rect = r;
++  }
++  return pi;
++}
++
++auto Mdp3Rotator::Accepts(const LayerData &layer) const -> bool {
++  if (disabled_ || !layer.bi || !layer.fb) {
++    return false;
++  }
++  const auto &bi = *layer.bi;
++  const int rotation = Rotation(layer.pi.transform);
++  if (rotation != 90 && rotation != 270) {
++    return false;
++  }
++  /* MDP3 moves 32-bit pixels unchanged when told both sides are ARGB32, so
++   * any 4-byte RGB layout works. */
++  switch (bi.format) {
++    case DRM_FORMAT_ARGB8888:
++    case DRM_FORMAT_XRGB8888:
++    case DRM_FORMAT_ABGR8888:
++    case DRM_FORMAT_XBGR8888:
++      break;
++    default:
++      return false;
++  }
++  if (bi.modifiers[0] != DRM_FORMAT_MOD_NONE &&
++      bi.modifiers[0] != DRM_FORMAT_MOD_INVALID) {
++    return false;
++  }
++  if (bi.prime_fds[0] < 0 || bi.offsets[0] != 0) {
++    return false;
++  }
++  if (bi.width < kMinSize || bi.height < kMinSize || bi.width > kMaxSize ||
++      bi.height > kMaxSize || bi.pitches[0] < bi.width * 4) {
++    return false;
++  }
++  /* The planes cannot scale either, so only take layers that are 1:1 once
++   * rotated. */
++  return !RotatedInfo(layer, rotation).RequireScalingOrPhasing();
++}
++
++auto Mdp3Rotator::AllocTarget(Target &t, uint32_t width, uint32_t height,
++                              uint32_t format) -> bool {
++  const int drm_fd = *drm_.GetFd();
++  struct drm_mode_create_dumb create {};
++  create.width = width;
++  create.height = height;
++  create.bpp = 32;
++  if (drmIoctl(drm_fd, DRM_IOCTL_MODE_CREATE_DUMB, &create) != 0) {
++    ALOGE("MDP3 rotation: dumb buffer %ux%u: %s", width, height,
++          strerror(errno));
++    return false;
++  }
++  int prime = -1;
++  const int err = drmPrimeHandleToFD(drm_fd, create.handle,
++                                     DRM_CLOEXEC | DRM_RDWR, &prime);
++  /* The dmabuf keeps the buffer. The FB importer takes its own handle and
++   * closes it when the FB goes, so ours must not linger. */
++  struct drm_mode_destroy_dumb destroy {};
++  destroy.handle = create.handle;
++  drmIoctl(drm_fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
++  if (err != 0) {
++    ALOGE("MDP3 rotation: export dumb buffer: %s", strerror(errno));
++    return false;
++  }
++
++  t.prime = MakeUniqueFd(prime);
++  t.bi = {};
++  t.bi.width = width;
++  t.bi.height = height;
++  t.bi.format = format;
++  t.bi.pitches[0] = create.pitch;
++  t.bi.sizes[0] = uint32_t(create.size);
++  for (int i = 0; i < kBufferMaxPlanes; i++) {
++    t.bi.prime_fds[i] = i == 0 ? prime : -1;
++    t.bi.modifiers[i] = DRM_FORMAT_MOD_NONE;
++  }
++  t.fb = drm_.GetDrmFbImporter().GetOrCreateFbId(&t.bi);
++  if (!t.fb) {
++    ALOGE("MDP3 rotation: cannot import %ux%u target", width, height);
++    return false;
++  }
++  return true;
++}
++
++auto Mdp3Rotator::Configure(State &st, const Config &cfg) -> bool {
++  ATRACE_NAME("MDP3 configure");
++  const uint32_t out_w = cfg.height;
++  const uint32_t out_h = cfg.width;
++
++  /* A new open() is a new m2m context, so the old one is dropped whole. */
++  st.video = MakeUniqueFd(-1);
++  st.shown = -1;
++  st.next = 0;
++  st.shown_fb.reset();
++  st.shown_fence.reset();
++
++  const bool same_targets = st.config && st.config->width == cfg.width &&
++                            st.config->height == cfg.height &&
++                            st.config->format == cfg.format &&
++                            st.targets[0].fb;
++  st.config.reset();
++  if (!same_targets) {
++    for (auto &t : st.targets) {
++      t = Target{};
++      if (!AllocTarget(t, out_w, out_h, cfg.format)) {
++        return false;
++      }
++    }
++  }
++
++  st.video = MakeUniqueFd(open(path_.c_str(), O_RDWR | O_CLOEXEC | O_NONBLOCK));
++  if (!st.video) {
++    ALOGE("MDP3 rotation: open %s: %s", path_.c_str(), strerror(errno));
++    return false;
++  }
++  const int fd = *st.video;
++
++  auto set_format = [fd](uint32_t type, uint32_t w, uint32_t h,
++                         uint32_t pitch) -> bool {
++    struct v4l2_format f {};
++    f.type = type;
++    f.fmt.pix_mp.width = w;
++    f.fmt.pix_mp.height = h;
++    f.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_ARGB32;
++    f.fmt.pix_mp.field = V4L2_FIELD_NONE;
++    f.fmt.pix_mp.num_planes = 1;
++    f.fmt.pix_mp.plane_fmt[0].bytesperline = pitch;
++    if (Xioctl(fd, VIDIOC_S_FMT, &f) != 0) {
++      ALOGE("MDP3 rotation: S_FMT %ux%u: %s", w, h, strerror(errno));
++      return false;
++    }
++    if (f.fmt.pix_mp.width != w || f.fmt.pix_mp.height != h ||
++        f.fmt.pix_mp.pixelformat != V4L2_PIX_FMT_ARGB32 ||
++        f.fmt.pix_mp.plane_fmt[0].bytesperline != pitch) {
++      ALOGE("MDP3 rotation: S_FMT %ux%u pitch %u became %ux%u pitch %u", w, h,
++            pitch, f.fmt.pix_mp.width, f.fmt.pix_mp.height,
++            f.fmt.pix_mp.plane_fmt[0].bytesperline);
++      return false;
++    }
++    return true;
++  };
++  auto request = [fd](uint32_t type, uint32_t count) -> bool {
++    struct v4l2_requestbuffers rb {};
++    rb.type = type;
++    rb.memory = V4L2_MEMORY_DMABUF;
++    rb.count = count;
++    if (Xioctl(fd, VIDIOC_REQBUFS, &rb) != 0 || rb.count < count) {
++      ALOGE("MDP3 rotation: REQBUFS %u: %s", count, strerror(errno));
++      return false;
++    }
++    return true;
++  };
++
++  uint32_t type_out = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
++  uint32_t type_cap = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
++  if (!set_format(type_out, cfg.width, cfg.height, cfg.pitch) ||
++      !set_format(type_cap, out_w, out_h, st.targets[0].bi.pitches[0])) {
++    return false;
++  }
++  struct v4l2_control ctrl {
++    .id = V4L2_CID_ROTATE, .value = cfg.rotation
++  };
++  if (Xioctl(fd, VIDIOC_S_CTRL, &ctrl) != 0) {
++    ALOGE("MDP3 rotation: rotate %d: %s", cfg.rotation, strerror(errno));
++    return false;
++  }
++  if (!request(type_out, 1) || !request(type_cap, kTargets)) {
++    return false;
++  }
++  if (Xioctl(fd, VIDIOC_STREAMON, &type_out) != 0 ||
++      Xioctl(fd, VIDIOC_STREAMON, &type_cap) != 0) {
++    ALOGE("MDP3 rotation: STREAMON: %s", strerror(errno));
++    return false;
++  }
++  st.config = cfg;
++  ALOGI("MDP3 rotation: %ux%u pitch %u rotate %d", cfg.width, cfg.height,
++        cfg.pitch, cfg.rotation);
++  return true;
++}
++
++auto Mdp3Rotator::Run(State &st, const LayerData &layer, int target_index)
++    -> bool {
++  ATRACE_NAME("MDP3 rotate");
++  const int fd = *st.video;
++  const auto &bi = *layer.bi;
++  auto &target = st.targets[target_index];
++
++  if (layer.acquire_fence &&
++      !WaitFd(*layer.acquire_fence, POLLIN, kFenceTimeoutMs)) {
++    ALOGE("MDP3 rotation: acquire fence timed out");
++    return false;
++  }
++  const uint32_t src_size = bi.pitches[0] * bi.height;
++  struct v4l2_plane plane {};
++  struct v4l2_buffer buf {};
++  buf.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
++  buf.memory = V4L2_MEMORY_DMABUF;
++  buf.index = 0;
++  buf.m.planes = &plane;
++  buf.length = 1;
++  plane.m.fd = bi.prime_fds[0];
++  plane.length = src_size;
++  plane.bytesused = src_size;
++  if (Xioctl(fd, VIDIOC_QBUF, &buf) != 0) {
++    ALOGE("MDP3 rotation: QBUF source: %s", strerror(errno));
++    return false;
++  }
++
++  plane = {};
++  buf = {};
++  buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
++  buf.memory = V4L2_MEMORY_DMABUF;
++  buf.index = uint32_t(target_index);
++  buf.m.planes = &plane;
++  buf.length = 1;
++  plane.m.fd = *target.prime;
++  plane.length = target.bi.sizes[0];
++  if (Xioctl(fd, VIDIOC_QBUF, &buf) != 0) {
++    ALOGE("MDP3 rotation: QBUF target: %s", strerror(errno));
++    return false;
++  }
++
++  uint32_t flags = 0;
++  if (!Dequeue(fd, V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE, POLLIN, &flags)) {
++    ALOGE("MDP3 rotation: no result within %d ms: %s", kJobTimeoutMs,
++          strerror(errno));
++    return false;
++  }
++  const bool failed = (flags & V4L2_BUF_FLAG_ERROR) != 0;
++  if (!Dequeue(fd, V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE, POLLOUT, &flags)) {
++    ALOGE("MDP3 rotation: source not returned: %s", strerror(errno));
++    return false;
++  }
++  if (failed) {
++    ALOGE("MDP3 rotation: job failed");
++    return false;
++  }
++  return true;
++}
++
++void Mdp3Rotator::WorkerLoop() {
++  for (;;) {
++    State *st = nullptr;
++    {
++      std::unique_lock lock(mutex_);
++      cv_.wait(lock, [this] { return stop_ || !queue_.empty(); });
++      if (queue_.empty()) {
++        return;
++      }
++      st = queue_.front();
++      queue_.pop_front();
++    }
++    /* The job is not changed and the state is not freed until job_done. */
++    const double start = NowMs();
++    const bool ok = Run(*st, st->job->src, st->job->target);
++    const double took = NowMs() - start;
++    {
++      const std::lock_guard lock(mutex_);
++      st->job_done = true;
++      st->job_ok = ok;
++      run_ms_ += took;
++      if (++runs_ % kStatsEvery == 0) {
++        ALOGI("MDP3 rotation: %" PRIu64 " runs, avg %.2f ms, %" PRIu64
++              " reused, %" PRIu64 " presents waited",
++              runs_, run_ms_ / double(runs_), reused_, waits_);
++      }
++    }
++    cv_.notify_all();
++    /* Ask for a frame so the result is shown even if nothing else changes. */
++    if (ok && refresh_) {
++      refresh_();
++    }
++  }
++}
++
++void Mdp3Rotator::Collect(State &st) {
++  if (!st.job || !st.job_done) {
++    return;
++  }
++  if (st.job_ok) {
++    st.shown = st.job->target;
++    st.next = (st.shown + 1) % kTargets;
++    st.shown_fb = st.job->src.fb;
++    st.shown_fence = st.job->src.acquire_fence;
++  } else {
++    Disable("rotate");
++  }
++  st.job.reset();
++  st.job_done = false;
++}
++
++void Mdp3Rotator::WaitJob(std::unique_lock<std::mutex> &lock, State &st) {
++  if (!st.job || st.job_done) {
++    return;
++  }
++  ATRACE_NAME("MDP3 wait");
++  waits_++;
++  cv_.wait(lock, [&st] { return !st.job || st.job_done; });
++}
++
++void Mdp3Rotator::Disable(const char *why) {
++  ALOGE("MDP3 rotation off: %s failed. Rotated layers go to the GPU.", why);
++  disabled_ = true;
++}
++
++auto Mdp3Rotator::Substitute(const void *key, const LayerData &layer, bool run)
++    -> std::optional<LayerData> {
++  if (!Accepts(layer)) {
++    return std::nullopt;
++  }
++  const auto &bi = *layer.bi;
++  const int rotation = Rotation(layer.pi.transform);
++  const Config cfg{bi.width, bi.height, bi.pitches[0], bi.format, rotation};
++
++  std::unique_lock lock(mutex_);
++  auto &st = states_[key];
++  st.idle_frames = 0;
++  Collect(st);
++
++  if (!st.config || !(*st.config == cfg)) {
++    /* The context and targets are replaced; let a running job finish. */
++    WaitJob(lock, st);
++    Collect(st);
++    if (!Configure(st, cfg)) {
++      Disable("configure");
++      return std::nullopt;
++    }
++  }
++
++  if (run) {
++    const bool queued = st.job && SameSource(layer, st.job->src.fb,
++                                             st.job->src.acquire_fence);
++    const bool shown = st.shown >= 0 &&
++                       SameSource(layer, st.shown_fb, st.shown_fence);
++    if (shown) {
++      reused_++;
++    } else if (!queued) {
++      /* One job per layer. The previous source may only be released once
++       * its job has read it, which happens before this present returns. */
++      WaitJob(lock, st);
++      Collect(st);
++      if (disabled_) {
++        return std::nullopt;
++      }
++      st.job = Job{layer, st.next};
++      st.job_done = false;
++      queue_.push_back(&st);
++      cv_.notify_all();
++    }
++    if (st.shown < 0) {
++      /* Nothing rotated yet, so this first frame has to wait. */
++      WaitJob(lock, st);
++      Collect(st);
++      if (st.shown < 0) {
++        return std::nullopt;
++      }
++    }
++  }
++
++  /* A test commit before the first result only needs a buffer of the right
++   * size; targets[next] is that buffer. */
++  const auto &target = st.targets[st.shown >= 0 ? st.shown : st.next];
++  LayerData out;
++  out.bi = target.bi;
++  out.bi->blend_mode = bi.blend_mode;
++  out.bi->color_space = bi.color_space;
++  out.bi->sample_range = bi.sample_range;
++  out.fb = target.fb;
++  out.pi = RotatedInfo(layer, rotation);
++  return out;
++}
++
++void Mdp3Rotator::EndFrame() {
++  std::unique_lock lock(mutex_);
++  for (auto it = states_.begin(); it != states_.end();) {
++    Collect(it->second);
++    if (++it->second.idle_frames > kIdleFramesBeforeFree) {
++      WaitJob(lock, it->second);
++      it = states_.erase(it);
++    } else {
++      ++it;
++    }
++  }
++}
++
++}  // namespace android
+diff --git a/hwc/Mdp3Rotator.h b/hwc/Mdp3Rotator.h
+new file mode 100644
+index 0000000..1901dd3
+--- /dev/null
++++ b/hwc/Mdp3Rotator.h
+@@ -0,0 +1,157 @@
++/*
++ * Copyright (C) 2026 The LineageOS Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#pragma once
++
++#include <array>
++#include <atomic>
++#include <condition_variable>
++#include <cstdint>
++#include <deque>
++#include <functional>
++#include <map>
++#include <memory>
++#include <mutex>
++#include <optional>
++#include <string>
++#include <thread>
++
++#include "compositor/LayerData.h"
++#include "utils/fd.h"
++
++namespace android {
++
++class DrmDevice;
++
++/*
++ * Rotates layers by 90 or 270 degrees with the MediaTek MDP3 V4L2 m2m device,
++ * for display planes that can only rotate by 0 or 180 degrees.
++ *
++ * Each rotated layer gets its own m2m context and three scanout buffers. The
++ * rotated copy replaces the layer in the KMS plan, with no transform left.
++ *
++ * Rotation runs on a worker thread, one frame ahead of scanout: a present
++ * that brings a new buffer queues a job and shows the last finished result.
++ * When a job finishes, the client is asked for another frame so the newest
++ * result reaches the screen even if the layer stops changing.
++ */
++class Mdp3Rotator {
++ public:
++  static auto Create(DrmDevice &drm, std::function<void()> refresh)
++      -> std::unique_ptr<Mdp3Rotator>;
++
++  ~Mdp3Rotator();
++  Mdp3Rotator(const Mdp3Rotator &) = delete;
++  Mdp3Rotator &operator=(const Mdp3Rotator &) = delete;
++
++  /* Whether the layer is a 90 or 270 degree rotation this class can do. */
++  auto Accepts(const LayerData &layer) const -> bool;
++
++  /*
++   * Returns the layer as it looks after rotation. With run == false (a test
++   * commit) nothing is queued. With run == true a new source buffer is
++   * queued for rotation. nullopt means the rotation failed. The rotator then
++   * turns itself off.
++   */
++  auto Substitute(const void *key, const LayerData &layer, bool run)
++      -> std::optional<LayerData>;
++
++  /* Call after each real commit. Frees layers that are no longer rotated. */
++  void EndFrame();
++
++ private:
++  static constexpr int kTargets = 3;
++
++  struct Target {
++    UniqueFd prime = MakeUniqueFd(-1);
++    BufferInfo bi{};
++    std::shared_ptr<DrmFbIdHandle> fb;
++  };
++
++  struct Config {
++    uint32_t width;
++    uint32_t height;
++    uint32_t pitch;
++    uint32_t format;
++    int rotation;
++    bool operator==(const Config &o) const {
++      return width == o.width && height == o.height && pitch == o.pitch &&
++             format == o.format && rotation == o.rotation;
++    }
++  };
++
++  struct Job {
++    LayerData src;
++    int target;
++  };
++
++  struct State {
++    std::optional<Config> config;
++    UniqueFd video = MakeUniqueFd(-1);
++    std::array<Target, kTargets> targets;
++    int next = 0;
++    int shown = -1;
++    /* Source of the result in targets[shown]. */
++    std::shared_ptr<DrmFbIdHandle> shown_fb;
++    SharedFd shown_fence;
++    /* Queued or running job. Only the worker touches video and the target
++     * while job is set and job_done is false. */
++    std::optional<Job> job;
++    bool job_done = false;
++    bool job_ok = false;
++    int idle_frames = 0;
++  };
++
++  Mdp3Rotator(DrmDevice &drm, std::string path, std::function<void()> refresh);
++
++  static auto Rotation(const LayerTransform &t) -> int;
++  static auto RotatedInfo(const LayerData &layer, int rotation) -> PresentInfo;
++  static auto SameSource(const LayerData &layer,
++                         const std::shared_ptr<DrmFbIdHandle> &fb,
++                         const SharedFd &fence) -> bool;
++
++  auto Configure(State &st, const Config &cfg) -> bool;
++  auto AllocTarget(Target &t, uint32_t width, uint32_t height,
++                   uint32_t format) -> bool;
++  auto Run(State &st, const LayerData &layer, int target) -> bool;
++  void Disable(const char *why);
++
++  /* These expect mutex_ to be held. */
++  void Collect(State &st);
++  void WaitJob(std::unique_lock<std::mutex> &lock, State &st);
++
++  void WorkerLoop();
++
++  DrmDevice &drm_;
++  const std::string path_;
++  const std::function<void()> refresh_;
++
++  std::mutex mutex_;
++  std::condition_variable cv_;
++  std::deque<State *> queue_;
++  bool stop_ = false;
++  std::map<const void *, State> states_;
++  std::atomic<bool> disabled_ = false;
++  std::thread worker_;
++
++  /* Statistics, under mutex_. */
++  uint64_t runs_ = 0;
++  uint64_t reused_ = 0;
++  uint64_t waits_ = 0;
++  double run_ms_ = 0;
++};
++
++}  // namespace android
+diff --git a/utils/properties.cpp b/utils/properties.cpp
+index e233171..edc58fc 100644
+--- a/utils/properties.cpp
++++ b/utils/properties.cpp
+@@ -108,6 +108,10 @@ auto Properties::ScaleWithGpu() -> bool {
+   return (property_get_bool("vendor.hwc.drm.scale_with_gpu", 0) != 0);
+ }
+ 
++auto Properties::Mdp3Rotation() -> bool {
++  return (property_get_bool("vendor.hwc.drm.mdp3_rotation", 1) != 0);
++}
++
+ auto Properties::EnableVirtualDisplay() -> bool {
+   return (property_get_bool("vendor.hwc.drm.enable_virtual_display", 0) != 0);
+ }
+diff --git a/utils/properties.h b/utils/properties.h
+index 56360d7..0022f7c 100644
+--- a/utils/properties.h
++++ b/utils/properties.h
+@@ -32,6 +32,8 @@ class Properties {
+   static auto InternalDisplayNames() -> std::string;
+   static auto UseOverlayPlanes() -> bool;
+   static auto ScaleWithGpu() -> bool;
++  /* Rotate 90/270 degree layers with MediaTek MDP3 when it is present. */
++  static auto Mdp3Rotation() -> bool;
+   static auto EnableVirtualDisplay() -> bool;
+   static auto GetCtmHandling() -> CtmHandling;
+   static auto GetBackendOverride() -> std::string;
