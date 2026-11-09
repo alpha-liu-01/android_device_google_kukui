@@ -85,8 +85,9 @@ else
         exit 1
     }
 fi
-# Krane sku0 is the same sku176 DTB with the AUO panel. Other boards,
-# including Kodama, keep the single DTB that was selected above.
+# Krane sku0 is the same sku176 DTB with the AUO panel. A Krane FIT also
+# carries the Kodama sku16 DTB, so one image boots both boards.
+# Passing KUKUI_DTB for another board keeps that single DTB.
 command -v fdtget >/dev/null || { echo "fdtget is required" >&2; exit 1; }
 board_compat=$(fdtget "$work/board.dtb" / compatible)
 case " $board_compat " in
@@ -111,6 +112,36 @@ if [[ -f "$work/krane-sku0.dtb" ]]; then
             description = "mt8183-kukui-krane-sku0";
             kernel = "kernel-1";
             fdt = "fdt-2";
+            ramdisk = "ramdisk-1";
+            loadables = "kernel-1";
+        };'
+fi
+kodama_images=""
+kodama_confs=""
+if [[ -f "$work/krane-sku0.dtb" ]]; then
+    linux_src="${LINUX_SRC:-$ROOT/work/phase2/linux-6.18.62}"
+    LINUX_SRC="$linux_src" KUKUI_COMPAT=google,kodama-sku16 \
+        "$ROOT/bringup/boards/build-dtb.sh" "$work/kodama-out"
+    cp "$work/kodama-out/mt8183-kukui-kodama-sku16.dtb" "$work/kodama.dtb"
+    kodama_text=$(dtc -I dtb -O dts "$work/kodama.dtb" 2>/dev/null || true)
+    grep -q -F -- 'auo,b101uan08.3' <<<"$kodama_text" || {
+        echo "kodama sku16 panel is not auo,b101uan08.3" >&2
+        exit 1
+    }
+    kodama_images='
+        fdt-3 {
+            description = "mt8183-kukui-kodama-sku16";
+            data = /incbin/("kodama.dtb");
+            type = "flat_dt";
+            arch = "arm64";
+            compression = "none";
+            hash-1 { algo = "crc32"; };
+        };'
+    kodama_confs='
+        conf-3 {
+            description = "mt8183-kukui-kodama-sku16";
+            kernel = "kernel-1";
+            fdt = "fdt-3";
             ramdisk = "ramdisk-1";
             loadables = "kernel-1";
         };'
@@ -178,6 +209,7 @@ pack_one() {
             hash-1 { algo = "crc32"; };
         };
 ${sku0_images}
+${kodama_images}
         ramdisk-1 {
             description = "unavailable";
             data = /incbin/("${ramdisk}");
@@ -198,6 +230,7 @@ ${sku0_images}
             loadables = "kernel-1";
         };
 ${sku0_confs}
+${kodama_confs}
     };
 };
 EOF

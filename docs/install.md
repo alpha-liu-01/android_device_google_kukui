@@ -16,10 +16,10 @@ Developer mode and USB boot are already enabled on a machine that boots
 postmarketOS from USB. This does not flash UEFI and does not replace
 the read-only firmware.
 
-The USB image is board-specific: the DTB inside `kernel.kpart` and
-`android.kpart` must match the tablet. A Krane image is not expected to
-boot correctly on Kodama and vice versa. The Kodama camera is not
-supported; see [docs/kodama.md](kodama.md).
+The USB image carries three FIT configurations: Krane sku176, Krane
+sku0, and Kodama sku16. depthcharge selects the one whose device tree
+matches the tablet. The Kodama camera is not supported; see
+[docs/kodama.md](kodama.md).
 
 ## What you need
 

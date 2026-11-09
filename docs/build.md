@@ -50,10 +50,12 @@ copies them. It does not compile either tree.
 
 ## Board DTB
 
-The DTB inside the FITs is board-specific. Krane is the default:
-running `pack-install-fits.sh` without extra variables keeps the Krane
-FIT, including both the sku176 and sku0 configurations. `build-images.sh`
-requires those two names only when the FIT is a Krane FIT.
+The DTB inside the FITs is selected by depthcharge. Krane is the
+default: running `pack-install-fits.sh` without extra variables keeps
+the Krane sku176 and sku0 configurations and adds Kodama sku16.
+`build-images.sh` requires all three names when the FIT contains a
+Krane name. Passing `KUKUI_DTB` for one other board still replaces
+that set with the single board DTB.
 
 For another Kukui board, build its DTB from the same Linux 6.18.62 tree:
 

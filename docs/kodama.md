@@ -35,10 +35,10 @@ a board-support patch unless they have been tested on the board.
 
 ## Device tree
 
-Build the Kodama DTB from a Linux 6.18.28 source tree:
+Build the Kodama DTB from the Linux 6.18.62 tree the kernel is built from:
 
 ```
-LINUX_SRC=/path/to/linux-6.18.28 \
+LINUX_SRC=/path/to/linux-6.18.62 \
 KUKUI_COMPAT=google,kodama-sku16 \
   bringup/boards/build-dtb.sh /tmp/kodama-dtb
 ```
@@ -74,6 +74,11 @@ If another Kodama SKU uses a different controller, add a new IDC named
 after the input device rather than changing these files.
 
 ## Pack the FITs
+
+A Krane release FIT already includes `mt8183-kukui-kodama-sku16` as
+`conf-3`, next to Krane sku176 and sku0. depthcharge picks it when the
+board compatible is `google,kodama-sku16`. The commands below build a
+Kodama-only FIT instead, replacing the Krane configurations.
 
 Pass the Kodama DTB and a FIT that contains the shared kernel and
 ramdisk:

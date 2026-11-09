@@ -116,6 +116,20 @@ zip 是 `work/release/lineage-23.2-kukui-20261108d.zip`，1110384099 字节，sh
 
 `20261108e` 只把菜单内核换回 `f3ea1c10`，并保留 sku0。U 盘内核仍是 `34631f42…`，eMMC 的 Android 内核仍是 `7f306da1…`，super 仍是 `7dadaeac…`。新的 `menu.kpart` 10448896 字节，sha256 `ee69fa15531cdcf08786d4ab0763abdb3a2b5876c9d436ba9fc75d9817a344ca`。zip 是 `work/release/lineage-23.2-kukui-20261108e.zip`，1110404158 字节，sha256 `42b8623aa7ee9fe62ecf426c300e52650121fa8192b52db4687536f05050746a`。`20261108d` 没有覆盖。没有写盘，没有重启。还没有从内置盘看过这个菜单。
 
+2026-11-08 用户确认内置盘菜单可以显示选项。同一份 FIT 再加入 Kodama sku16。设备树从这棵 6.18.28 编译，`compatible` 是 `google,kodama-sku16 google,kodama mediatek,mt8183`，面板是 `auo,b101uan08.3`，64487 字节。三份 FIT 都是五块镜像：内核、Krane sku176、Krane sku0、Kodama sku16、ramdisk。默认配置仍是 sku176。U 盘和 eMMC 的 Android 内核 lzma crc32 仍是 `dcd6734c`，菜单内核仍是 `f3ea1c10`。sku176 crc32 仍是 `756e2f96`，sku0 仍是 `2f0c4c74`。Kodama crc32 是 `0d87a230`。菜单命令行仍是 `console=ttynull`，没有 `drm_client_lib.active=none`。super 仍是 `7dadaeac…`。
+
+`kernel.kpart` 12632064 字节，sha256 `029824c8ca1d9ee72d4e0b5de793ba57b3a35fc3620fba827dd720d345eb1edd`。`android.kpart` 同样大小，sha256 `6d014050f324a7477517f5f55ad3a8ec5a48df39dae8768610a9be4bda313a05`。`menu.kpart` 10514432 字节，sha256 `653bb1a80043f3dd11f97d4059fc5f52335a50a99e8bf3ca4b8a8c0791d0a7ff`。zip 是 `work/release/lineage-23.2-kukui-20261108f.zip`，1110436980 字节，sha256 `e7e5e83a8e83888ab568667767d0ef966a0ce1d6be281c1b03187850fbd32dfc`。`20261108d` 和 `20261108e` 没有覆盖。没有写盘，没有重启。这份包含 Kodama 的包还没有在 10e 上启动过。
+
+2026-11-08 用户装上 `20261108f` 之后硬件解码没有了。解码服务以 `media`（uid 1013）运行，组里当时没有 `camera`。`ueventd.kukui.rc` 把 `/dev/video*`、`/dev/media*`、`/dev/v4l-subdev*` 设成 `0660 system camera`，`media` 打不开 `/dev/video2`。`su 1013` 得到 Permission denied。服务日志是 `No devices supporting H264`，然后走有状态路径并 `Failed to create V4L2 decoder for H264`。这三行是 2026-11-01 的 `f045ada`。`aca6fe4`、`6c5e5e0`、`d676523` 没有改这三行。
+
+同一棵 Lineage 树上，`system/cros-codecs`、`external/rust/crates/v4l2r`、`external/v4l2_codec2` 正向和反向都打不上。工作区是对不上补丁的混合状态。`20261108f` 的 super 是从这棵混合树编的。`libcros_codecs_ffi` 把捕获格式 `MM21`（`0x31324d4d`）原样交给 HAL，HAL 只接受 NV12，报 `Unsupported output fourcc`，然后 `reportError(14)`。
+
+这三份补丁对干净的 25Q4 快照可以正向打上。已把三棵仓库里对不上的未提交改动丢掉，按现有补丁重新打上。没有用 `git diff` 重新生成这三份补丁，也没有 `--reverse`。`apply-patches.sh` 现在对这三份以及其余补丁都是 already applied，退出码 0。`ueventd.kukui.rc` 改回 `0660 media camera`，相机进程仍在 `camera` 组里。解码服务的 rc 按补丁是 `group camera mediadrm drmrpc`。这次 `ueventd` 的修改还没提交。
+
+正在跑的系统上，节点改成 `media:camera`，三份库从 `/data/local/tmp/kukui-codec` bind 到 `/vendor/lib64`，只重启了 `android-hardware-media-c2-v4l2-hal`。SELinux 拒绝了 `shell_data_file`，当前是 permissive。MX Player 播放一部 1080p 的 mp4 时，解码器打开 `/dev/video2`，格式变化的 fourcc 是 `0x3231564e`（NV12），输出布局 Y stride 1920、UV offset 2088960。之后几秒没有 `reportError`。没有重启。bind 和这次改过的节点权限在重启后会消失。用户还没有确认画面。
+
+新 super 8589934592 字节，sha256 `a1789cf2165941fd534594e2425f821140dc91e5f6387f76b93096c972063f52`。vendor 里有 `0660 media camera` 和 `group camera mediadrm drmrpc`。三份 kpart 与 `20261108f` 相同。zip 是 `work/release/lineage-23.2-kukui-20261108g.zip`，1110465701 字节，sha256 `165cb01c56b8cf01e53e08fb4869c2ae23f59405d9724c821fe059d9632dbeec`。里面只有一份 deflate 的 `lineage-23.2-kukui-20261108g.img`，11756634112 字节。`20261108f` 没有覆盖。没有写盘。
+
 2026-11-09 内核换成 Linux 6.18.62（kernel.org 稳定版，tarball sha256 `490a7aedf1b355c565d3a6c05333ccccb5da82064eca46b590448a7099d7d651`）。pmOS mt81 的补丁和配置原本是给 6.18.28 的，在 6.18.62 上只有行号偏移和 fuzz。`bringup/kernel/` 和 `bringup/camera/` 里的补丁，包括 `mtk-mdp3-mt8183-scp-abi.patch`，以及 ReSukiSU 的钩子，都不用改就能打上。clang 18.1.3 编译，没有警告。和 6.18.28 的 `.config` 相比，只多了稳定版新加的选项：`ARM64_ERRATUM_3821522`、`ARM64_ERRATUM_4118414`、`ARM64_WORKAROUND_BROKEN_AMU_CONSTCNT`、`CRYPTO_KRB5`（模块）和 EROFS 的 LZMA 流数。
 
 版本字符串是 `6.18.62-mt81-kukui2`。`modules/` 的 64 个和 `prebuilt/` 的 55 个模块都换成同一次编译的产物，`prebuilt/6.18.28-mt81-kukui2` 改名为 `prebuilt/6.18.62-mt81-kukui2`。每个模块的依赖和旧的一样，`modules.dep`、`modules.load` 不用改。版本字符串写死的地方一起改了：`kukui-keep.c`、`kukui-menu.c`、`wrap-ramdisk.sh`、`pack-install-fits.sh`。换之前，eMMC 内核 FIT 的第一阶段 ramdisk 里装的还是 10 月 30 日 clang 21 编的模块，内核却是 11 月 9 日 clang 18 编的。没有 `MODVERSIONS`，所以能加载，`/proc/config.gz` 也是那个旧 `configs.ko` 里的配置。现在内核、ramdisk 模块和 vendor_dlkm 模块是同一次编译。
