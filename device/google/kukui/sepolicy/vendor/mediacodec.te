@@ -1,0 +1,8 @@
+# cros-codecs finds the MDP3 node by name under /sys/class/video4linux and
+# converts the decoder's MM21 frames to NV12 with it.
+allow mediacodec video_device:chr_file rw_file_perms;
+allow mediacodec sysfs_v4l:dir r_dir_perms;
+allow mediacodec sysfs_v4l:file r_file_perms;
+# Nodes that exist before policy load stay type sysfs.
+allow mediacodec sysfs:dir r_dir_perms;
+allow mediacodec sysfs:file r_file_perms;
