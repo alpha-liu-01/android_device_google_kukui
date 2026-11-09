@@ -1,0 +1,205 @@
+Subject: [PATCH] PM: sleep: add a minimal /sys/kernel/wakeup_reasons
+
+Android's suspend HAL reads last_resume_reason and last_suspend_time
+from /sys/kernel/wakeup_reasons, which only the Android common kernel
+has. Without them it logs "failed to read wakeup reasons" after every
+resume and battery stats have no wakeup reasons. Provide both files
+from pm_wakeup_irq() and the wakeup source list, in the ACK format.
+
+diff --git a/kernel/power/Makefile b/kernel/power/Makefile
+--- a/kernel/power/Makefile
++++ b/kernel/power/Makefile
+@@ -13,6 +13,7 @@
+ obj-$(CONFIG_VT_CONSOLE_SLEEP)	+= console.o
+ obj-$(CONFIG_FREEZER)		+= process.o
+ obj-$(CONFIG_SUSPEND)		+= suspend.o
++obj-$(CONFIG_SUSPEND)		+= wakeup_reasons.o
+ obj-$(CONFIG_PM_TEST_SUSPEND)	+= suspend_test.o
+ obj-$(CONFIG_HIBERNATION)	+= hibernate.o snapshot.o swap.o
+ obj-$(CONFIG_HIBERNATION_SNAPSHOT_DEV) += user.o
+diff --git a/kernel/power/wakeup_reasons.c b/kernel/power/wakeup_reasons.c
+new file mode 100644
+--- /dev/null
++++ b/kernel/power/wakeup_reasons.c
+@@ -0,0 +1,181 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Minimal /sys/kernel/wakeup_reasons for Android's suspend HAL.
++ *
++ * The Android common kernel has a full wakeup_reason driver that hooks the
++ * IRQ layer. Mainline does not. Android's SystemSuspend service opens
++ * last_resume_reason and last_suspend_time once at start and logs
++ * "failed to read wakeup reasons" after every resume when they are missing.
++ * This provides both files from what mainline already records:
++ *
++ *   last_resume_reason  "<irq> <handler name>" for the IRQ that woke the
++ *                       system (pm_wakeup_irq()), "Abort: <source>" when the
++ *                       suspend did not sleep, else "-1 <source>". <source>
++ *                       is the active, or else the most recently active,
++ *                       wakeup source.
++ *   last_suspend_time   "<suspend_resume_time> <sleep_time>" in seconds with
++ *                       nanoseconds, the format of the Android common kernel.
++ */
++#include <linux/device.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/irqdesc.h>
++#include <linux/kobject.h>
++#include <linux/ktime.h>
++#include <linux/mutex.h>
++#include <linux/suspend.h>
++#include <linux/sysfs.h>
++#include <linux/time64.h>
++
++/* Below this, the system did not sleep: the suspend was aborted. */
++#define WR_MIN_SLEEP_NS		(1 * NSEC_PER_MSEC)
++
++static DEFINE_MUTEX(wr_lock);
++static char wr_reason[160];
++static ktime_t wr_mono_start, wr_boot_start, wr_mono_end, wr_boot_end;
++static bool wr_have_time;
++
++static void wr_source_name(char *buf, size_t len)
++{
++	struct wakeup_source *ws, *last = NULL;
++	ktime_t last_time = 0;
++	int idx;
++
++	buf[0] = '\0';
++	idx = wakeup_sources_read_lock();
++	for_each_wakeup_source(ws) {
++		if (ws->active) {
++			last = ws;
++			break;
++		}
++		if (ktime_after(ws->last_time, last_time)) {
++			last_time = ws->last_time;
++			last = ws;
++		}
++	}
++	if (last && last->name)
++		strscpy(buf, last->name, len);
++	wakeup_sources_read_unlock(idx);
++
++	if (!buf[0])
++		strscpy(buf, "unknown", len);
++}
++
++static void wr_record(void)
++{
++	unsigned int irq = pm_wakeup_irq();
++	ktime_t sleep;
++	char src[96];
++
++	sleep = ktime_sub(ktime_sub(wr_boot_end, wr_boot_start),
++			  ktime_sub(wr_mono_end, wr_mono_start));
++
++	if (irq) {
++		struct irq_desc *desc = irq_to_desc(irq);
++		const char *name = NULL;
++
++		if (desc && desc->action)
++			name = desc->action->name;
++		scnprintf(wr_reason, sizeof(wr_reason), "%u %s\n", irq,
++			  name ? name : "unknown");
++		return;
++	}
++
++	wr_source_name(src, sizeof(src));
++	if (ktime_to_ns(sleep) < WR_MIN_SLEEP_NS)
++		scnprintf(wr_reason, sizeof(wr_reason), "Abort: %s\n", src);
++	else
++		scnprintf(wr_reason, sizeof(wr_reason), "-1 %s\n", src);
++}
++
++static int wr_pm_notify(struct notifier_block *nb, unsigned long action,
++			void *data)
++{
++	mutex_lock(&wr_lock);
++	switch (action) {
++	case PM_SUSPEND_PREPARE:
++		wr_mono_start = ktime_get();
++		wr_boot_start = ktime_get_boottime();
++		break;
++	case PM_POST_SUSPEND:
++		wr_mono_end = ktime_get();
++		wr_boot_end = ktime_get_boottime();
++		wr_have_time = true;
++		wr_record();
++		break;
++	}
++	mutex_unlock(&wr_lock);
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block wr_pm_nb = {
++	.notifier_call = wr_pm_notify,
++};
++
++static ssize_t last_resume_reason_show(struct kobject *kobj,
++				       struct kobj_attribute *attr, char *buf)
++{
++	ssize_t len;
++
++	mutex_lock(&wr_lock);
++	len = sysfs_emit(buf, "%s", wr_reason);
++	mutex_unlock(&wr_lock);
++	return len;
++}
++
++static ssize_t last_suspend_time_show(struct kobject *kobj,
++				      struct kobj_attribute *attr, char *buf)
++{
++	struct timespec64 total, suspend_resume, sleep;
++	ssize_t len;
++
++	mutex_lock(&wr_lock);
++	if (!wr_have_time) {
++		mutex_unlock(&wr_lock);
++		return sysfs_emit(buf, "0.000000000 0.000000000\n");
++	}
++	total = ktime_to_timespec64(ktime_sub(wr_boot_end, wr_boot_start));
++	suspend_resume = ktime_to_timespec64(ktime_sub(wr_mono_end,
++						       wr_mono_start));
++	sleep = timespec64_sub(total, suspend_resume);
++	len = sysfs_emit(buf, "%llu.%09lu %llu.%09lu\n",
++			 (unsigned long long)suspend_resume.tv_sec,
++			 suspend_resume.tv_nsec,
++			 (unsigned long long)sleep.tv_sec, sleep.tv_nsec);
++	mutex_unlock(&wr_lock);
++	return len;
++}
++
++static struct kobj_attribute last_resume_reason_attr =
++	__ATTR_RO(last_resume_reason);
++static struct kobj_attribute last_suspend_time_attr =
++	__ATTR_RO(last_suspend_time);
++
++static struct attribute *wr_attrs[] = {
++	&last_resume_reason_attr.attr,
++	&last_suspend_time_attr.attr,
++	NULL,
++};
++
++static const struct attribute_group wr_group = {
++	.attrs = wr_attrs,
++};
++
++static int __init wakeup_reasons_init(void)
++{
++	struct kobject *kobj;
++	int ret;
++
++	kobj = kobject_create_and_add("wakeup_reasons", kernel_kobj);
++	if (!kobj)
++		return -ENOMEM;
++
++	ret = sysfs_create_group(kobj, &wr_group);
++	if (ret) {
++		kobject_put(kobj);
++		return ret;
++	}
++
++	return register_pm_notifier(&wr_pm_nb);
++}
++late_initcall(wakeup_reasons_init);

@@ -179,6 +179,10 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/snd-soc-ts3a227e.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-ts3a227e.ko \
     $(LOCAL_PATH)/modules/snd-soc-bt-sco.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-bt-sco.ko \
     $(LOCAL_PATH)/modules/mt8183-mt6358-ts3a227-max98357.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mt8183-mt6358-ts3a227-max98357.ko \
+    $(LOCAL_PATH)/modules/rtc-mt6397.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rtc-mt6397.ko \
+    $(LOCAL_PATH)/modules/tpm_tis_core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_core.ko \
+    $(LOCAL_PATH)/modules/tpm_tis_spi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_spi.ko \
+    $(LOCAL_PATH)/modules/cros-ec-typec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-typec.ko \
     $(LOCAL_PATH)/etc/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \

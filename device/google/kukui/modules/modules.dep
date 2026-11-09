@@ -62,3 +62,7 @@ snd-soc-ts3a227e.ko:
 snd-soc-bt-sco.ko:
 mt8183-mt6358-ts3a227-max98357.ko: snd-soc-mt8183-afe.ko snd-soc-ts3a227e.ko
 mtk-mdp3.ko: mtk_scp.ko v4l2-mem2mem.ko videobuf2-dma-contig.ko videodev.ko mtk_scp_ipi.ko videobuf2-common.ko videobuf2-v4l2.ko
+rtc-mt6397.ko:
+tpm_tis_core.ko:
+tpm_tis_spi.ko: tpm_tis_core.ko
+cros-ec-typec.ko:

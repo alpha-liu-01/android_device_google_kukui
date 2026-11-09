@@ -139,3 +139,30 @@ sku176 和 sku0 的 DTB 带相机节点，除 phandle 外和之前的内容相�
 先从 U 盘启动 6.18.62，和同一天 6.18.28 在 eMMC 上的记录对比，再用"更新系统"写入 eMMC。eMMC 启动后内核槽和 super 的 sha256 与 U 盘上的镜像一致，userdata 保留。两个内核上：119 个模块全部加载，集合相同；`mtk-svs` 绑定；GPU 和 CCI 的 devfreq、10 个温度区相同。一次 s2idle 的结果也相同：第一次冻结被打断（6.18.62 上 304 个任务，`-16`），第二次成功，大约 0.2 秒后退出，唤醒后 Wi-Fi 重新连上。内核警告的位置相同，都是相机传感器唤醒后再下电一次：`camtg2_sel already disabled`，以及 `vcn18`、`vcamd` 的 `unbalanced disables`。6.18.62 这次另有一条 `EC detected sleep transition timeout`，10 月 31 日 6.18.28 从 U 盘启动时也出现过（见 phase-4.md），`cros_ec.c` 两个版本相同。
 
 Glimpse 播 1080p60 H.264（Big Buck Bunny），每次 20 秒，开 MDP3 时 61.7 到 61.9 fps，大约 1237 帧丢 0 到 1 帧，Codec2 服务 CPU 5.3 秒，MDP3 每帧 7.03 到 7.05 ms。关 MDP3 时 61.7 fps，CPU 10.1 秒。数字和 6.18.28 一样。蓝牙打开后 QCA 固件经 UART 加载，适配器起来。电池的 `time_to_empty_now` 读出来是 EIO；`sbs-battery.c` 在这段稳定版里的两处改动不碰这个读取，6.18.28 上还没对照过。相机拍照、扬声器出声、deep 睡眠和合盖这次没有测。
+
+## 夜间模式在画面动起来时失效（待查）
+
+2026-11-09 记下，没有修。打开夜间模式（色温 2850 K）后，画面静止时是暖色，一有滑动就变回正常颜色，停下来大约一秒后又变暖。
+
+原因在合成路径。drm_hwcomposer 在所有图层都交给 GPU 时（包括静止画面的 flattening），把 CRTC 的 CTM 设成单位矩阵，由 SurfaceFlinger 在 GPU 上乘颜色矩阵（`HwcDisplay.cpp` 里 `client_layer_count == layers_.size()` 那一段）。只要有一个图层上了 plane，它就把夜间模式的矩阵写进 CRTC 的 `CTM`，SurfaceFlinger 这时认为设备处理了颜色变换（`deviceHandlesColorTransform = usesDeviceComposition`），自己不再乘。
+
+硬件这一侧没有效果。`modetest -p` 看到滑动时 CRTC 的 `CTM` blob 是夜间矩阵，静止时是单位矩阵。CCORR（`ccorr@1400f000`，`mediatek,mt8183-disp-ccorr`）的寄存器也跟着变：`DISP_CCORR_EN`=1，`DISP_CCORR_CFG`=0x0a（engine 打开，不是 relay），滑动时系数 R/G/B 为 0x400/0x2fe/0x209（1.0/0.748/0.509），静止时三项都是 0x400。MMSYS 的走线是对的：`RDMA0_SOUT_SEL_IN`=1（到 COLOR0），`DITHER0_MOUT_EN`=1，`DSI0_SEL_IN`=0（从 DITHER0），CCORR 在 COLOR0 和 AAL 之间。静止画面上用 `devmem` 把绿和蓝的系数直接写成 0，保持 10 秒，屏幕颜色没有变化，之后写回 0x400。也就是 CCORR 的矩阵根本没作用到输出上，原因还不知道。
+
+可以走的两条路：
+
+1. 先绕开：给 drm_hwcomposer 加一个属性（例如 `vendor.hwc.drm.use_crtc_ctm=false`），让它把 CRTC 的 CTM 当作不存在，`CtmByGpu()` 返回真，夜间模式打开时所有图层交给 GPU，由 SurfaceFlinger 乘矩阵。代价是夜间模式开着时 GPU 负载更高，平时不受影响。
+2. 查清 CCORR 为什么不起作用：对照 ChromeOS 内核（Kukui 上夜间模式走的就是 CCORR）的 `mtk_disp_ccorr.c` 和 `mtk_crtc.c`，看 MT8183 是否需要额外的使能位、shadow 寄存器或 AAL/COLOR 的设置。
+
+## Build 1：调试选项、TPM、RTC、Type-C、唤醒原因
+
+2026-11-09 22:55 起 eMMC 上是这一版。内核 `android.kpart` sha256 `37096745a350e3e538f13fb6188333a50171d754f0559be249dbfca8ab313a8f`，super `c7250707e78486d3efcbabee6519d20ce7c08500a1c0fc78bc5230c4751a0e48`，暂存目录 `stick-update-o`。
+
+配置加了 `PM_SLEEP_DEBUG`、PSTORE（固件已经在 DT 里留了 1 MiB 的 ramoops）、2 MiB 内核日志、MGLRU、THP 改成 `madvise`，关掉 `RTC_HCTOSYS`。vendor_dlkm 多了 `rtc-mt6397`、`tpm_tis_core`、`tpm_tis_spi`、`cros-ec-typec`。新补丁三份：sbs-battery 对 `RunTimeToEmpty` 回 `-ENODATA`；最小的 `/sys/kernel/wakeup_reasons`；ov8856/ov02a10 加系统睡眠回调。
+
+实机结果：dmesg 从 0 秒开始；`/sys/fs/pstore/console-ramoops-0` 有上一次启动的日志；电池 `uevent` 完整；`/dev/tpm0` 是 Cr50 的 TPM 2.0，`rng_current` 是 `tpm-rng-0`；`/sys/class/typec/port0` 出现；`rtc0` 时间正确；一次 RTC 唤醒后 `last_resume_reason` 是 `209 mt6358-irq`，`last_suspend_time` 是 `0.197781462 12.168988231`，suspend-service 不再报读不到唤醒原因；唤醒后相机传感器不再报时钟和稳压器的警告。
+
+相机警告的原因是 6.18 的 PM 核心：没有系统睡眠回调的设备会被当成「没有 PM 回调」，打开 smart suspend，`device_resume_noirq()` 把它直接设成 `RPM_ACTIVE`，随后的 runtime suspend 再关一次从没打开的时钟和稳压器。`pm_ops_is_empty()` 不看 runtime 回调。dw9768 本来就有 `pm_runtime_force_suspend/resume`，所以不受影响。
+
+prng_seeder 在 `early-init` 启动，那时 TPM 模块还没从 vendor_dlkm 加载，它打出 `Hanging forever` 后不退出，init 也不会重启它。`init.kukui.rc` 改成在 `vendor.dlkm.modules.ready=true` 之后 `restart prng_seeder`。在正在跑的系统上手动重启过一次，不再报错。
+
+RTC 的 60 年偏差：之前 PMIC RTC 读出来是 2086-11-08，装上这版之后是正确的时间。原因是 Android 每次设系统时间都会写 `/dev/rtc0`（`com_android_server_SystemClockTime.cpp`，`settimeofday` 之后 `RTC_SET_TIME`）。这次启动日志里先有 `Current time only 20321, advancing to build time`，再有网络时间 `Setting time of day to sec=1794261480`，两次都写了 RTC，现在 RTC 和 UTC 到秒一致。2086 是谁写的还不知道，可能是用别的年份基准的系统或固件。`RTC_HCTOSYS` 先保持关闭：启动 pmOS 一次，再回到 Android、在网络对时之前看 `/sys/class/rtc/rtc0/date`，仍然正确才打开。

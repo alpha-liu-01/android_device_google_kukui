@@ -28,6 +28,13 @@ tree in this order:
 11. `bringup/kernel/mtk-mdp3-mt8183-scp-abi.patch`. Without it every
     MDP3 frame fails with `VPU MDP failure:-22` on the linux-firmware
     SCP image.
+12. `bringup/kernel/sbs-battery-time-to-empty-enodata.patch`. Without it
+    the battery's `uevent` is empty and battery change events are lost.
+13. `bringup/kernel/wakeup-reasons-sysfs.patch`. Adds the
+    `/sys/kernel/wakeup_reasons` files Android's suspend HAL reads.
+14. `bringup/kernel/camera-sensor-system-sleep-pm.patch`. Applies on top
+    of `kernel-camera.patch`. Without it ov8856 and ov02a10 log clock and
+    regulator warnings after every resume.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from

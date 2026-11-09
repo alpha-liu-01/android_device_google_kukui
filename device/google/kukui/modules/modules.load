@@ -62,3 +62,7 @@ mtk-vcodec-dbgfs.ko
 mtk-vcodec-dec.ko
 mtk-vcodec-enc.ko
 mtk-mdp3.ko
+rtc-mt6397.ko
+tpm_tis_core.ko
+tpm_tis_spi.ko
+cros-ec-typec.ko

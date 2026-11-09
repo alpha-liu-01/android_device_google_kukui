@@ -48,6 +48,13 @@ on init
     # before ath10k probes. The post-fs insmod block never ran.
     write /sys/module/firmware_class/parameters/path /vendor/firmware
 
+# prng_seeder starts in early-init and gives up for good ("Hanging forever")
+# when /dev/hw_random has no source. The source is the Cr50 TPM, and
+# tpm_tis_spi only loads from vendor_dlkm afterwards. Start it again once
+# dlkm_loader_mainline has loaded the modules.
+on property:vendor.dlkm.modules.ready=true
+    restart prng_seeder
+
 on fs
     # keymint is up before early_hal starts keystore2. userdata is not
     # metadata-encrypted, so mount_all does not call encryptFstab.

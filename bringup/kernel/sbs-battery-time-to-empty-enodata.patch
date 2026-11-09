@@ -1,0 +1,27 @@
+Subject: [PATCH] power: supply: sbs-battery: report ENODATA when the
+ bridge refuses RunTimeToEmpty
+
+On Krane the battery sits behind the ChromeOS EC I2C tunnel, which
+answers register 0x11 with -EIO. power_supply_uevent() aborts on any
+error except -ENODATA/-ENODEV, so `cat uevent` was empty and every
+battery change uevent was dropped. healthd only saw changes on its
+poll timer or on charger events.
+
+diff --git a/drivers/power/supply/sbs-battery.c b/drivers/power/supply/sbs-battery.c
+--- a/drivers/power/supply/sbs-battery.c
++++ b/drivers/power/supply/sbs-battery.c
+@@ -987,6 +987,14 @@
+ 			break;
+ 
+ 		ret = sbs_get_battery_property(client, ret, psp, val);
++		/*
++		 * The ChromeOS EC I2C tunnel on Krane refuses RunTimeToEmpty
++		 * (0x11) with -EIO. An error other than -ENODATA makes the
++		 * power supply core drop the whole uevent, so battery changes
++		 * never reach userspace. Report no data for it instead.
++		 */
++		if (ret == -EIO && psp == POWER_SUPPLY_PROP_TIME_TO_EMPTY_NOW)
++			return -ENODATA;
+ 		break;
+ 
+ 	case POWER_SUPPLY_PROP_MODEL_NAME:
