@@ -164,6 +164,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/mtk-vcodec-common.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-common.ko \
     $(LOCAL_PATH)/modules/mtk-vcodec-dbgfs.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-dbgfs.ko \
     $(LOCAL_PATH)/modules/mtk-vcodec-dec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-dec.ko \
+    $(LOCAL_PATH)/modules/mtk-mdp3.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-mdp3.ko \
     $(LOCAL_PATH)/modules/mtk-vcodec-enc.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mtk-vcodec-enc.ko \
     $(LOCAL_PATH)/modules/snd-seq-device.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-seq-device.ko \
     $(LOCAL_PATH)/modules/snd-rawmidi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-rawmidi.ko \

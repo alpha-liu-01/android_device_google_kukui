@@ -61,3 +61,4 @@ mtk-vcodec-common.ko
 mtk-vcodec-dbgfs.ko
 mtk-vcodec-dec.ko
 mtk-vcodec-enc.ko
+mtk-mdp3.ko
