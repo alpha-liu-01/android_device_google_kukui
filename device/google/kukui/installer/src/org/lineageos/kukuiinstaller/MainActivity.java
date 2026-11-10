@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.color.DynamicColors;
+import com.google.android.material.progressindicator.LinearProgressIndicator;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
@@ -41,6 +42,13 @@ public class MainActivity extends AppCompatActivity {
     private MaterialButton install;
     private MaterialButton cancel;
     private TextView logView;
+    private LinearProgressIndicator progress;
+    private TextView now;
+    private TextView stepsView;
+    // Steps of the running install as the daemon sent them, and the last
+    // one that was running, so a failure can be shown at the right step.
+    private String[] steps = new String[0];
+    private int lastStep = -1;
     private String bootName = "";
     private String bootPath = "";
     private String targetPath = "";
@@ -82,6 +90,9 @@ public class MainActivity extends AppCompatActivity {
         install = findViewById(R.id.install);
         cancel = findViewById(R.id.cancel);
         logView = findViewById(R.id.log);
+        progress = findViewById(R.id.progress);
+        now = findViewById(R.id.now);
+        stepsView = findViewById(R.id.steps);
         androidOnly.setOnClickListener(v -> ask("android"));
         checkAndroid.setOnClickListener(v -> dry("android"));
         dual.setOnClickListener(v -> ask("dual"));
@@ -105,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showChoices() {
+        hideProgress();
         detail.setVisibility(View.GONE);
         rootSizeLayout.setVisibility(View.GONE);
         calculate.setVisibility(View.GONE);
@@ -134,6 +146,79 @@ public class MainActivity extends AppCompatActivity {
         cancel.setVisibility(View.GONE);
         body.setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_HeadlineSmall);
         body.setText(message);
+    }
+
+    private void resetSteps() {
+        steps = new String[0];
+        lastStep = -1;
+        progress.setProgressCompat(0, false);
+    }
+
+    private void hideProgress() {
+        progress.setVisibility(View.GONE);
+        now.setVisibility(View.GONE);
+        stepsView.setVisibility(View.GONE);
+    }
+
+    // The step list of the running install: done, running, waiting, and
+    // the step a failure happened in.
+    private void showSteps(int current, boolean failed) {
+        if (steps.length == 0) {
+            stepsView.setVisibility(View.GONE);
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (int i = 0; i < steps.length; i++) {
+            String mark;
+            if (i < current) {
+                mark = "✓";
+            } else if (i == current) {
+                mark = failed ? "✗" : "▶";
+            } else {
+                mark = "○";
+            }
+            if (text.length() > 0) {
+                text.append('\n');
+            }
+            text.append(mark).append("  ").append(stepLabel(steps[i]));
+        }
+        stepsView.setText(text.toString());
+        stepsView.setVisibility(View.VISIBLE);
+    }
+
+    private String stepLabel(String code) {
+        int id = getResources().getIdentifier("step_" + code, "string", getPackageName());
+        return id == 0 ? code : getString(id);
+    }
+
+    // What the running step is doing right now: the area of super being
+    // copied or checked and how far it is, and the total.
+    private String nowLine(String text) {
+        String part = value(text, "part");
+        StringBuilder line = new StringBuilder();
+        if ("discard".equals(part)) {
+            line.append(getString(R.string.part_discard));
+        } else if (!part.isEmpty()) {
+            try {
+                line.append(getString(R.string.part_progress, part,
+                        Integer.parseInt(value(text, "part_done_mib")),
+                        Integer.parseInt(value(text, "part_mib"))));
+            } catch (NumberFormatException ignored) {
+                // A half-written status line; the next poll has it.
+            }
+        }
+        try {
+            String total = getString(R.string.progress_gib,
+                    Integer.parseInt(value(text, "done_mib")) / 1024.0,
+                    Integer.parseInt(value(text, "total_mib")) / 1024.0);
+            if (line.length() > 0) {
+                line.append('\n');
+            }
+            line.append(getString(R.string.progress_total, total));
+        } catch (NumberFormatException ignored) {
+            // No byte counts for this step.
+        }
+        return line.toString();
     }
 
     private void scan() {
@@ -199,12 +284,14 @@ public class MainActivity extends AppCompatActivity {
 
     private void ask(String mode) {
         pendingMode = mode;
+        resetSteps();
         writeRequest("op=probe\nmode=" + mode + "\nconfirm=no\n");
         showWorking(getString(R.string.calculating));
     }
 
     private void dry(String mode) {
         pendingMode = mode;
+        resetSteps();
         String request = "op=dry\nmode=" + mode + "\nconfirm=no\n";
         if ("dual".equals(mode) && rootSize.getText() != null) {
             String typed = rootSize.getText().toString().trim();
@@ -285,6 +372,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startInstall() {
+        resetSteps();
         if ("dual".equals(pendingMode)) {
             String typed = rootSize.getText() == null ? "" : rootSize.getText().toString().trim();
             if (!typed.equals(probedGib)) {
@@ -337,25 +425,51 @@ public class MainActivity extends AppCompatActivity {
             }
             return;
         }
+        String stepList = value(text, "steps");
+        if (!stepList.isEmpty()) {
+            steps = stepList.split(",");
+        }
         if ("running".equals(state)) {
             installStarted = true;
-            String line = message.isEmpty() ? getString(R.string.writing) : message;
-            if (!percent.isEmpty()) {
-                line = line + "\n\n" + percent + "%";
+            String code = value(text, "code");
+            for (int i = 0; i < steps.length; i++) {
+                if (steps[i].equals(code)) {
+                    lastStep = i;
+                }
             }
-            showWorking(line + "\n\n" + getString(R.string.stay_on));
+            showWorking(message.isEmpty() ? getString(R.string.writing) : message);
+            try {
+                progress.setProgressCompat(Integer.parseInt(percent), true);
+            } catch (NumberFormatException ignored) {
+                progress.setIndeterminate(true);
+            }
+            progress.setVisibility(View.VISIBLE);
+            String line = nowLine(text);
+            now.setText(line.isEmpty() ? getString(R.string.stay_on)
+                    : line + "\n\n" + getString(R.string.stay_on));
+            now.setVisibility(View.VISIBLE);
+            showSteps(lastStep, false);
         } else if ("dry_ok".equals(state)) {
             installStarted = false;
             showChoices();
             body.setText(localize(text));
         } else if ("ready_reboot".equals(state)) {
             showWorking(message + "\n\n" + getString(R.string.ready_suffix));
+            progress.setProgressCompat(100, true);
+            progress.setVisibility(View.VISIBLE);
+            now.setVisibility(View.GONE);
+            showSteps(steps.length, false);
         } else if ("failed".equals(state)) {
             installStarted = false;
             showChoices();
             int retry = "update".equals(pendingMode)
                     ? R.string.retry_update : R.string.retry_install;
-            body.setText(message + "\n\n" + getString(retry));
+            String part = value(text, "part");
+            String where = part.isEmpty() ? "" : "\n" + getString(R.string.failed_part, part);
+            body.setText(message + where + "\n\n" + getString(retry));
+            if (lastStep >= 0) {
+                showSteps(lastStep, true);
+            }
         }
     }
 

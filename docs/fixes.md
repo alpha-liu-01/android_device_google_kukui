@@ -206,3 +206,12 @@ Type-C 的数据角色切换没有做成，也做不成。Type-C 插座接在板
 - 内核换成 kernel.org 的 6.18.63（校验和与 autosigner 签名都核对过），发布串 `6.18.63-mt81-kukui2`，`#5`。所有补丁只有偏移和 fuzz，配置和 6.18.62 相比只多了下面三项。
 - 共享流量统计：netd 建 `tetherctrl_counters` 的那一批规则里有 `-j TCPMSS`，`xt_TCPMSS.ko` 不在内存盘里，整批失败，链从没建出来，NetworkStats 一直报 `failed to fetch tether stats`。内存盘加了 `xt_TCPMSS`，另外打开 `NETFILTER_XT_TARGET_NFLOG`（唤醒包日志）、`NET_CLS_BPF`、`NET_ACT_BPF`，加 `xt_NFLOG`、`sch_ingress`（clsact）、`cls_bpf`、`act_bpf`。现在链存在，不再报错。剩下 `quota2`：那是 Android 内核自己的模块，主线没有，只影响流量上限提醒。
 - health HAL 可以读触控笔电池（Build 4 改了类型之后有 146 条拒绝）。
+
+## Build 6：安装器只复制和校验用到的部分
+
+2026-11-10 21:30 起 eMMC 上是这一版。`android.kpart` sha256 `a07b8c323d6b5ad27f0d501829ef949ea652a1cb2f1e6e42bb57498ff88ccc52`，super（稀疏镜像）`ecfde683b3d5748404f7a3f8bc0f9ce38685e60b3cca41ac4d988875a38224c5`，暂存目录 `stick-update-v`。内核和 Build 5 相同。
+
+- 以前「更新系统」把 8 GiB 的 super 整个复制一遍，再把 U 盘和 eMMC 各读一遍 8 GiB 算校验，主要时间花在 U 盘（经板上 USB 2.0 hub，约 35–40 MB/s）读零上。实际内容只有 LP 元数据区和六个逻辑分区，约 1.3 GiB。
+- 现在安装器用 `lpdump` 读出分区范围，先对 eMMC 的 super `blkdiscard`，再只复制这些范围（元数据区最后写，中断时不会留下指向半份数据的分区表）。复制时 `tee` 同时算 U 盘那份的校验，U 盘只读一次。之后丢掉页缓存，逐段从 eMMC 读回比对。
+- 应用里显示步骤清单（✓ 完成、▶ 进行中、○ 等待、✗ 失败）、进度条和当前在复制或校验哪个分区。
+- 写 U 盘也一样：super 用构建出来的稀疏镜像，只写 RAW 和 FILL 块（1295 MiB），跳过 DONT_CARE，按写入的区域读回校验。

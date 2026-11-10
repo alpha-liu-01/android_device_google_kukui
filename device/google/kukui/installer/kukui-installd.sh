@@ -7,6 +7,9 @@ set -u
 PAYLOAD=""
 STATUS_DIR=""
 DISK_SECTORS=0
+# Comma-separated step codes of the running install, sent with every
+# status so the app can list them.
+STEPS=""
 
 log() {
     echo "$1"
@@ -18,7 +21,7 @@ log() {
 
 write_status() {
     local tmp="$STATUS_DIR/status.tmp"
-    printf '%s\n' "$@" > "$tmp"
+    printf '%s\n' "$@" "steps=$STEPS" > "$tmp"
     chmod 644 "$tmp"
     mv "$tmp" "$STATUS_DIR/status"
     chmod 644 "$STATUS_DIR/status"
@@ -390,18 +393,140 @@ hash_file() {
 
 hash_part() {
     local dev="$1" bytes="$2" mib
-    # bytes stays under 32 MiB here. The 8 GiB super uses hash_super.
+    # bytes stays under 32 MiB here. Super is checked area by area
+    # (verify_super).
     mib=$(((bytes + 1048575) / 1048576))
     dd if="$dev" bs=1048576 count="$mib" status=none | \
         head -c "$bytes" | sha256sum | awk '{print $1}'
 }
 
-hash_super() {
-    dd if="$1" bs=1048576 count=8192 status=none | sha256sum | awk '{print $1}'
+# Super holds the LP metadata in its first sectors and the logical
+# partitions at the extents the metadata lists. Nothing reads the rest,
+# so only those areas are copied and checked: about 1.3 GiB of 8 GiB.
+# The eMMC partition is discarded first, so the free space holds no old
+# data either. The source is read once: tee feeds the same bytes to
+# sha256sum while they are written, and the check then reads back only
+# the eMMC. All sizes are MiB because mksh arithmetic is 32-bit.
+
+# super_regions <file>: writes "<start MiB> <length MiB> <name>" lines,
+# the partitions first and the metadata area last. lpdump without a path
+# reads the super this system runs from, which super_source has checked
+# is the USB disk. Extents are 1 MiB aligned; rounding the end up only
+# copies more of the same source layout.
+super_regions() {
+    local out="$1" first
+    lpdump > "$STATUS_DIR/lpdump.txt" 2>&1 || fail super_no_metadata
+    first=$(awk '/First sector:/ { print $3; exit }' "$STATUS_DIR/lpdump.txt")
+    [ -n "$first" ] && [ "$first" -gt 0 ] || fail super_no_metadata
+    awk '$1 == "Name:" { name = $2 }
+         $2 == ".." && $4 == "linear" && $5 == "super" {
+            s = $6; n = $3 - $1 + 1
+            printf "%d %d %s\n", int(s / 2048), int((s % 2048 + n + 2047) / 2048), name
+         }' "$STATUS_DIR/lpdump.txt" > "$out"
+    [ -s "$out" ] || fail super_no_metadata
+    echo "0 $(((first + 2047) / 2048)) metadata" >> "$out"
+    log "super areas (MiB start length name): $(tr '\n' ' ' < "$out")"
+}
+
+# Progress lines. They replace the status file every two seconds and do
+# not go into the log.
+write_progress() {
+    local tmp="$STATUS_DIR/status.tmp"
+    printf '%s\n' "$@" "steps=$STEPS" > "$tmp"
+    chmod 644 "$tmp"
+    mv "$tmp" "$STATUS_DIR/status"
+}
+
+# watch_mib <pid> <io field> <code> <percent from> <percent to>
+#           <MiB done before> <MiB total> <area name> <area MiB>
+watch_mib() {
+    local pid="$1" field="$2" code="$3" from="$4" to="$5" base="$6" total="$7"
+    local part="$8" part_mib="$9" mib done pct
+    while kill -0 "$pid" 2>/dev/null; do
+        mib=$(awk -v f="$field:" '$1 == f { printf "%d", $2 / 1048576 }' \
+            "/proc/$pid/io" 2>/dev/null)
+        if [ -n "$mib" ]; then
+            [ "$mib" -gt "$part_mib" ] && mib=$part_mib
+            done=$((base + mib))
+            pct=$((from + (to - from) * done / total))
+            [ "$pct" -ge "$to" ] && pct=$((to - 1))
+            write_progress "state=running" "percent=$pct" "code=$code" \
+                "done_mib=$done" "total_mib=$total" \
+                "part=$part" "part_done_mib=$mib" "part_mib=$part_mib"
+        fi
+        sleep 2
+    done
+}
+
+# copy_super <source> <dest> <percent from> <percent to>
+# The metadata area comes last, so an interrupted copy leaves a super
+# without a partition table rather than one pointing at half written
+# partitions. Leaves "<start> <len> <name> <sha256>" lines of the source
+# in $STATUS_DIR/super-src.list for verify_super.
+copy_super() {
+    local src="$1" dest="$2" regions="$STATUS_DIR/super-regions"
+    local list="$STATUS_DIR/super-src.list" fifo="$STATUS_DIR/copy.fifo"
+    local out="$STATUS_DIR/copy.sha" total done pid hpid start len name
+    super_regions "$regions"
+    total=$(awk '{ t += $2 } END { print t }' "$regions")
+    write_status "state=running" "percent=$3" "code=copying_super" \
+        "done_mib=0" "total_mib=$total" "part=discard"
+    if blkdiscard "$dest" 2>/dev/null; then
+        log "discarded $dest"
+    else
+        log "discard of $dest not supported, old data stays in free space"
+    fi
+    : > "$list"
+    done=0
+    while read -r start len name; do
+        rm -f "$fifo" "$out"
+        mkfifo "$fifo" || fail copy_super_failed
+        sha256sum < "$fifo" > "$out" &
+        hpid=$!
+        dd if="$src" bs=1048576 skip="$start" count="$len" status=none | \
+            tee "$fifo" | \
+            dd of="$dest" bs=1048576 seek="$start" conv=notrunc,fsync status=none &
+        pid=$!
+        watch_mib "$pid" wchar copying_super "$3" "$4" "$done" "$total" "$name" "$len"
+        wait "$pid" || fail copy_super_failed "part=$name"
+        wait "$hpid"
+        echo "$start $len $name $(awk '{ print $1 }' "$out")" >> "$list"
+        log "copied $name ($len MiB)"
+        done=$((done + len))
+    done < "$regions"
+    rm -f "$fifo" "$out"
+}
+
+# verify_super <dest> <percent from> <percent to>: reads every copied
+# area back from the eMMC and compares it with the hash taken while it
+# was copied.
+verify_super() {
+    local dest="$1" list="$STATUS_DIR/super-src.list" out="$STATUS_DIR/verify.sha"
+    local total done pid start len name want got
+    total=$(awk '{ t += $2 } END { print t }' "$list")
+    # Right after the copy most of it is still in the page cache. Drop it
+    # so the check reads the flash, not RAM.
+    sync
+    echo 3 > /proc/sys/vm/drop_caches
+    done=0
+    while read -r start len name want; do
+        rm -f "$out"
+        dd if="$dest" bs=1048576 skip="$start" count="$len" status=none | \
+            sha256sum > "$out" &
+        pid=$!
+        watch_mib "$pid" rchar verifying_super "$2" "$3" "$done" "$total" "$name" "$len"
+        wait "$pid"
+        got=$(awk '{ print $1 }' "$out")
+        [ "$got" = "$want" ] || fail super_hash_mismatch "part=$name"
+        log "checked $name"
+        done=$((done + len))
+    done < "$list"
+    rm -f "$out"
 }
 
 install_android_only() {
     local src_hash got
+    STEPS="backing_up_kernel,writing_gpt,writing_android_kernel,copying_super,verifying_super,formatting_data"
     check_android_kpart
     plan_android
     refuse_mounted_emmc
@@ -429,11 +554,8 @@ install_android_only() {
     src_hash=$(hash_file "$PAYLOAD/kukui-install/android.kpart")
     got=$(hash_part /dev/block/mmcblk0p1 "$(stat -c %s "$PAYLOAD/kukui-install/android.kpart")")
     [ "$src_hash" = "$got" ] || fail kernel_hash_mismatch
-    write_status "state=running" "percent=45" "code=copying_super"
-    dd if="$(super_source /dev/block/mmcblk0p3)" of=/dev/block/mmcblk0p3 bs=1048576 conv=fsync || fail copy_super_failed
-    got=$(hash_super /dev/block/mmcblk0p3)
-    src_hash=$(hash_super /dev/block/by-name/super)
-    [ "$src_hash" = "$got" ] || fail super_hash_mismatch
+    copy_super "$(super_source /dev/block/mmcblk0p3)" /dev/block/mmcblk0p3 40 75
+    verify_super /dev/block/mmcblk0p3 75 85
     write_status "state=running" "percent=85" "code=formatting_data"
     mke2fs -t ext4 -F -L metadata /dev/block/mmcblk0p4 || fail format_metadata_failed
     dd if=/dev/zero of=/dev/block/mmcblk0p5 bs=1048576 count=4 conv=fsync status=none || true
@@ -448,6 +570,7 @@ install_dual() {
     local end src_hash got ec current args n
     local menu_start menu_end android_start android_end menu_files_start menu_files_end
     local super_start super_end meta_start meta_end misc_start misc_end data_start
+    STEPS="backing_up_kernel,checking_linux_root,shrinking_linux_root,adjusting_gpt,writing_kernel_slots,writing_menu_files,copying_super,verifying_super,formatting_data,switching_boot"
     check_android_kpart
     check_menu_kpart
     plan_dual
@@ -551,11 +674,8 @@ install_dual() {
     # Leave pmOS_boot alone so the existing Linux initramfs stays there.
     write_status "state=running" "percent=65" "code=writing_menu_files"
     mke2fs -t ext4 -F -L bootmenu /dev/block/mmcblk0p6 || fail format_bootmenu_failed
-    write_status "state=running" "percent=75" "code=copying_super"
-    dd if="$(super_source /dev/block/mmcblk0p7)" of=/dev/block/mmcblk0p7 bs=1048576 conv=fsync || fail copy_super_failed
-    got=$(hash_super /dev/block/mmcblk0p7)
-    src_hash=$(hash_super /dev/block/by-name/super)
-    [ "$src_hash" = "$got" ] || fail super_hash_mismatch
+    copy_super "$(super_source /dev/block/mmcblk0p7)" /dev/block/mmcblk0p7 70 85
+    verify_super /dev/block/mmcblk0p7 85 90
     write_status "state=running" "percent=90" "code=formatting_data"
     mke2fs -t ext4 -F -L metadata /dev/block/mmcblk0p8 || fail format_metadata_failed
     dd if=/dev/zero of=/dev/block/mmcblk0p9 bs=1048576 count=4 conv=fsync status=none || true
@@ -629,18 +749,20 @@ require_update_layout() {
 install_update() {
     local src dest src_hash got menu_now android_now
     require_update_layout
+    if [ "$UPDATE_LAYOUT" = dual ]; then
+        STEPS="copying_super,verifying_super,writing_android_and_menu"
+    else
+        STEPS="copying_super,verifying_super,writing_android_kernel"
+    fi
     refuse_mounted_emmc
     src=$(super_source "/dev/block/$SUPER_PART")
     dest="/dev/block/$SUPER_PART"
-    write_status "state=running" "percent=10" "code=copying_super"
-    dd if="$src" of="$dest" bs=1048576 conv=fsync || fail copy_super_failed
-    got=$(hash_super "$dest")
-    src_hash=$(hash_super "$src")
-    [ "$src_hash" = "$got" ] || fail super_hash_mismatch
+    copy_super "$src" "$dest" 5 75
+    verify_super "$dest" 75 85
     if [ "$UPDATE_LAYOUT" = dual ]; then
-        write_status "state=running" "percent=80" "code=writing_android_and_menu"
+        write_status "state=running" "percent=85" "code=writing_android_and_menu"
     else
-        write_status "state=running" "percent=80" "code=writing_android_kernel"
+        write_status "state=running" "percent=85" "code=writing_android_kernel"
     fi
     dd if="$PAYLOAD/kukui-install/android.kpart" of="/dev/block/$ANDROID_PART" \
         bs=1048576 conv=fsync || fail write_android_kernel_failed

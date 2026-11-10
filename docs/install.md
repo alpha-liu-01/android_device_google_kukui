@@ -103,6 +103,15 @@ text names the target device. For an update it also says that userdata
 is not formatted. Leave the installer open until it tells you to unplug
 the stick. It does not reboot on its own.
 
+While it works, the installer lists its steps with a mark for done,
+running and waiting, and shows a progress bar and what it is copying or
+checking. For `super` it copies only what the partition table on the
+stick uses: the metadata area and the logical partitions, about 1.3 GiB
+of the 8 GiB. It first discards the eMMC `super`, so no old content stays
+in the free space. The stick is read once; the checksum of each area is
+taken while it is copied, and afterwards only the eMMC is read back and
+compared.
+
 After it finishes, unplug the USB stick and power on. Ctrl+D opens the
 boot menu when a menu was installed, or boots Android directly on an
 Android-only disk. The menu stays available because its boot priority
