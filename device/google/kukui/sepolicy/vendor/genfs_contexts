@@ -1,0 +1,19 @@
+# Krane sysfs paths. The mainline policy labels the /class/* symlinks, but
+# the HALs open the real /devices/... paths, which stayed plain sysfs.
+
+# Battery behind the EC I2C tunnel, the USB-PD charger, and the stylus
+# battery that the Goodix touch controller reports (sku176 0E31, sku0 0E30)
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:i2c-tunnel/i2c-12/12-000b/power_supply u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/cros-ec-dev.1.auto/cros-usbpd-charger.9.auto/power_supply u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E31.0001/power_supply u:object_r:sysfs_batteryinfo:s0
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0001/power_supply u:object_r:sysfs_batteryinfo:s0
+
+# Panel backlight (light HAL)
+genfscon sysfs /devices/platform/backlight_lcd0/backlight u:object_r:vendor_sysfs_backlight:s0
+
+# EC sensors: accelerometer, gyroscope, light (sensor HAL)
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/cros-ec-dev.1.auto/cros-ec-sensorhub.2.auto u:object_r:vendor_sysfs_iio:s0
+
+# Wi-Fi interface attributes (netd sets the MTU)
+genfscon sysfs /devices/platform/soc/11240000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/net u:object_r:sysfs_net:s0
+

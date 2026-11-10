@@ -1,0 +1,2 @@
+# The light HAL writes the panel brightness; mainline only grants read.
+allow hal_light_default vendor_sysfs_backlight:file rw_file_perms;

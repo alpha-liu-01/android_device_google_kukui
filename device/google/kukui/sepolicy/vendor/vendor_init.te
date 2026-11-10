@@ -1,0 +1,2 @@
+# device.mk sets vendor.minigbm.device; vendor_init writes it at boot.
+set_prop(vendor_init, vendor_minigbm_prop)

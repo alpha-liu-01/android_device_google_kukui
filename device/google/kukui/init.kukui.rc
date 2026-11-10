@@ -55,12 +55,6 @@ on init
 on property:vendor.dlkm.modules.ready=true
     restart prng_seeder
 
-# The kernel log is on the panel (fbcon on the DRM fbdev client) until the
-# boot animation. Then detach fbcon so it stops drawing into a framebuffer
-# that drm_hwcomposer has replaced. vtcon0 is the dummy console.
-on property:init.svc.bootanim=running
-    write /sys/class/vtconsole/vtcon1/bind 0
-
 on boot
     # Bring-up: name the wakeup source when a suspend is aborted (the
     # occasional -16 at the freeze step) and log the WoW suspend path.

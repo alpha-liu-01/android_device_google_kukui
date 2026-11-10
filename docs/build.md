@@ -38,6 +38,14 @@ tree in this order:
 15. `bringup/kernel/dw9768-power-while-streaming.patch`. Without it the
     lens and its regulators stay on from boot, because the camera
     provider keeps the lens node open.
+16. `bringup/kernel/mtk-drm-mt8183-min-fb-size.patch`. Without it the
+    42 px wide status bar gets no DRM framebuffer, and the home screen
+    is composited on the GPU while it scrolls.
+
+Build with `KBUILD_BUILD_VERSION` set to a plain number (the build
+count). Settings parses `uname -v` with `(#\d+) ...` and shows the kernel
+version as "Not available" for a build number like `#1-kukui-phase2`.
+The release string `6.18.62-mt81-kukui2` is what identifies the kernel.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from

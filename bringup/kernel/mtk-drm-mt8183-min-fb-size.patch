@@ -1,0 +1,28 @@
+Subject: [PATCH] drm/mediatek: allow framebuffers below 64x64 on MT8183
+
+mtk_drm_kms_init() defaults mode_config.min_width/min_height to 64
+unless the SoC data sets them; MT8188/MT8195 set 1, MT8183 did not.
+On Krane the status bar buffer is 42x1920 in panel orientation, so
+AddFB2 failed with -EINVAL ("bad framebuffer width 42"),
+drm_hwcomposer could not put the layer on a plane, and because its
+client range has to be contiguous the full-screen launcher between
+the scaled wallpaper and the status bar was GPU-composited as well
+(91% of the pixel work while scrolling the home screen).
+
+diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+--- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
++++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+@@ -278,6 +278,13 @@
+ 	.ext_path = mt8183_mtk_ddp_ext,
+ 	.ext_len = ARRAY_SIZE(mt8183_mtk_ddp_ext),
+ 	.mmsys_dev_num = 1,
++	/*
++	 * The OVL layers take any size. The 64x64 default rejected the
++	 * 42 px wide Android status bar in AddFB2, so it and every layer
++	 * between it and the wallpaper went to GPU composition.
++	 */
++	.min_width = 1,
++	.min_height = 1,
+ };
+ 
+ static const struct mtk_mmsys_driver_data mt8186_mmsys_driver_data = {
