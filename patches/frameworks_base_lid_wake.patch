@@ -1,0 +1,41 @@
+diff --git a/services/core/java/com/android/server/policy/PhoneWindowManager.java b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+--- a/services/core/java/com/android/server/policy/PhoneWindowManager.java
++++ b/services/core/java/com/android/server/policy/PhoneWindowManager.java
+@@ -1621,6 +1621,17 @@
+                 Settings.Global.LID_BEHAVIOR, LID_BEHAVIOR_NONE);
+     }
+ 
++    /**
++     * The lid is closed and closing it puts the device to sleep. On tablets
++     * whose keyboard cover is the lid, the cover's touchpad and keys face the
++     * closed screen; touches and key presses from them must not wake it.
++     */
++    private boolean isLidClosedForSleep() {
++        return mDefaultDisplayPolicy != null
++                && mDefaultDisplayPolicy.getLidState() == LID_CLOSED
++                && getLidBehavior() == LID_BEHAVIOR_SLEEP;
++    }
++
+     private int getMaxMultiPressPowerCount() {
+         // The actual max power button press count is 5
+         // (EMERGENCY_GESTURE_POWER_TAP_COUNT_THRESHOLD), which is coming from
+@@ -5070,6 +5081,10 @@
+             if (isWakeKey && (!down || !isWakeKeyWhenScreenOff(keyCode))) {
+                 isWakeKey = false;
+             }
++            if (isWakeKey && keyCode != KeyEvent.KEYCODE_POWER
++                    && keyCode != KeyEvent.KEYCODE_WAKEUP && isLidClosedForSleep()) {
++                isWakeKey = false;
++            }
+             // Cache the wake key on down event so we can also avoid sending the up event to the app
+             if (isWakeKey && down) {
+                 mPendingWakeKey = keyCode;
+@@ -5823,7 +5838,7 @@
+     @Override
+     public int interceptMotionBeforeQueueingNonInteractive(int displayId, int source, int action,
+             long whenNanos, int policyFlags) {
+-        if ((policyFlags & FLAG_WAKE) != 0) {
++        if ((policyFlags & FLAG_WAKE) != 0 && !isLidClosedForSleep()) {
+             if (mWindowWakeUpPolicy.wakeUpFromMotion(displayId, whenNanos / 1000000, source,
+                     action == MotionEvent.ACTION_DOWN, mDeviceGoingToSleep)) {
+                 // Woke up. Pass motion events to user.

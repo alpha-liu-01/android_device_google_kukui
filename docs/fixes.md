@@ -166,3 +166,17 @@ Glimpse 播 1080p60 H.264（Big Buck Bunny），每次 20 秒，开 MDP3 时 61.
 prng_seeder 在 `early-init` 启动，那时 TPM 模块还没从 vendor_dlkm 加载，它打出 `Hanging forever` 后不退出，init 也不会重启它。`init.kukui.rc` 改成在 `vendor.dlkm.modules.ready=true` 之后 `restart prng_seeder`。在正在跑的系统上手动重启过一次，不再报错。
 
 RTC 的 60 年偏差：之前 PMIC RTC 读出来是 2086-11-08，装上这版之后是正确的时间。原因是 Android 每次设系统时间都会写 `/dev/rtc0`（`com_android_server_SystemClockTime.cpp`，`settimeofday` 之后 `RTC_SET_TIME`）。这次启动日志里先有 `Current time only 20321, advancing to build time`，再有网络时间 `Setting time of day to sec=1794261480`，两次都写了 RTC，现在 RTC 和 UTC 到秒一致。2086 是谁写的还不知道，可能是用别的年份基准的系统或固件。`RTC_HCTOSYS` 先保持关闭：启动 pmOS 一次，再回到 Android、在网络对时之前看 `/sys/class/rtc/rtc0/date`，仍然正确才打开。
+
+## Build 2：开机日志、合盖、深度睡眠、镜头供电
+
+2026-11-10 01:20 起 eMMC 上是这一版。`android.kpart` sha256 `74b1067074f9eecfc383bff569bce1c4fc1de5b5b43db87ecca0b019aab6b289`，super `6ad96f122162abf403d681b7f76380ee2e6aa48ca641bf68c1556afb2f3c2db6`，暂存目录 `stick-update-r`。
+
+- 开机日志：命令行去掉 `drm_client_lib.active=none`，`loglevel=7`，`fbcon=font:TER16x32`，配置加 `CONFIG_FONT_TER16x32`。按 Ctrl+U 之后就是横屏、能读的内核日志。开机动画一起来，`init.kukui.rc` 把 `vtcon1/bind` 写成 0。阶段 3 关掉 fbdev 是和 SET_MASTER 补丁同一步做的；有了那份补丁，drm_hwcomposer 照样拿到 master。
+- 合盖：键盘盖的触控板算外接设备，Android 对它的任何移动都会唤醒，而且触控板手势路径固定带 `POLICY_FLAG_WAKE`，`touch.wake` 管不到。合盖时手还在触控板上，屏幕在 lid_switch 睡下去之后 26–124 ms 又被 `WAKE_REASON_WAKE_MOTION` 点亮。`patches/frameworks_base_lid_wake.patch`：盖子合上并且 `lid_behavior` 是睡眠时，移动事件和除电源、WAKEUP 以外的按键都不唤醒。用户合盖时故意碰触控板，屏幕保持熄灭，打开后 `WAKE_REASON_LID` 点亮。
+- 深度睡眠：没有保存过选择时，从 eMMC 启动默认 `suspend_power_off=1`，也就是 `deep`。U 盘启动仍是 0。2026-11-09 测过：s2idle 约 53 mA，deep 约 10 mA；deep 下 30 次唤醒都正常，键盘盖唤醒后照常可用。睡眠中按键盘不会唤醒：deep 时 USB 没电，s2idle 时补丁关掉了 USB 唤醒。
+- 镜头：相机服务从开机起一直开着 `/dev/v4l-subdev4`，`dw9768_open()` 拿着 runtime PM，`vcamio` 和 `vcama2` 一直有电。`bringup/kernel/dw9768-power-while-streaming.patch` 去掉 open/close 的供电，只在 mtk-seninf 出流时上电。现在不用相机时五路相机电源都关着；用户拍照对焦正常，用完又关掉。
+- prng_seeder 在模块加载完之后重启，不再报 `Hanging forever`；`pm_debug_messages` 开机写 1。
+
+Type-C 的数据角色切换没有做成，也做不成。Type-C 插座接在板上 USB 2.0 hub `05e3:0610` 的下游口（hub 在 `1-1`，键盘盖 `1-1.1`，插座上的 U 盘是 `1-1.2`，见 phase-1.md），hub 的下游口不能当 USB 设备，所以没有经数据线的 adb 或 MTP。试过把 `usb@11201000` 改成 `dr_mode = "otg"` 加 `usb-role-switch`：第一次 mtu3 等不到 USB3 MAC 时钟，整个探测失败；加上 `mediatek,u3p-dis-msk` 之后探测成功，但根口上什么都枚举不出来，U 盘启动停在 `no boot partition`。全部撤回，控制器保持 `host`，`cros-ec-typec` 只用来显示 `/sys/class/typec/port0`。
+
+还没处理：开机时 `dlkm_loader_mainline` 在加载 ath10k 时停了约 34 秒（8.50 s 到 42.84 s）。ath10k 请求可选的 `ath10k/pre-cal-sdio-mmc1:0001:1.bin`，`force_sysfs_fallback=1` 让请求等 ueventd 回答找不到，后面的模块和 `vendor.dlkm.modules.ready` 都跟着晚 34 秒。夜间模式见上面一节，也还没处理。

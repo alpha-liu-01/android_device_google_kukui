@@ -35,6 +35,9 @@ tree in this order:
 14. `bringup/kernel/camera-sensor-system-sleep-pm.patch`. Applies on top
     of `kernel-camera.patch`. Without it ov8856 and ov02a10 log clock and
     regulator warnings after every resume.
+15. `bringup/kernel/dw9768-power-while-streaming.patch`. Without it the
+    lens and its regulators stay on from boot, because the camera
+    provider keeps the lens node open.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from
@@ -63,6 +66,18 @@ the Krane sku176 and sku0 configurations and adds Kodama sku16.
 `build-images.sh` requires all three names when the FIT contains a
 Krane name. Passing `KUKUI_DTB` for one other board still replaces
 that set with the single board DTB.
+
+The Krane DTB is the kernel's `mt8183-kukui-krane-sku176.dtb`,
+decompiled, with `bringup/camera/mt8183-kukui-krane-camera.dtsi` (run
+through `cpp`) appended and compiled again. `krane-sku0-dtb.sh` derives
+sku0 from that result. Kodama sku16 is built from the kernel tree
+without it.
+
+The USB controller stays `dr_mode = "host"`. The Type-C socket is a
+downstream port of the onboard USB 2.0 hub (`05e3:0610` at `1-1`; a USB
+disk on the socket is `1-1.2`), so it cannot be a USB device: no adb or
+MTP over the cable. Switching the controller to OTG only cuts off the
+hub, and with it the keyboard dock and the USB boot disk.
 
 For another Kukui board, build its DTB from the same Linux 6.18.62 tree:
 

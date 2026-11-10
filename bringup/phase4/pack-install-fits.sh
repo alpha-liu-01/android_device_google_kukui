@@ -162,7 +162,7 @@ chmod 755 "$work/rd/kukui-wifi-reprobe.sh"
 (cd "$work/rd" && find . -print0 | sort -z | cpio --null -o -H newc --quiet | gzip -n > "$work/emmc-ramdisk.gz")
 
 cat > "$work/android-cmd.txt" << 'EOF'
-kern_guid=%U cros_secure lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=4 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11230000.mmc drm_client_lib.active=none mem_sleep_default=s2idle
+kern_guid=%U cros_secure lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=7 fbcon=font:TER16x32 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11230000.mmc mem_sleep_default=s2idle
 EOF
 
 # Menu ramdisk. No Android init. fbdev stays enabled so /dev/fb0 exists.

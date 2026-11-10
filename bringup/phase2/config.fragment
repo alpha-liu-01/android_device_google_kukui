@@ -54,3 +54,8 @@ CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
 # rtc-mt6397 with HCTOSYS set the system clock to 2086. Android sets the
 # time from the network anyway; the RTC is only needed for wake alarms.
 # CONFIG_RTC_HCTOSYS is not set
+# Boot log on the panel until the boot animation. 8x16 is about 2 mm high
+# on this 1920x1200 10" panel; the command line picks TER16x32.
+CONFIG_FONTS=y
+CONFIG_FONT_8x16=y
+CONFIG_FONT_TER16x32=y

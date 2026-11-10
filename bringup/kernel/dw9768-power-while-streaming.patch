@@ -1,0 +1,64 @@
+Subject: [PATCH] media: dw9768: do not power the lens while the node is open
+
+dw9768_open() took a runtime PM reference. Android's libcamera camera
+provider opens all camera subdevs at boot and keeps them open, so
+vcamio and vcama2 stayed on from boot even with no camera app
+running. On Krane mtk-seninf already powers the lens while a sensor
+streams and sets its position. Drop the open/close references and
+only write the focus position while the lens is powered.
+
+diff --git a/drivers/media/i2c/dw9768.c b/drivers/media/i2c/dw9768.c
+--- a/drivers/media/i2c/dw9768.c
++++ b/drivers/media/i2c/dw9768.c
+@@ -357,8 +357,21 @@
+ 	struct dw9768 *dw9768 = container_of(ctrl->handler,
+ 					     struct dw9768, ctrls);
+ 
+-	if (ctrl->id == V4L2_CID_FOCUS_ABSOLUTE)
+-		return dw9768_set_dac(dw9768, ctrl->val);
++	if (ctrl->id == V4L2_CID_FOCUS_ABSOLUTE) {
++		struct device *dev = dw9768->sd.dev;
++		int ret;
++
++		/*
++		 * The lens is powered only while a sensor streams. Keep the
++		 * value otherwise; it is written when the lens is powered and
++		 * the position is set again.
++		 */
++		if (pm_runtime_get_if_in_use(dev) <= 0)
++			return 0;
++		ret = dw9768_set_dac(dw9768, ctrl->val);
++		pm_runtime_put_autosuspend(dev);
++		return ret;
++	}
+ 
+ 	return 0;
+ }
+@@ -367,21 +380,13 @@
+ 	.s_ctrl = dw9768_set_ctrl,
+ };
+ 
+-static int dw9768_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
+-{
+-	return pm_runtime_resume_and_get(sd->dev);
+-}
+-
+-static int dw9768_close(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
+-{
+-	pm_runtime_put_autosuspend(sd->dev);
+-
+-	return 0;
+-}
+-
++/*
++ * No open/close power handling: the libcamera camera provider keeps
++ * every subdev node open from boot, which kept the lens and its two
++ * regulators powered all the time. mtk-seninf powers the lens while a
++ * sensor streams.
++ */
+ static const struct v4l2_subdev_internal_ops dw9768_int_ops = {
+-	.open = dw9768_open,
+-	.close = dw9768_close,
+ };
+ 
+ static const struct v4l2_subdev_ops dw9768_ops = { };

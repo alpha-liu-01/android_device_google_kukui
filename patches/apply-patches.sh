@@ -50,6 +50,12 @@
 #     pre-rotation matrix, one extra buffer while planes hold the last
 #     one. Off unless debug.hwui.gl_prerotation is set; init.kukui.rc
 #     sets it. --reverse leaves it.
+#   frameworks_base_lid_wake.patch
+#     With the lid closed and lid_behavior sleep, motion events (the
+#     keyboard cover's touchpad) and keys other than power and wakeup do
+#     not wake the screen. The cover's touchpad faces the closed screen
+#     and counts as an external device, which may wake on any motion.
+#     --reverse leaves it; without a closed lid it changes nothing.
 #   external_minigbm*.patch
 #     NV12 decoder stride and an HWC fallback that drops scanout when the
 #     display cannot take the format. The Rockchip AFBC dumb backend is
@@ -270,6 +276,9 @@ apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
 apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
     "${REPO_ROOT}/patches/frameworks_base_hwui_gl_prerotation.patch" \
     "HWUI GL pre-rotation"
+apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
+    "${REPO_ROOT}/patches/frameworks_base_lid_wake.patch" \
+    "no touchpad or key wake with the lid closed"
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_mesa_board_mk.patch" \
     "mesa 25 board.mk"
