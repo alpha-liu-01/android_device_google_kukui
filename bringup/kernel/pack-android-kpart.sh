@@ -5,7 +5,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SRC="${1:-$ROOT/work/phase4/install-payload/android.kpart}"
-IMAGE="${2:-$ROOT/work/phase2/linux-6.18.62/arch/arm64/boot/Image}"
+IMAGE="${2:-$ROOT/work/phase2/linux-6.18.63/arch/arm64/boot/Image}"
 DEST="${3:-$ROOT/work/resukisu/android.kpart}"
 DEVKEYS=/usr/share/vboot/devkeys
 

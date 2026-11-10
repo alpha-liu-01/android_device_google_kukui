@@ -1,15 +1,15 @@
 # Building
 
 The Android tree is LineageOS 23.2. The kernel is not built by `lunch`.
-It is the kernel.org Linux 6.18.62 stable release with the patches and
+It is the kernel.org Linux 6.18.63 stable release with the patches and
 config of `linux-postmarketos-mediatek-mt81` (packaged there for
-6.18.28; all of them apply to 6.18.62), plus
+6.18.28; all of them apply to 6.18.63), plus
 `bringup/phase2/config.fragment` and the patches under `bringup/kernel/`
 and `bringup/camera/`. The FIT images and kernel modules in this
 repository are from that build. `LOCALVERSION` is `-mt81-kukui2`, so the
-release string and the module directory are `6.18.62-mt81-kukui2`.
+release string and the module directory are `6.18.63-mt81-kukui2`.
 
-Some kernel patches depend on each other. Apply them to the 6.18.62
+Some kernel patches depend on each other. Apply them to the 6.18.63
 tree in this order:
 
 1. The `linux-postmarketos-mediatek-mt81` patches.
@@ -56,7 +56,7 @@ BPF program (per-app CPU time in the battery stats) only loads with
 Build with `KBUILD_BUILD_VERSION` set to a plain number (the build
 count). Settings parses `uname -v` with `(#\d+) ...` and shows the kernel
 version as "Not available" for a build number like `#1-kukui-phase2`.
-The release string `6.18.62-mt81-kukui2` is what identifies the kernel.
+The release string `6.18.63-mt81-kukui2` is what identifies the kernel.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from
@@ -98,10 +98,10 @@ disk on the socket is `1-1.2`), so it cannot be a USB device: no adb or
 MTP over the cable. Switching the controller to OTG only cuts off the
 hub, and with it the keyboard dock and the USB boot disk.
 
-For another Kukui board, build its DTB from the same Linux 6.18.62 tree:
+For another Kukui board, build its DTB from the same Linux 6.18.63 tree:
 
 ```
-LINUX_SRC=/path/to/linux-6.18.62 \
+LINUX_SRC=/path/to/linux-6.18.63 \
 KUKUI_COMPAT=google,kodama-sku16 \
   bringup/boards/build-dtb.sh /tmp/kodama-dtb
 ```

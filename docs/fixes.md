@@ -198,3 +198,11 @@ Type-C 的数据角色切换没有做成，也做不成。Type-C 插座接在板
 - `INET_DIAG_DESTROY`：网络切换时 system_server 不再报 `Failed to destroy socket ... ENOTSUP`。`FS_VERITY` 也打开了，userdata 要重新格式化才会用上。
 - 内存盘加了 `iptable_nat`、`ip6table_nat`、`xt_MASQUERADE`、`udp_diag`，`nat` 表有了。共享统计还是报错：netd 的同一批规则里还要 `TCPMSS`，见 Build 5。
 - SELinux：触控笔电池单独一个类型（平台域不能读 `sysfs_batteryinfo`），唤醒源 `sysfs_wakeup`，EC 的 extcon `sysfs_extcon`，所有 IIO 设备 `vendor_sysfs_iio`，`/dev/media*` 和 `/dev/v4l-subdev*` 是 `video_device`。first-stage init 冷启动时读过的 `uevent` 文件在策略加载前就有了标签，genfscon 管不到，留到 enforcing 再处理。
+
+## Build 5：Linux 6.18.63、netd 的内核模块
+
+2026-11-10 21:00 起 eMMC 上是这一版。`android.kpart` sha256 `00d5bb5230faed784985d3d69e3c7719edb36cfa9e4f1ba06436d0ff71ea24ae`，super `29ba666d43509917163011949c47bb50e941cc437949156372a5d6bf3710335a`，暂存目录 `stick-update-u`。
+
+- 内核换成 kernel.org 的 6.18.63（校验和与 autosigner 签名都核对过），发布串 `6.18.63-mt81-kukui2`，`#5`。所有补丁只有偏移和 fuzz，配置和 6.18.62 相比只多了下面三项。
+- 共享流量统计：netd 建 `tetherctrl_counters` 的那一批规则里有 `-j TCPMSS`，`xt_TCPMSS.ko` 不在内存盘里，整批失败，链从没建出来，NetworkStats 一直报 `failed to fetch tether stats`。内存盘加了 `xt_TCPMSS`，另外打开 `NETFILTER_XT_TARGET_NFLOG`（唤醒包日志）、`NET_CLS_BPF`、`NET_ACT_BPF`，加 `xt_NFLOG`、`sch_ingress`（clsact）、`cls_bpf`、`act_bpf`。现在链存在，不再报错。剩下 `quota2`：那是 Android 内核自己的模块，主线没有，只影响流量上限提醒。
+- health HAL 可以读触控笔电池（Build 4 改了类型之后有 146 条拒绝）。

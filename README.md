@@ -63,7 +63,7 @@ Lunch target: `lineage_kukui-trunk_staging-userdebug`.
 | `patches/` | Changes to the Lineage tree. They are not Gru patches. |
 | `bringup/release/` | Builds the USB zip and writes a USB stick. |
 | `bringup/boards/` | Board DTB build helper (`build-dtb.sh`). |
-| `bringup/kernel/`, `bringup/camera/` | Kernel and camera patches on top of Linux 6.18.62-mt81. |
+| `bringup/kernel/`, `bringup/camera/` | Kernel and camera patches on top of Linux 6.18.63-mt81. |
 
 ## License
 

@@ -1,0 +1,4 @@
+# The health HAL walks every power_supply, the stylus battery included.
+# That one has its own type so system_server may read it too.
+allow hal_health_default vendor_sysfs_stylus_battery:dir r_dir_perms;
+allow hal_health_default vendor_sysfs_stylus_battery:file r_file_perms;

@@ -75,3 +75,9 @@ CONFIG_INET_UDP_DIAG=m
 # fs-verity for APK verity. userdata (f2fs) only uses it once it is
 # formatted with the verity feature.
 CONFIG_FS_VERITY=y
+# netd: wakeup packet logging (-j NFLOG) and the tc BPF programs it hangs
+# on the clsact qdisc of each interface (sch_ingress, cls_bpf, act_bpf).
+# The modules are in the ramdisk with the other netfilter modules.
+CONFIG_NETFILTER_XT_TARGET_NFLOG=m
+CONFIG_NET_CLS_BPF=m
+CONFIG_NET_ACT_BPF=m

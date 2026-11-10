@@ -35,10 +35,10 @@ a board-support patch unless they have been tested on the board.
 
 ## Device tree
 
-Build the Kodama DTB from the Linux 6.18.62 tree the kernel is built from:
+Build the Kodama DTB from the Linux 6.18.63 tree the kernel is built from:
 
 ```
-LINUX_SRC=/path/to/linux-6.18.62 \
+LINUX_SRC=/path/to/linux-6.18.63 \
 KUKUI_COMPAT=google,kodama-sku16 \
   bringup/boards/build-dtb.sh /tmp/kodama-dtb
 ```

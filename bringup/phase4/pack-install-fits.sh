@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 OUT="${1:?need a directory for the payloads}"
 KEEP="${2:?need kukui-keep-emmc}"
 MENU="${3:?need kukui-menu}"
-MOD="$ROOT/device/google/kukui/prebuilt/6.18.62-mt81-kukui2"
+MOD="$ROOT/device/google/kukui/prebuilt/6.18.63-mt81-kukui2"
 DEVKEYS=/usr/share/vboot/devkeys
 # FIT that supplies the shared kernel and ramdisk. The board DTB is
 # replaced below, so this only has to match the kernel build.
@@ -119,7 +119,7 @@ fi
 kodama_images=""
 kodama_confs=""
 if [[ -f "$work/krane-sku0.dtb" ]]; then
-    linux_src="${LINUX_SRC:-$ROOT/work/phase2/linux-6.18.62}"
+    linux_src="${LINUX_SRC:-$ROOT/work/phase2/linux-6.18.63}"
     LINUX_SRC="$linux_src" KUKUI_COMPAT=google,kodama-sku16 \
         "$ROOT/bringup/boards/build-dtb.sh" "$work/kodama-out"
     cp "$work/kodama-out/mt8183-kukui-kodama-sku16.dtb" "$work/kodama.dtb"
@@ -152,7 +152,7 @@ mkdir -p "$work/rd"
 # Device nodes need root. devtmpfs covers /dev before init runs.
 gzip -dc "$work/ramdisk.gz" | (cd "$work/rd" && cpio -id --quiet) || true
 test -f "$work/rd/init.android"
-test -d "$work/rd/lib/modules/6.18.62-mt81-kukui2"
+test -d "$work/rd/lib/modules/6.18.63-mt81-kukui2"
 cp "$KEEP" "$work/rd/init"
 chmod 755 "$work/rd/init"
 # kukui-keep reads this into memory and starts it after vendor is
@@ -168,11 +168,11 @@ EOF
 # Menu ramdisk. No Android init. fbdev stays enabled so /dev/fb0 exists.
 # ttynull keeps fbcon off that framebuffer; drm_client_lib.active=none
 # would remove fb0 entirely. evdev.ko is what creates /dev/input/event*.
-mkdir -p "$work/menu/lib/modules/6.18.62-mt81-kukui2"
+mkdir -p "$work/menu/lib/modules/6.18.63-mt81-kukui2"
 cp "$MENU" "$work/menu/init"
 chmod 755 "$work/menu/init"
 for ko in evdev.ko hid-multitouch.ko hid-generic.ko i2c-hid.ko i2c-hid-of.ko i2c-hid-of-goodix.ko; do
-    cp "$MOD/$ko" "$work/menu/lib/modules/6.18.62-mt81-kukui2/$ko"
+    cp "$MOD/$ko" "$work/menu/lib/modules/6.18.63-mt81-kukui2/$ko"
 done
 (cd "$work/menu" && find . -print0 | sort -z | cpio --null -o -H newc --quiet > "$work/menu-ramdisk.cpio")
 
