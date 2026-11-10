@@ -18,3 +18,12 @@ allow appdomain cameraserver_tmpfs:file { getattr read write map };
 hal_client_domain(hal_camera_default, hal_graphics_allocator)
 allow hal_camera_default hal_graphics_composer_default:fd use;
 get_prop({ hal_camera_default cameraserver }, vendor_minigbm_prop)
+# libcamera starts the soft ISP's IPA in a separate process inside a new
+# user namespace, allocates frame buffers from the system dma-buf heap,
+# and loads Mesa for the GPU debayer, which reads Mesa's vendor
+# properties. Running /vendor/bin/libcamera/soft_ipa_proxy itself needs
+# its own domain (a HAL may not execute_no_trans); open for enforcing.
+allow hal_camera_default self:user_namespace create;
+allow hal_camera_default self:cap_userns sys_admin;
+allow hal_camera_default dmabuf_system_heap_device:chr_file rw_file_perms;
+get_prop(hal_camera_default, vendor_mesa_prop)

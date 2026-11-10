@@ -54,6 +54,7 @@ on init
 # dlkm_loader_mainline has loaded the modules.
 on property:vendor.dlkm.modules.ready=true
     restart prng_seeder
+    start kukui-ids
 
 on boot
     # Bring-up: name the wakeup source when a suspend is aborted (the
@@ -112,6 +113,14 @@ service kukui-wifi-reprobe /system/bin/sh /vendor/bin/kukui-wifi-reprobe.sh
 # Existing data partitions already stored lid_behavior=0. The overlay
 # default applies only when settings are created.
 service kukui-lid /system/bin/sh /vendor/bin/kukui-lid.sh
+    disabled
+    user root
+    group root system
+    oneshot
+
+# Serial number from the VPD and the board revision from coreboot, for
+# Settings > About > Model. Needs vpd-sysfs, so it waits for the modules.
+service kukui-ids /system/bin/sh /vendor/bin/kukui-ids.sh
     disabled
     user root
     group root system

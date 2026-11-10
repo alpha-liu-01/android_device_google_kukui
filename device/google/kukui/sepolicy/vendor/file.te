@@ -1,1 +1,2 @@
 type sysfs_v4l, fs_type, sysfs_type;
+type vendor_sysfs_stylus_battery, fs_type, sysfs_type;

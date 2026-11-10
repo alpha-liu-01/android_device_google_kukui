@@ -1,12 +1,15 @@
 # Krane sysfs paths. The mainline policy labels the /class/* symlinks, but
 # the HALs open the real /devices/... paths, which stayed plain sysfs.
 
-# Battery behind the EC I2C tunnel, the USB-PD charger, and the stylus
-# battery that the Goodix touch controller reports (sku176 0E31, sku0 0E30)
+# Battery behind the EC I2C tunnel and the USB-PD charger (health HAL)
 genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:i2c-tunnel/i2c-12/12-000b/power_supply u:object_r:sysfs_batteryinfo:s0
 genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/cros-ec-dev.1.auto/cros-usbpd-charger.9.auto/power_supply u:object_r:sysfs_batteryinfo:s0
-genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E31.0001/power_supply u:object_r:sysfs_batteryinfo:s0
-genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0001/power_supply u:object_r:sysfs_batteryinfo:s0
+
+# Stylus battery that the Goodix touch controller reports (sku176 0E31,
+# sku0 0E30). InputManager in system_server reads it, and platform
+# domains must not read sysfs_batteryinfo (neverallow in domain.te).
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E31.0001/power_supply u:object_r:vendor_sysfs_stylus_battery:s0
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0001/power_supply u:object_r:vendor_sysfs_stylus_battery:s0
 
 # Panel backlight (light HAL)
 genfscon sysfs /devices/platform/backlight_lcd0/backlight u:object_r:vendor_sysfs_backlight:s0
@@ -17,3 +20,30 @@ genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/cros-ec
 # Wi-Fi interface attributes (netd sets the MTU)
 genfscon sysfs /devices/platform/soc/11240000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/net u:object_r:sysfs_net:s0
 
+
+# Other IIO devices. The sensor HAL lists /sys/bus/iio/devices and reads
+# every name: PMIC and SoC AUXADC, the two thermal sensor zones.
+genfscon sysfs /bus/iio/devices u:object_r:vendor_sysfs_iio:s0
+genfscon sysfs /devices/platform/soc/1000d000.pwrap/1000d000.pwrap:pmic/mt6359-auxadc/iio:device u:object_r:vendor_sysfs_iio:s0
+genfscon sysfs /devices/platform/soc/11001000.auxadc/iio:device u:object_r:vendor_sysfs_iio:s0
+genfscon sysfs /devices/platform/thermal-sensor1/iio:device u:object_r:vendor_sysfs_iio:s0
+genfscon sysfs /devices/platform/thermal-sensor2/iio:device u:object_r:vendor_sysfs_iio:s0
+
+# Wakeup sources behind /sys/class/wakeup (system_suspend reads their
+# names and counters). genfscon matches by prefix, so .../wakeup also
+# covers the wakeupN entries that sit directly in a power_supply directory.
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:cbas/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:keyboard-controller/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:i2c-tunnel/i2c-12/12-000b/power_supply/sbs-12-000b/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E31.0001/power_supply/hid-0018:27C6:0E31.0001-battery/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11007000.i2c/i2c-0/0-005d/0018:27C6:0E30.0001/power_supply/hid-0018:27C6:0E30.0001-battery/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/1000d000.pwrap/1000d000.pwrap:pmic/mt6358-rtc/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/1000d000.pwrap/1000d000.pwrap:pmic/mt6358-rtc/rtc/rtc0/alarmtimer u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11201000.usb/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11201000.usb/11200000.usb/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/soc/11240000.mmc/mmc_host/mmc1/mmc1:0001/mmc1:0001:1/wakeup u:object_r:sysfs_wakeup:s0
+genfscon sysfs /devices/platform/wifi-wakeup/wakeup u:object_r:sysfs_wakeup:s0
+
+# USB connector state from the EC (system_server's extcon observer)
+genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:extcon0/extcon u:object_r:sysfs_extcon:s0

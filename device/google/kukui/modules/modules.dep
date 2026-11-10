@@ -66,3 +66,5 @@ rtc-mt6397.ko:
 tpm_tis_core.ko:
 tpm_tis_spi.ko: tpm_tis_core.ko
 cros-ec-typec.ko:
+coreboot_table.ko:
+vpd-sysfs.ko: coreboot_table.ko

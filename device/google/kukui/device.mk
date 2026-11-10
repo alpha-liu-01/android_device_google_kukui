@@ -97,6 +97,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/installer/kukui-install.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/kukui-install.rc \
     $(LOCAL_PATH)/kukui-usb-suspend.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-usb-suspend.sh \
     $(LOCAL_PATH)/kukui-lid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-lid.sh \
+    $(LOCAL_PATH)/kukui-ids.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-ids.sh \
     $(LOCAL_PATH)/kukui-wifi-reprobe.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-wifi-reprobe.sh \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_RAMDISK)/ueventd.kukui.rc \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc \
@@ -183,6 +184,8 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/tpm_tis_core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_core.ko \
     $(LOCAL_PATH)/modules/tpm_tis_spi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_spi.ko \
     $(LOCAL_PATH)/modules/cros-ec-typec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-typec.ko \
+    $(LOCAL_PATH)/modules/coreboot_table.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/coreboot_table.ko \
+    $(LOCAL_PATH)/modules/vpd-sysfs.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/vpd-sysfs.ko \
     $(LOCAL_PATH)/etc/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \

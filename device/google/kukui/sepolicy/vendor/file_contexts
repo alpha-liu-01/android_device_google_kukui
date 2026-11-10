@@ -1,0 +1,4 @@
+# Camera media controller and sub-device nodes (seninf, sensors, lens).
+# Only /dev/video* has a label in the platform policy.
+/dev/media[0-9]*        u:object_r:video_device:s0
+/dev/v4l-subdev[0-9]*   u:object_r:video_device:s0

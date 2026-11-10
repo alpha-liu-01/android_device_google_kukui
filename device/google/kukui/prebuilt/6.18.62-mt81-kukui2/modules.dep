@@ -53,3 +53,7 @@ dummy.ko:
 af_key.ko: xfrm_algo.ko
 nfnetlink_log.ko: nfnetlink.ko
 configs.ko:
+iptable_nat.ko: x_tables.ko ip_tables.ko nf_nat.ko
+ip6table_nat.ko: x_tables.ko ip6_tables.ko nf_nat.ko
+xt_MASQUERADE.ko: x_tables.ko nf_nat.ko nf_conntrack.ko
+udp_diag.ko: ipv6.ko

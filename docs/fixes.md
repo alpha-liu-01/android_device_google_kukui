@@ -180,3 +180,21 @@ RTC 的 60 年偏差：之前 PMIC RTC 读出来是 2086-11-08，装上这版之
 Type-C 的数据角色切换没有做成，也做不成。Type-C 插座接在板上 USB 2.0 hub `05e3:0610` 的下游口（hub 在 `1-1`，键盘盖 `1-1.1`，插座上的 U 盘是 `1-1.2`，见 phase-1.md），hub 的下游口不能当 USB 设备，所以没有经数据线的 adb 或 MTP。试过把 `usb@11201000` 改成 `dr_mode = "otg"` 加 `usb-role-switch`：第一次 mtu3 等不到 USB3 MAC 时钟，整个探测失败；加上 `mediatek,u3p-dis-msk` 之后探测成功，但根口上什么都枚举不出来，U 盘启动停在 `no boot partition`。全部撤回，控制器保持 `host`，`cros-ec-typec` 只用来显示 `/sys/class/typec/port0`。
 
 还没处理：开机时 `dlkm_loader_mainline` 在加载 ath10k 时停了约 34 秒（8.50 s 到 42.84 s）。ath10k 请求可选的 `ath10k/pre-cal-sdio-mmc1:0001:1.bin`，`force_sysfs_fallback=1` 让请求等 ueventd 回答找不到，后面的模块和 `vendor.dlkm.modules.ready` 都跟着晚 34 秒。夜间模式见上面一节，也还没处理。
+
+## Build 3：状态栏上图层、内核版本、SELinux 标签、两路解码
+
+2026-11-10 02:30 起 eMMC 上是这一版。`android.kpart` sha256 `8989e795353a47f43d176106c425630be0ad5fe0847db0d172d504b153a229cc`，super `bd5315fa3195729fe8f3df5529dfc0c4c0e4b661ab0472868dd02366795d7b99`，暂存目录 `stick-update-s`。
+
+- GPU 合成：`mtk_drm_kms_init()` 默认帧缓冲最小 64×64，MT8183 没有覆盖。状态栏在面板方向是 42×1920，AddFB2 返回 `-EINVAL`，drm_hwcomposer 把它交给 GPU；客户端图层必须在 z 序上连续，于是夹在缩放壁纸和状态栏之间的全屏启动器也跟着走 GPU。`bringup/kernel/mtk-drm-mt8183-min-fb-size.patch` 把最小值设成 1×1（MT8188/MT8195 本来就是）。滚动时主屏幕的任务栏、状态栏、启动器都上 OVL 图层，只有壁纸是 CLIENT；设置里五个图层全部上图层。
+- 内核版本：设置用 `(#\d+) ...` 解析 `uname -v`，`#1-kukui-phase2` 不匹配，显示「不可用」。现在用 `KBUILD_BUILD_VERSION` 写构建序号。
+- 两路 H.264 硬件解码，Firefox 同时放两个视频正常。
+
+## Build 4：序列号、BTF、套接字销毁、SELinux 第二批
+
+2026-11-10 20:00 起 eMMC 上是这一版。`android.kpart` sha256 `f1bee3a236d1fd6296ee79c7053f282371894251ec3de50dfdc89de50be6f00c`，super `633b82fea79f869bffb5d0b0d7424a8a9a9d6716be0fa3ad622b42285f2204a3`，暂存目录 `stick-update-t`。
+
+- 序列号：设置里一直是 unknown。Chromebook 的序列号在只读 VPD 里，要靠 `coreboot_table` 和 `vpd-sysfs` 读出来，但 `coreboot_table` 探测返回 `-EINVAL`。6.18 的 OF 核心只有在父节点自己有 `#address-cells` 时才匹配默认总线（`of_bus_default_match`），depthcharge 建的 `/firmware` 只有空的 `ranges`，所以 `/firmware/coreboot` 拿不到地址。`bringup/kernel/mt8183-kukui-firmware-cells.patch` 在 `mt8183-kukui.dtsi` 里先放一个带 2/2 的 `firmware` 节点，depthcharge 往里面填。`kukui-ids.sh` 在模块加载完之后设置 `ro.serialno` 和 `ro.boot.hardware.revision`（`rev6 sku0`）。
+- 按应用统计 CPU 时间：`timeInState.bpf` 的 `raw_tp/sched_process_free` 用 CO-RE 读 `task_struct->pid`，内核没有 BTF，libbpf 整个对象都不加载。打开 `DEBUG_INFO_BTF`（构建机要装 `dwarves`），`/sys/fs/bpf/cputimeinstate/` 出现。
+- `INET_DIAG_DESTROY`：网络切换时 system_server 不再报 `Failed to destroy socket ... ENOTSUP`。`FS_VERITY` 也打开了，userdata 要重新格式化才会用上。
+- 内存盘加了 `iptable_nat`、`ip6table_nat`、`xt_MASQUERADE`、`udp_diag`，`nat` 表有了。共享统计还是报错：netd 的同一批规则里还要 `TCPMSS`，见 Build 5。
+- SELinux：触控笔电池单独一个类型（平台域不能读 `sysfs_batteryinfo`），唤醒源 `sysfs_wakeup`，EC 的 extcon `sysfs_extcon`，所有 IIO 设备 `vendor_sysfs_iio`，`/dev/media*` 和 `/dev/v4l-subdev*` 是 `video_device`。first-stage init 冷启动时读过的 `uevent` 文件在策略加载前就有了标签，genfscon 管不到，留到 enforcing 再处理。

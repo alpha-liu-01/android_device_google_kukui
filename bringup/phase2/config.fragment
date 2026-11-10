@@ -59,3 +59,19 @@ CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
 CONFIG_FONTS=y
 CONFIG_FONT_8x16=y
 CONFIG_FONT_TER16x32=y
+# Kernel BTF. The cputimeinstate BPF object (per-app CPU time in battery
+# stats) reads task_struct->pid with a CO-RE relocation; without
+# /sys/kernel/btf/vmlinux libbpf drops the whole object. Needs pahole
+# (dwarves) on the build host. The DWARF stays in vmlinux; the Image only
+# gains the .BTF section, and the modules keep theirs after strip-debug.
+CONFIG_DEBUG_INFO_DWARF5=y
+CONFIG_DEBUG_INFO_BTF=y
+CONFIG_DEBUG_INFO_BTF_MODULES=y
+# Android destroys sockets of a network that went away (SOCK_DESTROY);
+# without it system_server logs ENOTSUP for each one.
+CONFIG_INET_DIAG_DESTROY=y
+# =m because IPV6 is a module; udp_diag.ko is in the ramdisk.
+CONFIG_INET_UDP_DIAG=m
+# fs-verity for APK verity. userdata (f2fs) only uses it once it is
+# formatted with the verity feature.
+CONFIG_FS_VERITY=y

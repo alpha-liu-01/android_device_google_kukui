@@ -41,6 +41,17 @@ tree in this order:
 16. `bringup/kernel/mtk-drm-mt8183-min-fb-size.patch`. Without it the
     42 px wide status bar gets no DRM framebuffer, and the home screen
     is composited on the GPU while it scrolls.
+17. `bringup/kernel/mt8183-kukui-firmware-cells.patch`. Depthcharge
+    creates `/firmware` without `#address-cells`, and since 6.18 the OF
+    core then gives `/firmware/coreboot` no address. Without it
+    `coreboot_table` fails with -EINVAL, there is no
+    `/sys/firmware/vpd`, and Settings shows the serial number as
+    "unknown".
+
+The kernel needs `pahole` (Ubuntu package `dwarves`) on the build host:
+the config has `CONFIG_DEBUG_INFO_BTF`, because the `cputimeinstate`
+BPF program (per-app CPU time in the battery stats) only loads with
+`/sys/kernel/btf/vmlinux`.
 
 Build with `KBUILD_BUILD_VERSION` set to a plain number (the build
 count). Settings parses `uname -v` with `(#\d+) ...` and shows the kernel
