@@ -77,6 +77,19 @@ A USB image needs four pieces:
 the kernel build. `bringup/release/build-images.sh` only checks and
 copies them. It does not compile either tree.
 
+`pack-install-fits.sh` writes the command line of `android.kpart`. The
+USB `kernel.kpart` takes its command line from the FIT it is packed
+from, so set it there. The tested images use:
+
+```
+kern_guid=%U cros_secure lsm=landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,bpf console=tty0 loglevel=7 fbcon=font:TER16x32 deferred_probe_timeout=30 androidboot.selinux=permissive androidboot.hardware=kukui androidboot.boot_devices=soc/11201000.usb/11200000.usb mem_sleep_default=s2idle
+```
+
+`loglevel=7` and `fbcon=font:TER16x32` without `drm_client_lib.active=none`
+put the kernel log on the panel until the boot animation. An older
+command line with `loglevel=4` and `drm_client_lib.active=none` still
+boots, only with a dark screen until then.
+
 ## Board DTB
 
 The DTB inside the FITs is selected by depthcharge. Krane is the
