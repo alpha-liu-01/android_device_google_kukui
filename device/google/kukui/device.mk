@@ -26,6 +26,9 @@ TARGET_HOSTAPD_AND_WPA_SUPPLICANT_FORM := legacy
 # Set before options.mk. default-aidl otherwise pulls the cuttlefish policy.
 TARGET_AUDIO_HAL := default-aidl
 TARGET_AUDIO_POLICY := kukui
+# Lineage libperfmgr power HAL instead of the AOSP example, which ignores
+# touch and launch hints. power/powerhint.json has the boost table.
+TARGET_POWER_HAL := perfmgr-lineage
 # Kukui edits to hardware/interfaces live in this repo's patches/.
 # Without them, lunch still builds, but the speaker opens card 0.
 ifeq ($(wildcard $(LOCAL_PATH)/../../../hardware/interfaces/audio/aidl/default/include/core-impl/KukuiMixer.h),)
@@ -186,6 +189,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/cros-ec-typec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-typec.ko \
     $(LOCAL_PATH)/modules/coreboot_table.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/coreboot_table.ko \
     $(LOCAL_PATH)/modules/vpd-sysfs.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/vpd-sysfs.ko \
+    $(LOCAL_PATH)/modules/tun.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tun.ko \
     $(LOCAL_PATH)/etc/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
@@ -210,6 +214,14 @@ PRODUCT_SYSTEM_PROPERTIES += \
     mmd.zram.enabled=true \
     mmd.zram.comp_algorithm=zstd \
     mmd.zram.size=50%
+
+# "Update system" boots like an OTA, and the default (verify) drops apps
+# in /data back to the interpreter and JIT until the idle-and-charging
+# job runs. Firefox started in 1332 ms at verify and 659 ms at
+# speed-profile. The system apps are compiled at build time, so this
+# only adds a few seconds to the first boot after an update.
+PRODUCT_SYSTEM_PROPERTIES += \
+    pm.dexopt.boot-after-ota=speed-profile
 
 PRODUCT_PRODUCT_PROPERTIES += \
     ro.adb.secure=0 \

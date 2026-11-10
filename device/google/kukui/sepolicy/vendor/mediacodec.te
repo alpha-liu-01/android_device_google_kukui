@@ -6,3 +6,8 @@ allow mediacodec sysfs_v4l:file r_file_perms;
 # Nodes that exist before policy load stay type sysfs.
 allow mediacodec sysfs:dir r_dir_perms;
 allow mediacodec sysfs:file r_file_perms;
+# Codec2 message queues and the libcutils memfd probe: memfd instead of
+# ashmem on 6.18 (see hal_audio_default.te). The clients map them.
+type mediacodec_tmpfs, file_type;
+tmpfs_domain(mediacodec)
+allow { appdomain mediaswcodec system_server } mediacodec_tmpfs:file { getattr read write map };

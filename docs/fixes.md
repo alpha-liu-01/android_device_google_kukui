@@ -215,3 +215,24 @@ Type-C 的数据角色切换没有做成，也做不成。Type-C 插座接在板
 - 现在安装器用 `lpdump` 读出分区范围，先对 eMMC 的 super `blkdiscard`，再只复制这些范围（元数据区最后写，中断时不会留下指向半份数据的分区表）。复制时 `tee` 同时算 U 盘那份的校验，U 盘只读一次。之后丢掉页缓存，逐段从 eMMC 读回比对。
 - 应用里显示步骤清单（✓ 完成、▶ 进行中、○ 等待、✗ 失败）、进度条和当前在复制或校验哪个分区。
 - 写 U 盘也一样：super 用构建出来的稀疏镜像，只写 RAW 和 FILL 块（1295 MiB），跳过 DONT_CARE，按写入的区域读回校验。
+
+## Build 7：性能——power HAL、MDP3 旋转、壁纸、AOT 编译
+
+2026-11-11 00:00 起 eMMC 上是这一版。`android.kpart` sha256 `018641f5d4ec868178f026e6da945e1768ad4468d24c61b8b792e920e1d3ace5`，super（稀疏镜像）`a1a3d4b181278aaa8fd3ec41a44618f75017c4b5e08c175f07893345cb4890b8`，暂存目录 `stick-update-w`。内核和 Build 5 相同。
+
+先在平板上实测，再写进构建。基线是 Build 6，测量用 `am start -W`（每个应用 5 次取中位数）、设置里滚动时的 `dumpsys gfxinfo`，电池供电下用 `current_now × voltage_now` 取 60 秒平均。
+
+- 持续负载：8 个核全满 3 分钟仍是 1989 MHz，CPU 76 °C；冷却映射在 80 °C 的 trip 才动作，没有降频。
+- ondemand 原来 `up_threshold=95`、`io_is_busy=0`。改成 80 和 1，后台和 system-background 只放在 A53（0–3）。应用启动快 7–16%，滚动卡顿不变。
+- power HAL 换成 Lineage 的 libperfmgr（`TARGET_POWER_HAL := perfmgr-lineage`），AOSP 示例 HAL 不处理触摸和启动提示。`power/powerhint.json`：触摸时小核 1248、大核 1716、GPU 653 MHz（在滚动测试里和全频只差 0.2 个百分点），启动时全部最高最多 3 秒，省电模式大核上限 1508、GPU 上限 500 MHz。启动：设置 1161→1021 ms，计算器 786→549，相册 532→444；滚动卡顿帧 2.61%→0.87%，90/99 分位 19/24→14/17 ms。代价：亮屏空闲 +37–53 mW，滚动 +66–72 mW（约 2–3%）。
+- MDP3 旋转：drm_hwcomposer 的旋转补丁一直没生效，因为合成器（system:graphics）打不开 `/dev/video4`（media:camera 0660）。`ueventd.kukui.rc` 把这个节点的组改成 graphics。Firefox 的内容层（ROT_270）从 GPU 合成变成上图层，播视频时 SurfaceFlinger CPU 41%→21%；功耗不变（3460–3527 对 3487 mW），40 秒视频的丢帧 0–2，和以前一样。
+- 壁纸：`config_wallpaperMaxScale` 默认 1.1，图层不能缩放，壁纸一直走 GPU，下拉通知栏时连带全部图层。改成 1.0 之后主屏幕和通知栏全部上图层，主屏幕操作 −80 mW，SurfaceFlinger CPU 17%→11%。代价是没有了壁纸的缩放动画。SurfaceFlinger 的 planner（`debug.sf.enable_layer_caching`）试过：它的缓存缓冲区上不了图层，结果全部变成 GPU 合成，所以保持关闭。
+- AOT：「更新系统」启动时按 OTA 处理，`pm.dexopt.boot-after-ota` 默认 verify，/data 里的应用（Firefox 等）退回解释执行，直到空闲充电时的后台任务。Firefox 启动 1332 ms（verify）对 659 ms（speed-profile）。改成 `speed-profile`。
+- 没有效果的：GPU devfreq 轮询 16 ms（不变），eMMC 预读 512 KB（Firefox 冷启动慢 7%）。eMMC 已经是 HS400 192 MHz。
+- SELinux（仍是 permissive）：power HAL 写 GPU devfreq（`vendor_sysfs_gpu_devfreq`）；GPU 和显示的 `uevent` 标成 `sysfs_gpu`（应用、system_server、bootanim 的 libdrm 读它）；6.18 没有 ashmem，共享内存是 memfd，音频 HAL 和 c2 解码器加 `tmpfs_domain`，客户端可以映射。
+- SurfaceFlinger 重新预编译着色器（AOSP 默认）。早期 bring-up 时 RenderEngine 线程在预编译时 abort，所以关掉过；现在 4 秒编译 93 个，帧率不受影响，第一次走 GPU 合成的动画不再卡在编译上。
+- VPN（上游 issue #7）：`CONFIG_TUN=m` 一直有，但 `tun.ko` 没装进 vendor_dlkm，没有 `/dev/tun`，VPN 应用报 cannot create interface。现在随 vendor_dlkm 加载，实机上 `/dev/tun` 是 `system:vpn`，能建 tun 接口。
+- 试过没有用的：Mesa glthread（Mesa 在少于 5 个大核时故意关闭，属性也打不开）；SurfaceFlinger planner（见上）。Vulkan：panvk 对 Bifrost（G72，arch 7）只报 1.0，HWUI 的 Vulkan 要 1.1 和 `samplerYcbcrConversion`（panvk 只在 arch ≥ 10 有），所以 UI 继续用 GLES。
+- Firefox 每次启动都报 `Failed to load a program object with a program binary`：它的 `shader-cache` 里是 11 月 8 日那版 Mesa 生成的二进制（头里的驱动 sha1 是 `f4810cb6…`），Mesa 升到 25.3.3 之后正确地拒绝，而 Firefox 从不重写这些条目。删一次 `files/mozilla/<profile>/shader-cache` 之后不再报错，新的二进制正常加载。速度上没有差别：Mesa 自己经 EGL blob cache（`com.android.opengl.shaders_cache`）缓存了编译结果，GPU 进程前 12 秒的 CPU 时间两种情况都是 0.7 秒左右。Mesa 的程序二进制本身没问题：同进程和跨进程用 `glProgramBinary` 都能重新加载。
+- 最终测量（Build 7 镜像，对比 Build 6 当天的基线）：设置 1161→984 ms，计算器 786→544，相册 532→409，相机 661→593，Firefox 1433→718；滚动卡顿帧 2.61%→1.20%，90/99 分位 19/24→15/17 ms。
+- 观察到一次、没能复现：更新后第一次启动约 9 分钟时，10 秒内 panfrost 报了 8 次 `Unhandled Page fault`（AS0–AS4 几个地址空间同时，EXECUTE 和 READ），每次 GPU 任务超时后复位，Firefox 的 GPU 进程重启。前面有 `Purging`（panfrost shrinker 回收可丢弃的缓冲区）。之后在 200 MB 可用内存、50 次 purge、77 次 lmkd 杀进程的压力下滚动和开 Firefox，没有再出现。如果再出现，先看 dmesg 里 fault 之前的 `Purging` 和当时的内存。

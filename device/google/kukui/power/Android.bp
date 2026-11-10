@@ -1,0 +1,8 @@
+// Boost table for android.hardware.power-service.lineage-libperfmgr
+// (TARGET_POWER_HAL := perfmgr-lineage). Values come from scroll and
+// launch measurements on Krane, see docs/fixes.md (Build 7).
+prebuilt_etc {
+    name: "powerhint.json",
+    src: "powerhint.json",
+    vendor: true,
+}

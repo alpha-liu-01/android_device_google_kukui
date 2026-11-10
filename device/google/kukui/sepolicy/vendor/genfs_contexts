@@ -47,3 +47,13 @@ genfscon sysfs /devices/platform/wifi-wakeup/wakeup u:object_r:sysfs_wakeup:s0
 
 # USB connector state from the EC (system_server's extcon observer)
 genfscon sysfs /devices/platform/soc/11012000.spi/spi_master/spi2/spi2.0/11012000.spi:cros-ec@0:extcon0/extcon u:object_r:sysfs_extcon:s0
+
+# Panfrost devfreq: the power HAL raises min_freq for touch and launch
+# boosts and lowers max_freq in battery saver (power/powerhint.json).
+genfscon sysfs /devices/platform/soc/13040000.gpu/devfreq u:object_r:vendor_sysfs_gpu_devfreq:s0
+
+# libdrm (Mesa, minigbm) reads the uevent of the DRM devices to find the
+# driver: apps, system_server, SurfaceFlinger and bootanim may read
+# sysfs_gpu. The mediatek-drm instance number comes from the probe order.
+genfscon sysfs /devices/platform/soc/13040000.gpu/uevent u:object_r:sysfs_gpu:s0
+genfscon sysfs /devices/platform/soc/14000000.syscon/mediatek-drm.17.auto/uevent u:object_r:sysfs_gpu:s0

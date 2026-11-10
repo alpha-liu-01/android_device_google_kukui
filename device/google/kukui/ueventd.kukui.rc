@@ -1,6 +1,12 @@
 /dev/dri/*                                                                  0666   root       graphics
 /dev/dma_heap/system                                                        0666   system     system
 /dev/video*                                                                 0660   media      camera
+# mtk-mdp3:m2m. The composer (system:graphics) rotates layers with it
+# (patches/external_drm_hwcomposer_mdp3_rotation.patch) and could not open
+# it, so every 90/270 layer, Firefox's content among them, went to the
+# GPU. The decoder (media) keeps owner access. vendor_dlkm registers the
+# nodes in a fixed order: camsv 0-1, vcodec dec 2, enc 3, mdp3 4.
+/dev/video4                                                                 0660   media      graphics
 /dev/media*                                                                 0660   media      camera
 /dev/v4l-subdev*                                                            0660   media      camera
 /sys/class/backlight/backlight_lcd0/brightness                              0664   system     system

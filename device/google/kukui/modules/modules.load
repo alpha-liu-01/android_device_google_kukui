@@ -68,3 +68,4 @@ tpm_tis_spi.ko
 cros-ec-typec.ko
 coreboot_table.ko
 vpd-sysfs.ko
+tun.ko

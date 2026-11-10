@@ -15,6 +15,8 @@ BOARD_MESA3D_GALLIUM_DRIVERS := panfrost
 TARGET_HAS_VIBRATOR := false
 TARGET_SUPPORTS_USB_ACCESSORY_MODE := false
 TARGET_USB_INIT_SCRIPT := none
+# Same value as device.mk; board.mk adds the libperfmgr sepolicy.
+TARGET_POWER_HAL := perfmgr-lineage
 include $(MAINLINE_COMMON_PATH)/optional/options.mk
 SUPPORTS_INLINE_KERNEL_BUILDING := false
 

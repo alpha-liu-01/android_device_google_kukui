@@ -30,11 +30,11 @@ on early-init
     # skiavk would pre-rotate too, but HWUI needs Vulkan 1.1 and panvk on
     # Bifrost reports 1.0.
     setprop debug.hwui.gl_prerotation true
-    # The tenth boot got past HWC hotplug (ctl.start bootanim) and then
-    # SIGABRT about 160ms later, on the RenderEngine thread. That thread
-    # is priming the shader cache. Skip it so the first frames are the
-    # ones bootanim actually needs.
-    setprop service.sf.prime_shader_cache false
+    # SurfaceFlinger primes its shader cache again (the AOSP default). In
+    # the early bring-up the RenderEngine thread aborted while priming,
+    # so it was off; on 6.18.63 with the current Mesa it compiles 93
+    # shaders in about 4 s on that thread and the first GPU-composited
+    # animation no longer stalls on shader compiles.
     # Desktop window shadows are drawn by the GPU. On Mali-G72 that pass
     # takes about 24 ms, so a 60 Hz panel presents every other vsync and
     # the whole screen, including menus, runs at about 30 fps. The panel
@@ -55,6 +55,20 @@ on init
 on property:vendor.dlkm.modules.ready=true
     restart prng_seeder
     start kukui-ids
+
+on boot
+    # ondemand ramps up only at 95% load and does not count I/O wait.
+    # 80% with io_is_busy cut app launches by 7-16% on Krane with no
+    # change in scroll jank. Touch and launch boosts are in the power HAL
+    # (power/powerhint.json).
+    write /sys/devices/system/cpu/cpufreq/policy0/ondemand/up_threshold 80
+    write /sys/devices/system/cpu/cpufreq/policy4/ondemand/up_threshold 80
+    write /sys/devices/system/cpu/cpufreq/policy0/ondemand/io_is_busy 1
+    write /sys/devices/system/cpu/cpufreq/policy4/ondemand/io_is_busy 1
+    # Background work on the four Cortex-A53 cores (0-3); the foreground
+    # and top app keep all eight, including the Cortex-A73 cores (4-7).
+    write /dev/cpuset/background/cpus 0-3
+    write /dev/cpuset/system-background/cpus 0-3
 
 on boot
     # Bring-up: name the wakeup source when a suspend is aborted (the
