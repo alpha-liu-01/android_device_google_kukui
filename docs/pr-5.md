@@ -220,6 +220,8 @@
 
 事件：
 
+2026-11-13 当前合成器里 `ForcedScalingWithGpu()` 会在图层需要缩放或亚像素裁切时把它送去 GPU。正在运行的系统没有这个属性，内核日志里 `Test-only seamless=0 ret=-34 errno=34` 在刷。`device.mk` 已设 `vendor.hwc.drm.scale_with_gpu=true`，编进 `vendor/build.prop`。super 展开后 8589934592 字节，sha256 `04bbfa0a6d843b39b745afb256d19de9dab21f788537208b964d016b7f964ddc`。三份 FIT 与 `20261113d` 相同，菜单仍是 10 月 31 日那份。zip 是 `work/release/lineage-23.2-kukui-20261113e.zip`，1112363546 字节，sha256 `3136ca0415f8d46a529dbc4722c1ceed0ffdae3bd45a7f081ac748ddaa57777a`。2026-11-13 18:16 写入 `/dev/sda`（序列号 `000000002959`）。整盘回读 sha256 `837274b52f97b98f332a1617de2f1fabeb61f92ff5fb1699590074b2dfc63472`，super 回读与上面一致。2026-11-13 18:27 从 U 盘开机，`ro.build.date` 为 Fri Nov 13 18:10:10 EST 2026，内核仍是 16:17 那份 SVS。`vendor.hwc.drm.scale_with_gpu=true`，渲染器仍是 skiagl，预旋转仍开。日志里 `ret=-34` 和 `ERANGE` 都是 0。壁纸源裁切是 1125×1799 进 1200×1920，走 CLIENT。同一帧里 175 像素宽的任务栏曾走 DEVICE。当前画面整帧由 plane-0 扫描 1200×1920 的 AB24 客户端目标。打开应用时有 5 次 `could not create drm fb -22`，没有崩溃，也没有 tombstone。主屏壁纸和开关应用的画面看起来正常。42 像素宽的状态栏仍进 GPU，留给 `bcc64e1`。这份 super 同时带上了已经提交的安装器更新。
+
 ## b53e50e Kernel: make MDP3 work with the MT8183 SCP firmware
 
 内容：新增 `bringup/kernel/mtk-mdp3-mt8183-scp-abi.patch`，大约 610 行。MT8183 的 SCP 固件和主线 MDP3 驱动的 ABI 对不上，补丁让 `mtk-mdp3` 能用这块固件。`docs/build.md` 记了它的位置。
