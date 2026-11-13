@@ -82,6 +82,8 @@
 
 事件：
 
+2026-11-13 补丁已按正在运行的 `drm_auth.c` 写出，没有采用 krecks 那份重写。干净的 6.18.28 正向试打通过，已打过的树上反向试打通过。U 盘上的系统 SurfaceFlinger 有 HWC display 0。用户确认画面正常。这一笔不换内核，也不需要新的刷机包。
+
 ## 7465cfb Enable the system DMA-BUF heap in the camera config fragment
 
 内容：`bringup/camera/config.fragment` 打开 `CONFIG_DMABUF_HEAPS_SYSTEM=y`。`docs/camera.md` 和 `ueventd.kukui.rc` 都依赖 `/dev/dma_heap/system`，已提交的 fragment 没有打开它。缺了以后相机采集返回 -38，Codec2 软解返回 `NO_MEMORY`。

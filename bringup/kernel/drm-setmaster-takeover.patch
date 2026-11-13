@@ -1,0 +1,46 @@
+Subject: [PATCH] drm: let SET_MASTER take over from the implicit master
+
+minigbm opens the primary node first and becomes master. hwcomposer is
+not root, so drm_master_check_perm() returns EACCES and SurfaceFlinger
+aborts with "HWC did not hotplug". This is the change in the booted
+6.18.28-mt81-kukui2 kernel, not a reconstruction.
+
+--- a/drivers/gpu/drm/drm_auth.c
++++ b/drivers/gpu/drm/drm_auth.c
+@@ -242,22 +242,29 @@
+ 	return 0;
+ }
+ 
++static void drm_drop_master(struct drm_device *dev, struct drm_file *fpriv);
++
+ int drm_setmaster_ioctl(struct drm_device *dev, void *data,
+ 			struct drm_file *file_priv)
+ {
+-	int ret;
++	int ret = 0;
+ 
+ 	guard(mutex)(&dev->master_mutex);
+ 
+-	ret = drm_master_check_perm(dev, file_priv);
+-	if (ret)
+-		return ret;
+-
+ 	if (drm_is_current_master_locked(file_priv))
+-		return ret;
++		return 0;
+ 
++	/*
++	 * The display primary node has no render node. minigbm opens it
++	 * first and becomes the implicit master, and the in-kernel fbdev
++	 * client does the same. hwcomposer is not root and was never
++	 * master, so drm_master_check_perm() returns EACCES. It then
++	 * creates a null display and does not hotplug. SurfaceFlinger
++	 * aborts on "HWC did not hotplug" and the panel blinks.
++	 * The client that calls SET_MASTER is the one that modesets.
++	 */
+ 	if (dev->master)
+-		return -EBUSY;
++		drm_drop_master(dev, file_priv);
+ 
+ 	if (!file_priv->master)
+ 		return -EINVAL;
