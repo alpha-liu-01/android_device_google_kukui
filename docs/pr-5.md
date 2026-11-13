@@ -68,6 +68,8 @@
 
 事件：
 
+2026-11-13 `device.mk` 加了 `PRODUCT_COMPRESSED_APEX := false`。`com.android.tethering.apex` 里的 `apex_payload.img` 是 Stored。system 分区从 586403840 字节增到 627113984 字节。六个逻辑分区合计 1355194368 字节，动态分区组 8585740288 字节，占用 15.8%。super 展开后 8589934592 字节，sha256 `f85a31c85c75298f35a738081a565c62a8faeee03ddee8cf8fbafd4a02a49a3f`。三份 FIT 与 `20261108f` 相同。zip 是 `work/release/lineage-23.2-kukui-20261113.zip`，1112350386 字节，sha256 `476cea2465d4fa193623a155355a8a2f5c20df37c546dcc8db94598de9a2c624`。用户从 U 盘启动，`ro.boot.boot_devices` 是 `soc/11201000.usb/11200000.usb`，`ro.build.date` 是 Fri Nov 13 14:28:27 EST 2026，`sys.boot_completed` 是 1，开机动画已停，zygote 在跑。`/data/apex/decompressed` 是空的，`/apex` 下有 89 个已激活的 APEX。
+
 ## 386f27b Add the DRM SET_MASTER takeover patch the display needs
 
 内容：新增 `bringup/kernel/drm-setmaster-takeover.patch`。`DRM_IOCTL_SET_MASTER` 不再检查 `CAP_SYS_ADMIN`，已经有 master 时直接接手，而不是返回 `-EBUSY`。他写明这是按 `docs/phase-3.md` 重写的，不是原来的那份代码。没有它时，minigbm 先打开 `/dev/dri/card0`，drm_hwcomposer 拿不到 master，屏幕不亮。
