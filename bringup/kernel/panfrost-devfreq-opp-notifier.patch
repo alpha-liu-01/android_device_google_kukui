@@ -1,0 +1,31 @@
+Subject: [PATCH] drm/panfrost: follow OPP table changes in devfreq
+
+mtk-svs init01 disables every GPU OPP except the fastest one that runs
+at vboot, then checks that the GPU buck reads vboot. panfrost never
+registered the devfreq OPP notifier, so the GPU stayed on its disabled
+OPP and SVS failed for all banks:
+
+  SVSB_GPU: buck voltage: 700000uV, expected vboot: 800000uV
+  mtk-svs 1100bc00.svs: error -EPERM: svs start fail
+
+Register it, so devfreq recomputes the available range and retargets
+when OPPs are disabled, enabled or adjusted.
+---
+--- a/drivers/gpu/drm/panfrost/panfrost_devfreq.c
++++ b/drivers/gpu/drm/panfrost/panfrost_devfreq.c
+@@ -212,6 +212,15 @@
+ 	}
+ 	pfdevfreq->devfreq = devfreq;
+ 
++	/*
++	 * Follow OPP table changes. mtk-svs disables every GPU OPP but the
++	 * one it calibrates at and then expects the buck at that OPP's
++	 * voltage; without the notifier the GPU stays on its disabled OPP.
++	 */
++	ret = devm_devfreq_register_opp_notifier(dev, devfreq);
++	if (ret)
++		DRM_DEV_INFO(dev, "Couldn't register OPP notifier: %d\n", ret);
++
+ 	cooling = devfreq_cooling_em_register(devfreq, NULL);
+ 	if (IS_ERR(cooling))
+ 		DRM_DEV_INFO(dev, "Failed to register cooling device\n");

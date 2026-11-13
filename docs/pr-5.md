@@ -138,6 +138,8 @@
 
 事件：
 
+2026-11-13 四份补丁在已打过的 6.18.28 上正向试打通过，没有改内容。`.config` 只多了 `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y`。正在运行的 11 月 8 日内核里 SVS 停在 `failed to get OPP device for bank 2`，`AddTidToCgroup` 对 top-app、foreground、background 都是 `Permission denied`，温区只有 `cpu-thermal`、两块板温和电池，没有 `gpu-thermal`。新内核仍是 `6.18.28-mt81-kukui2`，`#1-kukui-phase2`，编译时间 Fri Nov 13 16:17:50 EST 2026。USB 和 eMMC FIT 的内核 lzma crc32 是 `d4016293`，三份 DTB 和原来的 ramdisk 没换，命令行仍有 `drm_client_lib.active=none`。菜单 FIT 仍是 10 月 31 日那份，lzma crc32 `f3ea1c10`，sha256 `653bb1a80043f3dd11f97d4059fc5f52335a50a99e8bf3ca4b8a8c0791d0a7ff`，命令行仍是 `console=ttynull`。super 与 `20261113c` 相同，sha256 `83be14748cc121c20034f8f1f53b0ed9da13f98f376611435fd4c284568c31d2`。zip 是 `work/release/lineage-23.2-kukui-20261113d.zip`，1112379450 字节，sha256 `ed1bd5bf2a94c3ae996704447b036f99057db53b1bc50c58cab83907902a57b0`。2026-11-13 17:49 整盘写入读卡器序列号 `000000002959` 的 `/dev/sda`。写入 11756634112 字节，读回 sha256 `629f05d9315c0fa25f3de9814cfb978c7a820afb8929a3412eb85f7dc6edfdf4`，super 读回 `83be14748cc121c20034f8f1f53b0ed9da13f98f376611435fd4c284568c31d2`。没有写 eMMC。用户从 U 盘启动，`/proc/version` 是 Fri Nov 13 16:17:50 EST 2026，`ro.boot.boot_devices` 是 `soc/11201000.usb/11200000.usb`，`sys.boot_completed` 是 1。`cpu-thermal` 仍在，另有 `soc-thermal`、`gpu-thermal`、`md1-thermal`、`cpu-little-thermal`、`cpu-big-thermal`、`tsabb-thermal`。`/sys/class/devfreq/cci` 绑在 `mtk-ccifreq`，passive，273–1196 MHz。`SVSB_CPU_LITTLE`、`SVSB_CPU_BIG`、`SVSB_CCI`、`SVSB_GPU` 都完成了 init01 和 init02，没有 `svs start fail`。`AddTidToCgroup failed` 是 0。合成器仍是 `skiagl`，有 HWC display 0。用户确认画面正常。`/proc/config.gz` 来自 ramdisk 里的旧 `configs.ko`，仍写着 CCI 未设置；正在运行的是 `mtk-ccifreq`。
+
 ## 2f60951 Kernel: register the per-sensor thermal zones mtk-svs needs
 
 内容：新增 `bringup/kernel/auxadc-thermal-sensor-zones.patch`。CCI 通了之后，mtk-svs 停在 GPU：找不到 `gpu-thermal`。auxadc 驱动原来只注册 zone 0。补丁保留每个传感器的读数，并注册设备树里已有的温区。zone 0 不变。没有这些温区的设备树会跳过。
@@ -149,6 +151,8 @@
 合并需要的修改：在 6.18.28 上试打。启动后看 `gpu-thermal` 是否出现，zone 0 的读数是否还在。
 
 事件：
+
+2026-11-13 和 SVS 一组打进 6.18.28，没有改补丁。`20261113d` 从 U 盘启动后，四组都完成了 init02，见上面 `73c4903` 的事件。用户确认画面正常。
 
 ## ac44fef Installer: update an Android only eMMC without formatting userdata
 
@@ -174,6 +178,8 @@
 
 事件：
 
+2026-11-13 和 SVS 一组打进 6.18.28，没有改补丁。`20261113d` 从 U 盘启动后，四组都完成了 init02，见上面 `73c4903` 的事件。用户确认画面正常。
+
 ## b94297e Kernel: let panfrost devfreq follow OPP changes for SVS
 
 内容：新增 `bringup/kernel/panfrost-devfreq-opp-notifier.patch`。GPU 那一组 SVS 调 OPP 时，panfrost 的 devfreq 要跟着离开被禁用的档，否则 GPU 电压和频率会对不上。
@@ -185,6 +191,8 @@
 合并需要的修改：在 6.18.28 上试打。看 GPU devfreq 是否跟着 SVS 的 OPP 走。
 
 事件：
+
+2026-11-13 和 SVS 一组打进 6.18.28，没有改补丁。`20261113d` 从 U 盘启动后，四组都完成了 init02，见上面 `73c4903` 的事件。用户确认画面正常。
 
 ## 736d92a Docs: kernel patch order, Android only update
 

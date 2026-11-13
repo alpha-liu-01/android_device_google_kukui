@@ -11,6 +11,13 @@ Apply `bringup/kernel/pm-set-mem-sleep.patch` before
 `pm_set_mem_sleep()`, which mainline 6.18.28 does not have. The helper
 takes the system sleep lock and sets `mem_sleep_current`.
 
+SVS needs four more changes on this same 6.18.28 tree, in this order:
+`cgroup-v1-cap-sys-nice.patch`, `auxadc-thermal-sensor-zones.patch`,
+`mtk-cci-devfreq-opp-disable.patch`, then
+`panfrost-devfreq-opp-notifier.patch`. The fragment enables
+`CONFIG_ARM_MEDIATEK_CCI_DEVFREQ`. The menu FIT stays on the 2026-10-31
+kernel. These patches go into the USB and eMMC FITs only.
+
 A USB image needs four pieces:
 
 | File | Role |

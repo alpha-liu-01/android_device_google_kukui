@@ -1,0 +1,114 @@
+Subject: [PATCH] thermal: mediatek: auxadc: register per-sensor thermal zones
+
+The driver only registers zone 0, the hottest of all sensors. mt8183.dtsi
+also describes one zone per sensor (soc-, gpu-, md1-, cpu-little-,
+cpu-big-thermal and the ABB one, thermal-sensors = <&thermal 1..6>), but
+none of them was ever registered. mtk-svs looks up "gpu-thermal" for its
+GPU bank, logs 'cannot get "gpu-thermal" thermal zone' and fails the
+whole probe, so no SVS voltages are applied on any bank.
+
+Keep each sensor's last reading and register the zones the device tree
+has; zone N reports sensor N - 1. Zone 0 is unchanged. SoCs whose device
+tree only has zone 0 skip the rest (-ENODEV).
+
+--- a/drivers/thermal/mediatek/auxadc_thermal.c
++++ b/drivers/thermal/mediatek/auxadc_thermal.c
+@@ -234,6 +234,7 @@
+ 
+ /* The maximum number of banks */
+ #define MAX_NUM_ZONES		8
++#define MAX_NUM_SENSOR_ZONES	16
+ 
+ /* The calibration coefficient of sensor  */
+ #define MT7622_CALIBRATION	165
+@@ -308,6 +309,12 @@
+ 	int id;
+ };
+ 
++/* A thermal zone that reports one sensor instead of the hottest one. */
++struct mtk_thermal_sensor_zone {
++	struct mtk_thermal *mt;
++	int sensor;
++};
++
+ struct mtk_thermal_data {
+ 	s32 num_banks;
+ 	s32 num_sensors;
+@@ -347,6 +354,10 @@
+ 	const struct mtk_thermal_data *conf;
+ 	struct mtk_thermal_bank banks[MAX_NUM_ZONES];
+ 
++	/* Last reading of every sensor, by sensor id, for the per-sensor zones */
++	int sensor_temp[MAX_NUM_SENSOR_ZONES];
++	struct mtk_thermal_sensor_zone sensor_zones[MAX_NUM_SENSOR_ZONES];
++
+ 	int (*raw_to_mcelsius)(struct mtk_thermal *mt, int sensno, s32 raw);
+ };
+ 
+@@ -838,6 +849,9 @@
+ 		if (!mtk_thermal_temp_is_valid(temp))
+ 			temp = THERMAL_TEMP_INVALID;
+ 
++		if (conf->bank_data[bank->id].sensors[i] < MAX_NUM_SENSOR_ZONES)
++			mt->sensor_temp[conf->bank_data[bank->id].sensors[i]] = temp;
++
+ 		if (temp > max)
+ 			max = temp;
+ 	}
+@@ -870,6 +884,30 @@
+ 	.get_temp = mtk_read_temp,
+ };
+ 
++static int mtk_read_sensor_temp(struct thermal_zone_device *tz, int *temperature)
++{
++	struct mtk_thermal_sensor_zone *sz = thermal_zone_device_priv(tz);
++	struct mtk_thermal *mt = sz->mt;
++	int i;
++
++	/* Reading the banks stores every sensor's temperature. */
++	for (i = 0; i < mt->conf->num_banks; i++) {
++		struct mtk_thermal_bank *bank = &mt->banks[i];
++
++		mtk_thermal_get_bank(bank);
++		mtk_thermal_bank_temperature(bank);
++		mtk_thermal_put_bank(bank);
++	}
++
++	*temperature = mt->sensor_temp[sz->sensor];
++
++	return 0;
++}
++
++static const struct thermal_zone_device_ops mtk_thermal_sensor_ops = {
++	.get_temp = mtk_read_sensor_temp,
++};
++
+ static void mtk_thermal_init_bank(struct mtk_thermal *mt, int num,
+ 				  u32 apmixed_phys_base, u32 auxadc_phys_base,
+ 				  int ctrl_id)
+@@ -1290,6 +1328,25 @@
+ 	if (IS_ERR(tzdev))
+ 		return PTR_ERR(tzdev);
+ 
++	/*
++	 * Zone 0 is the hottest sensor. A device tree may also describe one
++	 * zone per sensor (thermal-sensors = <&thermal N>, N = sensor id + 1),
++	 * as mt8183.dtsi does; the SVS GPU bank looks up "gpu-thermal" there.
++	 * Register the ones that exist.
++	 */
++	for (i = 0; i < mt->conf->num_sensors && i < MAX_NUM_SENSOR_ZONES; i++) {
++		struct thermal_zone_device *stz;
++
++		mt->sensor_temp[i] = THERMAL_TEMP_INVALID;
++		mt->sensor_zones[i].mt = mt;
++		mt->sensor_zones[i].sensor = i;
++		stz = devm_thermal_of_zone_register(&pdev->dev, i + 1,
++						    &mt->sensor_zones[i],
++						    &mtk_thermal_sensor_ops);
++		if (IS_ERR(stz) && PTR_ERR(stz) != -ENODEV)
++			dev_warn(&pdev->dev, "sensor %d zone: %pe\n", i, stz);
++	}
++
+ 	ret = devm_thermal_add_hwmon_sysfs(&pdev->dev, tzdev);
+ 	if (ret)
+ 		dev_warn(&pdev->dev, "error in thermal_add_hwmon_sysfs");

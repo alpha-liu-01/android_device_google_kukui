@@ -1,0 +1,74 @@
+From: Kevin Shenavai <24247382+krecks@users.noreply.github.com>
+Subject: [PATCH] devfreq: mtk-cci: leave a disabled OPP, run at the resolved rate
+
+mtk-svs init01 disables every CCI OPP except the fastest one that runs at
+vboot and then checks that the buck shared by the LITTLE cluster and the
+CCI reads vboot. mtk-cci-devfreq only handled OPP_EVENT_ADJUST_VOLTAGE,
+so the CCI stayed on its disabled OPP and kept the buck above vboot:
+
+  SVSB_CPU_LITTLE: buck voltage: 893750uV, expected vboot: 800000uV
+  mtk-svs 1100bc00.svs: error -EPERM: svs start fail
+
+Retarget when the current OPP is disabled, as mediatek-cpufreq does.
+
+mtk_ccifreq_target() also looked the voltage up from the nearest
+available OPP but set the PLL to the requested rate. With the requested
+OPP disabled that runs the CCI faster than its voltage allows. Use the
+resolved rate for the clock and for pre_freq.
+---
+--- a/drivers/devfreq/mtk-cci-devfreq.c	2026-11-08 21:59:59.227581460 +0100
++++ b/drivers/devfreq/mtk-cci-devfreq.c	2026-11-08 21:59:59.243214218 +0100
+@@ -134,9 +134,6 @@
+ 	if (!drv)
+ 		return -EINVAL;
+ 
+-	if (drv->pre_freq == *freq)
+-		return 0;
+-
+ 	mutex_lock(&drv->reg_lock);
+ 
+ 	inter_voltage = drv->inter_voltage;
+@@ -153,6 +150,17 @@
+ 	voltage = dev_pm_opp_get_voltage(opp);
+ 	dev_pm_opp_put(opp);
+ 
++	/*
++	 * The requested OPP can be disabled (mtk-svs disables all but one
++	 * while it calibrates). Run at the OPP that was found, so the clock
++	 * never runs faster than the voltage that was looked up allows.
++	 */
++	*freq = opp_rate;
++	if (drv->pre_freq == *freq) {
++		ret = 0;
++		goto out_unlock;
++	}
++
+ 	pre_voltage = regulator_get_voltage(drv->proc_reg);
+ 	if (pre_voltage < 0) {
+ 		dev_err(dev, "invalid vproc value: %d\n", pre_voltage);
+@@ -237,6 +245,25 @@
+ 			mtk_ccifreq_set_voltage(drv, volt);
+ 		}
+ 		mutex_unlock(&drv->reg_lock);
++	} else if (event == OPP_EVENT_DISABLE) {
++		bool current_opp;
++
++		mutex_lock(&drv->reg_lock);
++		current_opp = dev_pm_opp_get_freq(opp) == drv->pre_freq;
++		mutex_unlock(&drv->reg_lock);
++
++		/*
++		 * The OPP the CCI runs at was disabled. Pick a new target now,
++		 * like mediatek-cpufreq does for the CPUs: mtk-svs disables
++		 * all but its vboot OPP and then expects the shared buck to be
++		 * at vboot. Staying on the disabled OPP keeps that buck high
++		 * and SVS init fails with "buck voltage ... expected vboot".
++		 */
++		if (current_opp) {
++			mutex_lock(&drv->devfreq->lock);
++			update_devfreq(drv->devfreq);
++			mutex_unlock(&drv->devfreq->lock);
++		}
+ 	}
+ 
+ 	return 0;
