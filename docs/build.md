@@ -6,6 +6,11 @@ It is Linux 6.18.28 from `linux-postmarketos-mediatek-mt81`, plus
 and `bringup/camera/`. The FIT images and kernel modules in this
 repository are from that build. `LOCALVERSION` is `-mt81-kukui2`.
 
+Apply `bringup/kernel/pm-set-mem-sleep.patch` before
+`bringup/kernel/mt8183-usb-suspend-power.patch`. The USB patch calls
+`pm_set_mem_sleep()`, which mainline 6.18.28 does not have. The helper
+takes the system sleep lock and sets `mem_sleep_current`.
+
 A USB image needs four pieces:
 
 | File | Role |

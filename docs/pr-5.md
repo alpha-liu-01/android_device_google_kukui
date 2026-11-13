@@ -1,0 +1,413 @@
+# Pull request 5
+
+2026-11-13 对照本地 `ef09a94` 看过 [alpha-liu-01/android_device_google_kukui#5](https://github.com/alpha-liu-01/android_device_google_kukui/pull/5)。作者 krecks，分支 `krane-bringup-fixes`，从 `a0f8aab` 拉出，中间用 `8ceb40f` 合并了 `ef09a94`。29 个提交。他在 Krane sku0 上从 U 盘和 eMMC 启动过，内核从 6.18.28 换到 6.18.62，再换到 6.18.63。这份文档只记录判断，没有合并，也没有拿他的镜像启动。
+
+整份 pull request 一次合进来会换掉内核版本、菜单里的版本字符串、Android FIT 的命令行，以及一批 6.18.63 的 `.ko`。按下面每一笔挑。预编译模块用自己的内核重编，不收仓库里的二进制。
+
+`patches/system_cros_codecs_mdp3.patch`、`patches/external_drm_hwcomposer_mdp3_rotation.patch`、`patches/frameworks_base_hwui_gl_prerotation.patch`、`patches/frameworks_base_lid_wake.patch` 在当前 Lineage 23.2 树上正向试打通过。前一份 MDP3 补丁叠在已经打上的 `system_cros_codecs.patch` 上面。
+
+每一节的「事件」留给以后填写。
+
+## 索引
+
+| 提交 | 结论 |
+|---|---|
+| `b9175a8` | 应该合并 |
+| `12eb743` | 应该合并 |
+| `386f27b` | 功能要留，这份补丁先不合并 |
+| `7465cfb` | 应该合并 |
+| `249ab61` | 应该合并 |
+| `6526f4b` | 应该合并 |
+| `73c4903` | 应该合并，和后面三笔内核补丁一起 |
+| `2f60951` | 应该合并，和 SVS 一组 |
+| `ac44fef` | 功能要，脚本重做后再合并 |
+| `b7ed7de` | 应该合并，和 SVS 一组 |
+| `b94297e` | 应该合并，和 SVS 一组 |
+| `736d92a` | 随功能一起改写后合并 |
+| `d9cbef0` | 应该合并 |
+| `b53e50e` | 先不单独合并 |
+| `2815d72` | 模块名单要，二进制不要 |
+| `5e0cc3f` | 应该合并，排在 MDP3 模块之后 |
+| `c91f3e0` | 应该合并，排在 MDP3 模块之后 |
+| `be4af95` | 不合并 |
+| `8b99860` | 先不合并 |
+| `8ceb40f` | 不合并 |
+| `3b51904` | 补丁和配置应该合并，二进制不要 |
+| `a9706cd` | 拆开合并 |
+| `bcc64e1` | 拆开合并 |
+| `7f6d160` | 应该合并，二进制不要 |
+| `7814fe5` | 内核版本先不合并，模块名单要 |
+| `5067807` | 功能要，和安装器上一笔一起重做 |
+| `fc5ee05` | 拆开合并 |
+| `fccfd18` | 不作为我们的构建说明合并 |
+| `174c947` | 应该合并 |
+
+## b9175a8 Add the pm_set_mem_sleep() helper the USB suspend patch calls
+
+内容：新增 `bringup/kernel/pm-set-mem-sleep.patch`。`mt8183-usb-suspend-power.patch` 调用 `pm_set_mem_sleep()`，主线和 postmarketOS 的 mt81 补丁里都没有这个函数，干净的内核编不过 `mtu3_plat.c`。补丁在 `kernel/power/suspend.c` 里按写 `/sys/power/mem_sleep` 的方式设置 `mem_sleep_current`。要排在 USB 睡眠补丁前面。
+
+可行性：仓库里的 USB 睡眠补丁已经在调用这个符号。从源码重编内核时缺这一笔就会停。补丁本身只提供助手，不改默认睡眠模式。
+
+是否应该合并：应该合并。
+
+合并需要的修改：把应用顺序写进内核构建说明。对照现在能启动的那棵内核，确认这个函数和现有行为一致。
+
+事件：
+
+2026-11-13 正在运行的 `6.18.28-mt81-kukui2` 的 kallsyms 里已有 `pm_set_mem_sleep`。`/sys/power/mem_sleep` 读到 `s2idle [deep]`。源码里的实现用 `lock_system_sleep()` 写 `mem_sleep_current`，和 krecks 补丁里的 `WRITE_ONCE` 不是同一份。入库的是和这棵已启动源码一致的补丁。干净的 6.18.28 正向试打通过，已打过的树上反向试打通过。`docs/build.md` 写了它必须排在 USB 睡眠补丁前面。没有重编内核，没有重启。
+
+## 12eb743 Ship APEXes uncompressed
+
+内容：`device.mk` 设置 `PRODUCT_COMPRESSED_APEX := false`。压缩的 APEX 第一次启动会在 `/data/apex/decompressed` 解开。他从 USB 2.0 U 盘启动时，这一步大约两分钟。25 个 APEX 从 131 MiB 涨到 174 MiB。
+
+可行性：增加的体积落在 8 GiB 的 super 里，他量过能放下。只影响 Kukui 的 product。第一次启动变快，super 变大约 42 MiB。
+
+是否应该合并：应该合并。
+
+合并需要的修改：编出来的 super 展开后仍要正好 8589934592 字节。看动态分区组还有没有被撑满。
+
+事件：
+
+## 386f27b Add the DRM SET_MASTER takeover patch the display needs
+
+内容：新增 `bringup/kernel/drm-setmaster-takeover.patch`。`DRM_IOCTL_SET_MASTER` 不再检查 `CAP_SYS_ADMIN`，已经有 master 时直接接手，而不是返回 `-EBUSY`。他写明这是按 `docs/phase-3.md` 重写的，不是原来的那份代码。没有它时，minigbm 先打开 `/dev/dri/card0`，drm_hwcomposer 拿不到 master，屏幕不亮。
+
+可行性：这个行为是出画需要的，当前能用的内核里已经有一份本地修改。他的补丁把权限检查整段拿掉，和本地那份是否逐行一致还没有对过。用错版本有可能把已经能出画的路径换掉。
+
+是否应该合并：功能要留在内核里。这份重写的补丁先不合并。
+
+合并需要的修改：用现在能出画的 `drm_auth.c` 重新导出补丁再入库。菜单 FIT 继续用已经能画出选项的那颗内核，不因为这一笔换成新 Image。
+
+事件：
+
+## 7465cfb Enable the system DMA-BUF heap in the camera config fragment
+
+内容：`bringup/camera/config.fragment` 打开 `CONFIG_DMABUF_HEAPS_SYSTEM=y`。`docs/camera.md` 和 `ueventd.kukui.rc` 都依赖 `/dev/dma_heap/system`，已提交的 fragment 没有打开它。缺了以后相机采集返回 -38，Codec2 软解返回 `NO_MEMORY`。
+
+可行性：一行配置。按文档从零编内核时确实会漏。正在运行的系统已经有这个节点，说明当前内核是打开的，仓库 fragment 落后于实际内核。
+
+是否应该合并：应该合并。
+
+合并需要的修改：重编内核之后确认节点仍在。这一笔不单独更换菜单内核。
+
+事件：
+
+## 249ab61 Add the EC ambient light sensor and adaptive brightness
+
+内容：传感器 HAL 原来只有加速度和陀螺。新增 `LightSensor`，因为 `cros-ec-light` 没有 IIO buffer，只有 `in_illuminance_input`，不能走 `HWSensorBase`。它以 5 Hz 读 lux，上报成 on-change 的 LIGHT。overlay 打开自动亮度，并给了一条 lux 到背光的曲线。`device.mk` 声明 `android.hardware.sensor.light`。他在 Krane sku0 上看到约 21 lux 对应背光 224/1023。
+
+可行性：HAL 和 overlay 都在 Kukui 设备树里。EC 光线传感器在 sku0 上存在。sku176 和 Kodama 没有在这笔记里测过。这一笔不带 `.ko`，节点要靠内核模块，模块在后面的预编译包里。
+
+是否应该合并：应该合并。
+
+合并需要的修改：模块用自己的内核编，不拿 6.18.63 的 `cros_ec_light_prox.ko`。sku176 和 Kodama 各确认一次是否有这个 sysfs。亮度曲线是按 sku0 的房间灯光写的，另外两块面板分开看。
+
+事件：
+
+## 6526f4b Pre-rotate HWUI's GL rendering so planes can scan out app layers
+
+内容：新增 `patches/frameworks_base_hwui_gl_prerotation.patch`，`apply-patches.sh` 会打上。面板是竖屏扫描，界面是 `ORIENTATION_270`。MT8183 的 OVL 只能做 0/180 和镜像，HWUI 的 GL 路径忽略窗口变换提示，图层带着 `ROT_270` 进合成器，全部落到 GPU。补丁让 GL 走和 Vulkan 一样的预旋转：缓冲按面板方向分配，用逆变换绘制，损伤区域换算到缓冲坐标。旋转时重建 EGL surface。多留一块缓冲，给还被平面占着的上一帧。属性 `debug.hwui.gl_prerotation` 不设置就关闭。`init.kukui.rc` 设成 true。他在 sku0 上把平面上的图层从 0/5 变成 3/5，SurfaceFlinger 的 CPU 时间从 19.96 s 降到 11.60 s。
+
+可行性：补丁在当前 `frameworks/base` 上能打上。默认关闭，别的设备不设这个属性就保持原样。合成器继续用 GLES，和现在的选择一致。改动在 HWUI 里，范围不小。
+
+是否应该合并：应该合并。
+
+合并需要的修改：属性未设置时，绘制结果要和现在一致。四个方向和相机预览再看一次。保持 GLES，不打开 Vulkan。
+
+事件：
+
+## 73c4903 Kernel: CCI devfreq for SVS, CAP_SYS_NICE for cgroup v1 moves
+
+内容：`bringup/phase2/config.fragment` 打开 `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y`。mtk-svs 的第三组是 CCI，驱动关闭时它停在 deferred probe，SVS 电压不会生效。另一份新补丁 `cgroup-v1-cap-sys-nice.patch` 让持有 `CAP_SYS_NICE` 的进程可以写 cgroup v1 的 tasks 文件。没有它时 system_server 每次在 top-app、foreground、background 之间移线程都会 `Permission denied`。
+
+可行性：两处都是主线内核相对 Android 通用内核的缺口。只合这一笔时 SVS 还会在后面的温区和 OPP 上停住，他后面的提交就是在补这些。cgroup 放宽的是写 tasks 的权限。
+
+是否应该合并：应该合并，和 `2f60951`、`b7ed7de`、`b94297e` 一起。
+
+合并需要的修改：四份补丁先在 6.18.28 上试打。确认 `CAP_SYS_NICE` 只覆盖 Android 需要的那次迁移。
+
+事件：
+
+## 2f60951 Kernel: register the per-sensor thermal zones mtk-svs needs
+
+内容：新增 `bringup/kernel/auxadc-thermal-sensor-zones.patch`。CCI 通了之后，mtk-svs 停在 GPU：找不到 `gpu-thermal`。auxadc 驱动原来只注册 zone 0。补丁保留每个传感器的读数，并注册设备树里已有的温区。zone 0 不变。没有这些温区的设备树会跳过。
+
+可行性：这是 SVS 的第二步，和他描述的启动日志对得上。改的是热区注册，不是调温策略。
+
+是否应该合并：应该合并，作为 SVS 一组。
+
+合并需要的修改：在 6.18.28 上试打。启动后看 `gpu-thermal` 是否出现，zone 0 的读数是否还在。
+
+事件：
+
+## ac44fef Installer: update an Android only eMMC without formatting userdata
+
+内容：安装器的「更新系统」原来要求 `android_kernel` 和 `menu_kernel`，那是 Android 加 Linux 的布局。只装 Android 时内核在 `pmOS_kernel`（p1），没有菜单，更新会停在找不到 `android_kernel`，只能再走一遍会格式化 userdata 的安装。这一笔让更新也接受 p1 是 `pmOS_kernel`、p3 是 super、p6 是 userdata、没有 `pmOS_root`、并且 p1 里已经是 eMMC 用的 Android 内核。然后复制 super，把 `android.kpart` 写到 p1，userdata、metadata、分区表和启动优先级不动。界面增加英文和中文状态。他在 Krane 上做了 dry-run，`state=dry_ok`。
+
+可行性：缺口是真的。当前仓库里的 `kukui-installd.sh` 在这之后又有只装 Android、ChromeOS 大分区跳过备份和 dry-run，和他的基线不是同一份脚本。整文件拿过来会盖掉这些路径。
+
+是否应该合并：功能要。这一笔先不直接合并。
+
+合并需要的修改：在当前 `kukui-installd.sh` 上重做。保留只装 Android、ChromeOS 备份规则和 dry-run。更新不得格式化 userdata，不得改 GPT 优先级。先 dry-run，再写盘。
+
+事件：
+
+## b7ed7de Kernel: let mtk-cci-devfreq leave an OPP that SVS disables
+
+内容：新增 `bringup/kernel/mtk-cci-devfreq-opp-disable.patch`。温区注册之后，SVS 的 init01 失败：小核 buck 停在 893750 µV，期望 vboot 800000 µV。小核和 CCI 共用 vproc12。cpufreq 会离开被关掉的 OPP，CCI devfreq 原来只处理调压，于是 CCI 留在 845 MHz，把电压撑住。补丁在当前 OPP 被禁用时重新 `update_devfreq()`，并让目标频率用 `devfreq_recommended_opp()` 找到的那档，避免频率高于电压。他当时写的是编过、还没启动。后面的镜像包含这一笔并且启动了。
+
+可行性：和前两笔是一条链。单独看日志是说得通的。要在我们的板上看到 buck 电压掉到 vboot，才算这一笔生效。
+
+是否应该合并：应该合并，和 SVS 一组。
+
+合并需要的修改：在 6.18.28 上试打。启动日志里看 SVS init01 是否还报电压不符。
+
+事件：
+
+## b94297e Kernel: let panfrost devfreq follow OPP changes for SVS
+
+内容：新增 `bringup/kernel/panfrost-devfreq-opp-notifier.patch`。GPU 那一组 SVS 调 OPP 时，panfrost 的 devfreq 要跟着离开被禁用的档，否则 GPU 电压和频率会对不上。
+
+可行性：和 CCI 那笔是同一类问题，换到 GPU 驱动上。后面的性能提交在 sku0 上跑过持续负载，温度到 76°C，80°C 才开始降温。他在更后面的记录里写过第一次启动后有过一阵 panfrost 缺页，之后没有再出现。
+
+是否应该合并：应该合并，和 SVS 一组。
+
+合并需要的修改：在 6.18.28 上试打。看 GPU devfreq 是否跟着 SVS 的 OPP 走。
+
+事件：
+
+## 736d92a Docs: kernel patch order, Android only update
+
+内容：`docs/build.md` 和 `docs/install.md` 补了内核补丁顺序，以及只装 Android 的 eMMC 可以更新、不格式化 userdata。
+
+可行性：文档跟着前面的提交走。那些提交还没按我们的脚本重做之前，这段说明会和仓库里的安装器不一致。后面的内核版本提交还会再改这些路径。
+
+是否应该合并：随对应功能一起改写后再合并。
+
+合并需要的修改：补丁顺序按最终决定的内核版本重写。安装器一节按重做后的脚本写。当前内核仍是 6.18.28 时，文档里的源码路径保持 6.18.28。
+
+事件：
+
+## d9cbef0 Send only scaled layers to the GPU in drm_hwcomposer
+
+内容：`device.mk` 设置 `vendor.hwc.drm.scale_with_gpu=true`。drm_hwcomposer 认为列出 YUV 格式的平面就能缩放。MT8183 的 OVL 列了 YUYV 和 UYVY，但不能缩放。壁纸以 1.1 倍裁切显示时，测试提交返回 `ERANGE`，整帧落到 GPU。这个属性让需要缩放或亚像素裁切的图层走 GPU，其余仍试平面。他在 sku0 上把失败的测试提交从大约 170/650 降到 0。42 像素宽的状态栏仍然进 GPU，因为 mediatek-drm 把 MT8183 的 `min_width` 留在 64，那一笔在 `bcc64e1`。
+
+可行性：只加一个厂商属性，不改合成器源码。和现有的 GLES 合成可以并存。
+
+是否应该合并：应该合并。
+
+合并需要的修改：合入后看主屏和打开应用的缩放动画，缩放图层进 GPU，其余图层还能上平面。
+
+事件：
+
+## b53e50e Kernel: make MDP3 work with the MT8183 SCP firmware
+
+内容：新增 `bringup/kernel/mtk-mdp3-mt8183-scp-abi.patch`，大约 610 行。MT8183 的 SCP 固件和主线 MDP3 驱动的 ABI 对不上，补丁让 `mtk-mdp3` 能用这块固件。`docs/build.md` 记了它的位置。
+
+可行性：这是后面旋转和 MM21 转换的前提。改动大，并且绑在我们正在用的那份 `scp.img` 上。他后面的系统能打开 MDP3，说明在他的 6.18.62/63 和那份固件上是通的。节点顺序被后面的 ueventd 写成固定的：camsv 0–1，解码 2，编码 3，mdp3 4。
+
+是否应该合并：先不单独合并。和模块、合成器补丁、解码补丁、`/dev/video4` 权限一起，等内核编出来并且节点名字核对过再合。
+
+合并需要的修改：先在 6.18.28 上试打。继续用现有的 `scp.img`。启动后读 `/sys/class/video4linux/video4/name`，确认是 mdp3，再写 ueventd。相机和解码节点的编号不能被挤乱。
+
+事件：
+
+## 2815d72 Ship mtk-mdp3.ko in vendor_dlkm
+
+内容：`device.mk` 把 `mtk-mdp3.ko` 放进 vendor_dlkm，并改了 `modules.dep` 和 `modules.load`。仓库里同时带上编好的 `.ko`。
+
+可行性：模块要进镜像，否则用户态打不开节点。他提交里的 `.ko` 是他那棵内核的产物，和 6.18.28 的 vermagic 对不上就不能加载。
+
+是否应该合并：模块名单应该合并。二进制不合并。
+
+合并需要的修改：在选定的内核上自己编 `mtk-mdp3.ko`，再写入 `device.mk` 和模块清单。
+
+事件：
+
+## 5e0cc3f Rotate 90/270 degree layers with MDP3 in drm_hwcomposer
+
+内容：新增 `patches/external_drm_hwcomposer_mdp3_rotation.patch` 和 `sepolicy/vendor/hal_graphics_composer_default.te`。90/270 度的图层，包括 Firefox 的内容，提前一帧交给 MDP3 旋转，再放到平面上。没有 mtk-mdp3 节点，或者 `vendor.hwc.drm.mdp3_rotation=0` 时，这些图层仍走 GPU。
+
+可行性：补丁在当前 `external/drm_hwcomposer` 上能打上。没有节点时的退路写在补丁说明里。真正旋转要等内核模块和 `/dev/video4` 的权限，权限在 `fc5ee05` 才加上。SELinux 仍是 permissive，策略可以先放进树里。
+
+是否应该合并：应该合并，排在 MDP3 模块和节点权限之后。
+
+合并需要的修改：先在没有 mdp3 节点的当前镜像上确认合成结果不变。节点出现之后再打开旋转。
+
+事件：
+
+## c91f3e0 Convert MM21 to NV12 with MDP3 in the V4L2 decoder
+
+内容：新增 `patches/system_cros_codecs_mdp3.patch` 和 `sepolicy/vendor/mediacodec.te`。MDP3 把解码器缓冲里的 MM21 转成线性 NV12，直接写入客户端缓冲。没有 mtk-mdp3 节点，或者 `vendor.cros_codecs.mdp3=0` 时，仍走现有的 CPU 反块。`--reverse` 时先撤这一份，再撤原来的解码补丁。
+
+可行性：补丁能叠在当前已经打上的 `system_cros_codecs.patch` 上。CPU 路径还在，所以模块没就绪时解码不应消失。不要用 `git diff` 重新生成原来的三份解码补丁。
+
+是否应该合并：应该合并，排在 MDP3 模块之后。
+
+合并需要的修改：`vendor.cros_codecs.mdp3=0` 时确认仍是现在的 CPU 反块。`/dev/video*` 保持 `media:camera`，只有确认是 mdp3 的那个节点另给 graphics 组。
+
+事件：
+
+## be4af95 Rebuild the kernel modules with the MDP3 patch
+
+内容：按带 MDP3 补丁的内核重新放了一套 `.ko` 和模块清单。没有源码改动。
+
+可行性：二进制只和他的那次构建匹配。
+
+是否应该合并：不合并。
+
+合并需要的修改：没有。模块在我们自己的内核构建里产生。
+
+事件：
+
+## 8b99860 Kernel: move to Linux 6.18.62
+
+内容：内核换成 kernel.org 的 6.18.62。版本字符串改到 `6.18.62-mt81-kukui2`。`kukui-keep.c`、`kukui-menu.c`、`wrap-ramdisk.sh`、`pack-install-fits.sh`、`build-dtb.sh`、`pack-android-kpart.sh`、`setup-resukisu.sh`、`NOTICE`、`README` 和文档里的 6.18.28 路径一起改掉。`prebuilt/6.18.28-mt81-kukui2` 的模块清单换成 6.18.62。
+
+可行性：他在 Krane sku0 的 eMMC 上启动过这个版本。我们这边菜单 FIT 固定用 2026-10-31 的 6.18.28 Image，后一次同版本内核放进菜单后再没有画出选项。换稳定版是另一次决定，不是这一批功能补丁的附带结果。Kodama 的 DTB 也从这棵新内核编。
+
+是否应该合并：先不合并。
+
+合并需要的修改：真要升级时，菜单 FIT 先保持能画出选项的那颗内核，单独验证新 Image 能画出 Android / Linux 之后再换。三份 FIT 配置（sku176、sku0、kodama sku16）保持原样。6.18.28 的模块清单留到新清单替换它为止。
+
+事件：
+
+## 8ceb40f Merge upstream main (one image for three devices)
+
+内容：把 `ef09a94` 合并进他的分支。冲突在 `docs/fixes.md` 的末尾，以及两处 6.18.28 路径被改到 6.18.62：`pack-install-fits.sh` 的 `LINUX_SRC` 默认值，和 `docs/kodama.md` 里编 Kodama DTB 的步骤。
+
+可行性：这是他追上我们主分支的 merge commit。我们这一侧就是 `ef09a94`。cherry-pick 这个合并没有新功能，还会把路径改到 6.18.62。
+
+是否应该合并：不合并。
+
+合并需要的修改：没有。从他的分支拿提交时跳过这一笔，源码路径留在 6.18.28，直到内核版本那一笔单独决定。
+
+事件：
+
+## 3b51904 Kernel: suspend debugging, pstore, TPM, RTC, Type-C, wakeup reasons
+
+内容：`config.fragment` 打开 `CONFIG_PM_DEBUG`、`CONFIG_PM_SLEEP_DEBUG`、pstore ramoops、`CONFIG_LOG_BUF_SHIFT=21`、LRU_GEN、透明大页改为 madvise，并关掉 `CONFIG_RTC_HCTOSYS`。MT6358 的 RTC 会读成 2086 年，打开 HCTOSYS 会把系统时间设到那一年。新增三份补丁：相机传感器在系统睡眠时的电源、`sbs-battery` 对 time-to-empty 的 `ENODATA`、唤醒原因的 sysfs。`device.mk` 和模块清单加入对应 `.ko`，包括 TPM、RTC、Type-C。`init.kukui.rc` 有配套改动。`docs/build.md` 和 `docs/fixes.md` 记了他的测量。
+
+可行性：RTC 那条是实打实的启动问题。pstore 用的是 coreboot 已经留好的 ramoops。`PM_DEBUG` 会多一些睡眠日志。这一笔没有打开喂狗。`.ko` 仍是他的构建产物。
+
+是否应该合并：三份补丁和这些配置应该合并。二进制不合并。
+
+合并需要的修改：三份补丁先在 6.18.28 上试打。模块清单按我们的构建重写。USB 启动看新的唤醒源会不会让睡眠立刻失败。系统时间确认不再跳到 2086。
+
+事件：
+
+## a9706cd Boot log on the panel, lid, deep sleep by default, lens power
+
+内容：四件事情放在一笔里。
+
+开机日志：USB 和 eMMC 的 Android FIT 去掉 `drm_client_lib.active=none`，改成 `loglevel=7` 和 `fbcon=font:TER16x32`。内核日志打在面板上，直到开机动画。`init.kukui.rc` 再解开 vtcon。他的前提是 SET_MASTER 已经让 drm_hwcomposer 能拿到 master。
+
+盖子：键盘盖上的触摸板算外部设备，合盖后手还放在上面会在 26–124 ms 内把屏幕重新唤醒。`patches/frameworks_base_lid_wake.patch` 在合盖且 `lid_behavior` 为睡眠时，忽略触摸板和除电源、唤醒键以外的按键。开盖仍然唤醒。补丁在当前 `frameworks/base` 上能打上。
+
+深睡：没有保存过选择时，eMMC 启动把 `suspend_power_off` 设为 1，于是 `mem_sleep` 用 deep。他量到睡眠电流大约 10 mA，s2idle 大约 53 mA，30 次 WoW 都能回来，键盘坞也能恢复。U 盘启动保持 0，避免关掉正在使用的 USB 口。
+
+镜头：`bringup/kernel/dw9768-power-while-streaming.patch`。DW9768 在出流期间保持供电。
+
+可行性：盖子补丁和镜头补丁可以分开落地。去掉 `drm_client_lib.active=none` 和我们现在的 Android FIT 相反：当前 U 盘和 eMMC 的 Android 内核带这个参数，让合成器独占显示。他是在自己的新内核上拿掉的。菜单 FIT 必须继续用 `console=ttynull`，不能带 `loglevel=7` 和 fbcon。深睡默认值只在没有保存选择时改 eMMC，和设置里的开关方向一致，但会改变没动过开关的机器。
+
+是否应该合并：拆开。盖子补丁应该合并。镜头补丁应该合并，先在 6.18.28 上试打。eMMC 默认深睡可以合并，条件是已经保存的选择不动，U 盘启动保持不断电。去掉 `drm_client_lib.active=none` 和把开机日志打到面板上，先不合并。
+
+合并需要的修改：Android 和 U 盘 FIT 继续带 `drm_client_lib.active=none` 与 `mem_sleep_default=s2idle`，直到在当前内核上证明拿掉之后仍然出画。菜单命令行保持 `console=ttynull` 和 `loglevel=1`。
+
+事件：
+
+## bcc64e1 Status bar on a plane, kernel version, SELinux labels, two decoders
+
+内容：新增 `bringup/kernel/mtk-drm-mt8183-min-fb-size.patch`，把 MT8183 的最小 framebuffer 宽度从 64 降到能放下大约 42 像素的状态栏，否则 AddFB2 返回 -22，状态栏只能进 GPU。`media_codecs_c2.xml` 里 H.264 解码的 `concurrent-instances` 从 1 改成 2。他用 Firefox 同时播了两路视频。新增一批 SELinux 标签：灯、传感器、vendor_init，以及 genfs。`init.kukui.rc` 去掉开机动画阶段再解一次 vtcon 的动作，因为 post-fs 已经解过 vtcon0 和 vtcon1。SELinux 仍是 permissive。
+
+可行性：状态栏宽度是 `d9cbef0` 留下的具体限制，补丁小。两路解码在他的镜像上跑过，我们这边单路硬解刚恢复，还没有在同一棵用户态上试过第二路。策略文件可以在 permissive 下先入库。
+
+是否应该合并：最小宽度补丁和 SELinux 标签应该合并。并发实例先留在 1。
+
+合并需要的修改：最小宽度只改到状态栏能过 AddFB2。两路解码等单路在我们自己的镜像上确认之后再改 xml。vtcon 解绑只留 post-fs 那一处。
+
+事件：
+
+## 7f6d160 Serial number, kernel BTF, socket destroy, SELinux labels part 2
+
+内容：设置里的序列号原来是 unknown。序列号在只读 VPD 里，需要 `coreboot_table` 和 vpd-sysfs。6.18 起 `of_bus_default_match()` 要求父节点有 `#address-cells`，depthcharge 创建的 `/firmware` 只有空的 `ranges`，`coreboot_table` 返回 `-EINVAL`。`bringup/kernel/mt8183-kukui-firmware-cells.patch` 在 `mt8183-kukui.dtsi` 里声明 2/2，由 depthcharge 填进去。`kukui-ids.sh` 从 VPD 写 `ro.serialno`，从 coreboot 的板号和 SKU 写 `ro.boot.hardware.revision`。配置打开 BTF（编译机要有 pahole）、`CONFIG_INET_DIAG_DESTROY`、`CONFIG_INET_UDP_DIAG=m`、`CONFIG_FS_VERITY`。没有 BTF 时，电量统计用的 cputimeinstate BPF 对象会被 libbpf 丢掉。没有 `INET_DIAG_DESTROY` 时，system_server 每销毁一个套接字都记 `ENOTSUP`。SELinux 再补触控笔电池、wakeup、extcon、IIO、video 节点和相机 HAL 的若干权限。他在 eMMC 上看到了序列号和硬件版本。
+
+可行性：固件节点和序列号脚本是设备树里的小改动，不依赖换内核版本，但固件补丁要在 6.18.28 的 dtsi 上对得上。BTF 让内核构建依赖 dwarves，Image 多一个 `.BTF` 段。fs-verity 要 userdata 带这个特性才会被用到，现有数据分区不会因为这一行就启用。
+
+是否应该合并：应该合并。二进制模块不合并。
+
+合并需要的修改：编译机安装 dwarves。固件补丁在 6.18.28 上试打。`kukui-ids.sh` 只在属性还空的时候写入。SELinux 保持 permissive。
+
+事件：
+
+## 7814fe5 Kernel: move to Linux 6.18.63; netd modules for tether stats
+
+内容：内核再换到 6.18.63，版本字符串 `6.18.63-mt81-kukui2`，`KBUILD_BUILD_VERSION=5`。他说相对 6.18.62 只多了下面三个网络选项，其余补丁能用偏移打上。netd 在同一批 iptables-restore 里带 `-j TCPMSS`，ramdisk 里没有 `xt_TCPMSS`，整批失败，`tetherctrl_counters` 不存在，NetworkStats 每次轮询都报取不到热点统计。ramdisk 增加 `xt_TCPMSS`、`xt_NFLOG`、`sch_ingress`、`cls_bpf`、`act_bpf`。quota2 仍然没有，主线内核没有这个 Android 模块。健康 HAL 重新允许读触控笔电池。文档和 Kodama 的路径改到 6.18.63。预编译模块清单从 6.18.62 改名到 6.18.63。
+
+可行性：热点统计这一段可以落在当前内核的模块清单上，不必等版本升级。6.18.63 本身和 `8b99860` 是同一种版本决定。他在 eMMC 上确认计数链出现、没有热点统计错误。
+
+是否应该合并：内核版本先不合并。网络模块名单应该合并。
+
+合并需要的修改：版本字符串保持 `6.18.28-mt81-kukui2`。`xt_TCPMSS` 等放进我们自己的 ramdisk 清单并重编。看 netd 日志里 quota2 仍然缺失时，其余规则是否已经能建起来。
+
+事件：
+
+## 5067807 Installer: copy and check only the used parts of super, show steps
+
+内容：更新系统原来复制并回读全部 8 GiB。U 盘在板载 USB 2.0 集线器后面，大约 35–40 MB/s，时间大多花在读零上。Android 实际用的是 LP 元数据和六个逻辑分区，大约 1.3 GiB。`kukui-installd` 用 `lpdump` 读 extent，丢掉 eMMC 上的 super，只复制元数据区和分区 extent，元数据区最后写，避免写到一半时分区表已经指向半份数据。复制时用 tee 算 sha256，U 盘只读一遍；丢掉页缓存后再从 eMMC 读回比较。界面列出步骤和进度，中英文都有。他在 Krane 上更新过，每一步不到一分钟，之后从 eMMC 启动。
+
+可行性：方向对，而且依赖 `ac44fef` 的更新布局。我们的发布镜像里是展开后的 raw super，不是他 U 盘写入器用的 sparse 文件。只要 GPT 里的 super 带合法的 LP 元数据，`lpdump` 就能列出 extent。安装器进程里要有 `lpdump`。当前脚本和他的脚本已经分叉。
+
+是否应该合并：功能要。和 `ac44fef` 一起在当前脚本上重做，不直接合并。
+
+合并需要的修改：安装器里带上 `lpdump`。中断后不能留下指向半份数据的元数据。回读前丢掉页缓存。只装 Android 和 Android 加 Linux 都做 dry-run。继续接受展开后的 raw super。
+
+事件：
+
+## fc5ee05 Performance: power HAL boosts, MDP3 for the composer, wallpaper on a plane, AOT after updates
+
+内容：一笔里放了多件已经在 sku0 上量过的事。
+
+电源：`TARGET_POWER_HAL := perfmgr-lineage`，新增 `power/powerhint.json`。触摸时小核 1248 MHz、大核 1716 MHz、GPU 653 MHz；启动时拉满最多 3 秒；省电把大核限在 1508 MHz、GPU 限在 500 MHz。AOSP 的示例 HAL 会忽略这些提示。
+
+CPU：`init.kukui.rc` 把 ondemand 的 `up_threshold` 设为 80，`io_is_busy` 设为 1，background 和 system-background 留在 A53 上。
+
+合成：MDP3 旋转以前没跑起来，因为 drm_hwcomposer 是 `system:graphics`，打不开 `0660 media camera` 的 `/dev/video4`。ueventd 给这个节点加上 graphics 组，属主仍是 media。播视频时 SurfaceFlinger 的 CPU 从 41% 降到 21%。
+
+壁纸：`config_wallpaperMaxScale` 改成 1.0。1.1 倍时壁纸永远要缩放，平面做不到，连同它和上面活动图层之间的东西都进 GPU。主屏和通知栏因此上了平面，壁纸的缩放动画没有了。
+
+AOT：更新系统走 OTA 那条启动，`pm.dexopt.boot-after-ota` 原来是 verify，`/data` 里的应用要等充电空闲才编译。改成 speed-profile 之后，Firefox 的启动时间大约减半。
+
+另外重新打开 SurfaceFlinger 的 shader cache，把 `tun.ko` 放进 vendor_dlkm 以提供 `/dev/tun`，并补了 GPU、显示、音频和memfd 的 SELinux 类型。他试过但没有收益的项：GPU devfreq 16 ms 轮询、eMMC read-ahead 512 KB、Mesa glthread。第一次更新后的启动有过一阵 panfrost 缺页，加压之后没有再出现。
+
+可行性：电源 HAL、ondemand、tun 和 AOT 都在设备树里，可以单独合。`/dev/video4` 那一行建立在节点顺序不变的前提下；顺序变了就会把 graphics 组套到解码器或编码器上。壁纸 1.0 会去掉缩放动画。shader cache 早期关过，是因为 RenderEngine 崩过，重新打开要再看一次。
+
+是否应该合并：拆开。电源 HAL、ondemand、`tun.ko` 的名单、AOT 应该合并。`/dev/video4` 在确认节点名字之后合并。壁纸缩放和 shader cache 单独决定。
+
+合并需要的修改：启动后确认 `video4` 的名字是 mdp3，再加 `0660 media graphics`。`/dev/video*`、`/dev/media*`、`/dev/v4l-subdev*` 继续是 `0660 media camera`。电源 HAL 只写在 Kukui 的 `BoardConfig.mk` 和 `device.mk`。要保留壁纸缩放动画就不改 `config_wallpaperMaxScale`。`tun.ko` 用自己的内核编。
+
+事件：
+
+## fccfd18 docs: the USB kernel command line of the tested images
+
+内容：`docs/build.md` 写下他 Build 1 到 7 的 U 盘内核命令行：`loglevel=7`、`fbcon=font:TER16x32`，没有 `drm_client_lib.active=none`。`pack-install-fits.sh` 写的是 eMMC 命令行，U 盘 FIT 沿用被打包的那份 FIT 自带的命令行，仓库里原先没有记下这一份。
+
+可行性：这是他测过的镜像的记录，不是我们 `20261108f` 和 `20261108g` 的命令行。我们的 U 盘内核带 `androidboot.boot_devices=soc/11201000.usb/11200000.usb` 和 `drm_client_lib.active=none`。
+
+是否应该合并：不把这段写成当前构建说明。
+
+合并需要的修改：若以后要记，单独标明是 krecks Build 1–7 的 U 盘内核。当前发布包的命令行保持现有 FIT。
+
+事件：
+
+## 174c947 Use the legacy MessageQueue so Firefox can start
+
+内容：Firefox 159 的界面能起来，Gecko 马上退出。`trunk_staging` 把 `RELEASE_PACKAGE_MESSAGEQUEUE_IMPLEMENTATION` 设成 `CombinedDeliMessageQueue`，它的 `next()` 没有 `@UnsupportedAppUsage`，ART 对 targetSdk 37 的 JNI 调用直接拒绝。随 Android 16 发布的配置用 `CombinedMessageQueue`，也只放到 targetSdk 36。这一笔在设备树里把 Kukui 的 trunk_staging 覆盖成 `LegacyMessageQueue`，也就是这个 flag 的默认值，Android 15 及更早使用的队列。`next()` 仍带普通的 `@UnsupportedAppUsage`。隐藏 API 的执行策略本身没有放宽。三个文件都在 `device/google/kukui/release/`。
+
+可行性：只影响 `lineage_kukui-trunk_staging` 这一次 lunch。别的设备和别的 release 配置不读这些 textproto。当前构建就是这个 lunch。
+
+是否应该合并：应该合并。
+
+合并需要的修改：合入后看 Firefox 能进入主界面，并且没有放宽别的隐藏 API。
+
+事件：
