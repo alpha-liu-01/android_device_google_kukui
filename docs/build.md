@@ -22,6 +22,9 @@ tree in this order:
 8. `bringup/kernel/auxadc-thermal-sensor-zones.patch`
 9. `bringup/kernel/mtk-cci-devfreq-opp-disable.patch`
 10. `bringup/kernel/panfrost-devfreq-opp-notifier.patch`
+11. `bringup/kernel/mtk-mdp3-mt8183-scp-abi.patch`. It matches
+    `mtk-mdp3` to the ChromeOS SCP firmware. Rebuild `mtk-mdp3.ko`
+    and ship that module. This patch is not in the FIT kernel image.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from

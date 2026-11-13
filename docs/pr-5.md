@@ -234,6 +234,8 @@
 
 事件：
 
+2026-11-13 补丁在 6.18.28 上原样打上。2026-11-13 18:57 从 U 盘开机，`ro.build.date` 为 Fri Nov 13 18:33:01 EST 2026，内核仍是 16:17 那份。`video0` 和 `video1` 仍是 camsv，`video2` 是 `mtk-vcodec-dec`，`video3` 是 `mtk-vcodec-enc`，`video4` 是 `mtk-mdp3:m2m`。`/dev/video4` 仍是 `0660 media camera`，`ueventd` 没改。没有 `VPU MDP failure`。同一次休眠里 EC 报了 sleep transition timeout，ov02a10 和 ov8856 在关掉电源时打了时钟和稳压器的不平衡警告，调用栈不在 mdp3。
+
 ## 2815d72 Ship mtk-mdp3.ko in vendor_dlkm
 
 内容：`device.mk` 把 `mtk-mdp3.ko` 放进 vendor_dlkm，并改了 `modules.dep` 和 `modules.load`。仓库里同时带上编好的 `.ko`。
@@ -245,6 +247,8 @@
 合并需要的修改：在选定的内核上自己编 `mtk-mdp3.ko`，再写入 `device.mk` 和模块清单。
 
 事件：
+
+2026-11-13 自己编的 `mtk-mdp3.ko` 是 136168 字节，vermagic `6.18.28-mt81-kukui2 SMP preempt mod_unload aarch64`。没有收他的 138704 字节二进制。`device.mk`、`modules.load`、`modules.dep` 已加上，排在编码器模块后面。内核 Image 时间仍是 16:17:59。三份 FIT 与 `20261113e` 相同，菜单仍是 10 月 31 日那份。super 展开后 8589934592 字节，sha256 `8e49d0b1c5855f4a6cf3055a0c164bccff71d1084f8c681f2208ff574438b01e`。zip 是 `work/release/lineage-23.2-kukui-20261113f.zip`，1112400638 字节，sha256 `c7ec8056432c70056b61a83441b1ac4f6d9eb38b02bec799eb1cb0753fa7957b`。2026-11-13 18:38 写入 `/dev/sda`（序列号 `000000002959`）。整盘回读 sha256 `9a8e9e0bc340d1750801d80dc3dd18922075afb7ee023ebeaa7c10025a4ef742`，super 回读与上面一致。模块已加载，`mtk_scp` 的引用计数是 2。主屏看起来正常。旋转和 MM21 转换还没放进这份镜像。
 
 ## 5e0cc3f Rotate 90/270 degree layers with MDP3 in drm_hwcomposer
 
