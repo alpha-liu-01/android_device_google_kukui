@@ -4,3 +4,6 @@ CONFIG_VIDEO_OV8856=m
 CONFIG_VIDEO_OV02A10=m
 CONFIG_VIDEO_DW9768=m
 CONFIG_PHY_MTK_MIPI_CSI_0_5=m
+# libcamera allocates from /dev/dma_heap/system. The reserved heap is too
+# small. Codec2 software decoders use the same node.
+CONFIG_DMABUF_HEAPS_SYSTEM=y

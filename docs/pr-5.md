@@ -96,6 +96,8 @@
 
 事件：
 
+2026-11-13 正在运行的 `6.18.28-mt81-kukui2`（11 月 8 日 08:47）kallsyms 里有 `system_heap_allocate`，`/dev/dma_heap/system` 是 `system:system` 0666。`/proc/config.gz` 写着 `CONFIG_DMABUF_HEAPS_SYSTEM` 未设置，内核树里的 `.config` 则是 `=y`。片段原先没写这一行，从零编内核时会丢掉它。已补进 `bringup/camera/config.fragment`。没有重编内核，菜单内核不动。
+
 ## 249ab61 Add the EC ambient light sensor and adaptive brightness
 
 内容：传感器 HAL 原来只有加速度和陀螺。新增 `LightSensor`，因为 `cros-ec-light` 没有 IIO buffer，只有 `in_illuminance_input`，不能走 `HWSensorBase`。它以 5 Hz 读 lux，上报成 on-change 的 LIGHT。overlay 打开自动亮度，并给了一条 lux 到背光的曲线。`device.mk` 声明 `android.hardware.sensor.light`。他在 Krane sku0 上看到约 21 lux 对应背光 224/1023。
