@@ -166,7 +166,7 @@
 
 事件：
 
-## b7ed7de Kernel: let mtk-cci-devfreq leave an OPP that SVS disables
+2026-11-13 当前 `kukui-installd.sh` 和两份 `strings.xml` 与 `ac44fef` 的父提交逐字节相同。ChromeOS 备份和 dry-run 已经在这份脚本里，摘这一笔不会盖掉它们。这一台的 eMMC 不是仅 Android 布局：p1 `pmOS_kernel`，p3 `pmOS_root`，p4 `menu_kernel`，p5 `android_kernel`（65536 扇区），p7 `super`（16777216 扇区），p10 `userdata` 是 f2fs。分区都没有挂载。新路径只在没有名为 `android_kernel` 的分区时才会走到。这张盘有 `android_kernel`，所以更新仍走原来的双系统路径。仅 Android 那条路径在这张盘上没有可测的布局。按用户要求把 `ac44fef` 原样合进当前脚本、字符串和 `MainActivity`。双系统路径的代码没有改写。没有写 eMMC，也没有在仅 Android 的盘上做 dry-run。
 
 内容：新增 `bringup/kernel/mtk-cci-devfreq-opp-disable.patch`。温区注册之后，SVS 的 init01 失败：小核 buck 停在 893750 µV，期望 vboot 800000 µV。小核和 CCI 共用 vproc12。cpufreq 会离开被关掉的 OPP，CCI devfreq 原来只处理调压，于是 CCI 留在 845 MHz，把电压撑住。补丁在当前 OPP 被禁用时重新 `update_devfreq()`，并让目标频率用 `devfreq_recommended_opp()` 找到的那档，避免频率高于电压。他当时写的是编过、还没启动。后面的镜像包含这一笔并且启动了。
 
