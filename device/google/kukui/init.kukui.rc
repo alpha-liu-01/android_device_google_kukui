@@ -22,6 +22,11 @@ on early-init
     export PAN_I_WANT_A_BROKEN_VULKAN_DRIVER 1
     setprop debug.renderengine.backend skiaglthreaded
     setprop debug.hwui.renderer skiagl
+    # The panel scans out portrait and the UI is landscape (ORIENTATION_270).
+    # The OVL planes cannot rotate by 90. With the HWUI GL pre-rotation
+    # patch applied, apps render in panel orientation so planes can scan
+    # them out. The compositor stays on GLES.
+    setprop debug.hwui.gl_prerotation true
     # The tenth boot got past HWC hotplug (ctl.start bootanim) and then
     # SIGABRT about 160ms later, on the RenderEngine thread. That thread
     # is priming the shader cache. Skip it so the first frames are the

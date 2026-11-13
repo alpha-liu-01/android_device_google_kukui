@@ -124,6 +124,8 @@
 
 事件：
 
+2026-11-13 正在运行的 `20261113b` 合成器是 `skiagl` / `skiaglthreaded`，GLES 是 Mesa Mali-G72。显示 0 的图层 `bufferTransform` 都是 `ROT_270`，`usesClientComposition=true`，`usesDeviceComposition=false`。补丁已进 `patches/frameworks_base_hwui_gl_prerotation.patch`，`apply-patches.sh` 打上，反向试打通过。`init.kukui.rc` 设 `debug.hwui.gl_prerotation true`，`debug.hwui.renderer` 仍是 `skiagl`。编出的 `system/lib64/libhwui.so` 含这个属性名，vendor 镜像里的 init 也有。system 分区 627118080 字节。super 展开后 8589934592 字节，sha256 `83be14748cc121c20034f8f1f53b0ed9da13f98f376611435fd4c284568c31d2`。三份 FIT 与 `20261108f` 相同。zip 是 `work/release/lineage-23.2-kukui-20261113c.zip`，1112365728 字节，sha256 `298026e083fd661c6e9c212308d0062ccf5a6d947a18aadf8d12e09c503f057b`。2026-11-13 15:58 整盘写入读卡器序列号 `000000002959` 的 `/dev/sda`。写入 11756634112 字节，读回 sha256 `8b0f50b2c69bd2034cf87a732a0fcc05fab735f278add17d96b1487d8d0be437`，super 读回 `83be14748cc121c20034f8f1f53b0ed9da13f98f376611435fd4c284568c31d2`。没有写 eMMC。用户从 U 盘启动，`ro.build.date` 是 Fri Nov 13 15:48:32 EST 2026，`ro.boot.boot_devices` 是 `soc/11201000.usb/11200000.usb`，`sys.boot_completed` 是 1。`debug.hwui.gl_prerotation` 是 true，`debug.hwui.renderer` 仍是 `skiagl`，GLES 仍是 Mesa Mali-G72。图层 `bufferTransform` 从 `ROT_270` 变成 0，源矩形按 1200×1920 的面板方向。设置界面这一帧五层都是 CLIENT，plane 0 扫的是这块 1200×1920 的合成缓冲；更早一帧 `usesDeviceComposition=true`。没有 tombstone，也没有 SurfaceFlinger 的 FATAL。用户确认四个方向和相机取景都正常。
+
 ## 73c4903 Kernel: CCI devfreq for SVS, CAP_SYS_NICE for cgroup v1 moves
 
 内容：`bringup/phase2/config.fragment` 打开 `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y`。mtk-svs 的第三组是 CCI，驱动关闭时它停在 deferred probe，SVS 电压不会生效。另一份新补丁 `cgroup-v1-cap-sys-nice.patch` 让持有 `CAP_SYS_NICE` 的进程可以写 cgroup v1 的 tasks 文件。没有它时 system_server 每次在 top-app、foreground、background 之间移线程都会 `Permission denied`。
