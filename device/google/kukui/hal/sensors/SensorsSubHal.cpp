@@ -16,6 +16,7 @@
 #define LOG_TAG "GoogleIIOSensorSubHal"
 
 #include "SensorsSubHal.h"
+#include "LightSensor.h"
 #include <android/hardware/sensors/2.1/types.h>
 #include <log/log.h>
 
@@ -139,6 +140,13 @@ SensorsSubHal::SensorsSubHal() : mCallback(nullptr), mNextHandle(1) {
     } else {
         ALOGE("SensorsSubHal: load_iio_devices returned error %d", err);
     }
+
+    // The EC light sensor has no IIO buffer, so it is not one of the devices above.
+    LightSensor* light = LightSensor::build(mNextHandle, this);
+    if (light != nullptr) {
+        mLightHandle = mNextHandle++;
+        mSensors[mLightHandle] = std::unique_ptr<SensorBase>(light);
+    }
 }
 
 // Methods from ::android::hardware::sensors::V2_1::ISensors follow.
@@ -229,12 +237,17 @@ Return<void> SensorsSubHal::debug(const hidl_handle& fd, const hidl_vec<hidl_str
     stream << "Available sensors:" << std::endl;
     for (auto& sensor : mSensors) {
         SensorInfo info = sensor.second->getSensorInfo();
-        HWSensorBase* hwSensor = static_cast<HWSensorBase*>(sensor.second.get());
         stream << "Name: " << info.name << std::endl;
         stream << "handle: " << info.sensorHandle << std::endl;
         stream << "resolution: " << info.resolution << " minDelay: " << info.minDelay
                << " maxDelay:" << info.maxDelay << std::endl;
-        stream << "iio path" << hwSensor->mIioData.sysfspath << std::endl;
+        if (sensor.first == mLightHandle) {
+            LightSensor* light = static_cast<LightSensor*>(sensor.second.get());
+            stream << "sysfs " << light->inputPath() << std::endl;
+        } else {
+            HWSensorBase* hwSensor = static_cast<HWSensorBase*>(sensor.second.get());
+            stream << "iio path" << hwSensor->mIioData.sysfspath << std::endl;
+        }
     }
 
     stream << std::endl;

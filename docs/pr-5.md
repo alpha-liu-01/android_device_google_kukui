@@ -110,6 +110,8 @@
 
 事件：
 
+2026-11-13 当前 U 盘系统已有 `cros-ec-light`，`in_illuminance_input` 读到 260 lux，`cros_ec_light_prox.ko` 已在 vendor 里。HAL、overlay 和 `android.hardware.sensor.light` 已放进树，新文件补了 Soong 符号链接。`android.hardware.sensors@2.1-kukui-subhal.so` 含 `cros-ec-light`。super 展开后 8589934592 字节，sha256 `f550f18cab5e6e4c3d546648ef46dd54a0ae4fbd3b6bf51a14d823e465833711`。三份 FIT 与 `20261108f` 相同。zip 是 `work/release/lineage-23.2-kukui-20261113b.zip`，1112360370 字节，sha256 `bc5a88684ebaafc8a573184cbd10ffd00c97ee2b1de7f5b2da0070b71ad9fae9`。2026-11-13 15:40 整盘写入读卡器序列号 `000000002959` 的 `/dev/sda`（119.1G USB，分区仍是 pmOS_boot / 8G super / metadata / userdata）。写入 11756634112 字节，读回 sha256 `1d67ae5cd125babad783d79843de5e6a32e4fbba5c410365a626d9df376dee8e`，super 读回 `f550f18cab5e6e4c3d546648ef46dd54a0ae4fbd3b6bf51a14d823e465833711`。没有写 eMMC。用户从 U 盘启动，`ro.build.date` 是 Fri Nov 13 15:25:39 EST 2026，`ro.boot.boot_devices` 是 `soc/11201000.usb/11200000.usb`，`sys.boot_completed` 是 1。`cros-ec-light` 在 sensorservice 里是 `android.sensor.light`，`AutomaticBrightnessController` 以 250 ms 订阅，事件在 0 到 51 lux 之间变化。`screen_brightness_mode` 是 1，overlay 曲线已进显示配置，策略是 `AutomaticBrightnessStrategy`。用户确认自动亮度看起来正常。
+
 ## 6526f4b Pre-rotate HWUI's GL rendering so planes can scan out app layers
 
 内容：新增 `patches/frameworks_base_hwui_gl_prerotation.patch`，`apply-patches.sh` 会打上。面板是竖屏扫描，界面是 `ORIENTATION_270`。MT8183 的 OVL 只能做 0/180 和镜像，HWUI 的 GL 路径忽略窗口变换提示，图层带着 `ROT_270` 进合成器，全部落到 GPU。补丁让 GL 走和 Vulkan 一样的预旋转：缓冲按面板方向分配，用逆变换绘制，损伤区域换算到缓冲坐标。旋转时重建 EGL surface。多留一块缓冲，给还被平面占着的上一帧。属性 `debug.hwui.gl_prerotation` 不设置就关闭。`init.kukui.rc` 设成 true。他在 sku0 上把平面上的图层从 0/5 变成 3/5，SurfaceFlinger 的 CPU 时间从 19.96 s 降到 11.60 s。

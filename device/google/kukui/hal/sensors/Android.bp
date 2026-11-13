@@ -25,6 +25,7 @@ cc_library {
     vendor: true,
     srcs: [
         "iio_utils.cpp",
+        "LightSensor.cpp",
         "MultiPoll.cpp",
         "Sensor.cpp",
         "SensorsSubHal.cpp",

@@ -112,6 +112,11 @@ class SensorsSubHal : public ISensorsSubHal, public ISensorsEventCallback {
      * The next available sensor handle
      */
     int32_t mNextHandle;
+
+    /**
+     * Handle of the polled ambient light sensor, or -1 when there is none
+     */
+    int32_t mLightHandle = -1;
 };
 
 }  // namespace implementation
