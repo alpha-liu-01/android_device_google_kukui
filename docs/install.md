@@ -92,7 +92,7 @@ The labels follow the system language. English and Chinese are included.
 | --- | --- |
 | Android only | Replaces the internal disk with Android. An existing Linux installation on that disk is erased. |
 | Android and Linux | Shrinks an existing Linux root and adds Android beside it. The screen asks for the Linux root size in GiB. Calculate, then install. |
-| Update system | Replaces `super`, the Android kernel, and the boot menu with the copies on the USB stick. It does not format userdata, does not change the partition table, and does not change boot priority. |
+| Update system | Replaces `super` and the Android kernel with the copies on the USB stick. On an Android-and-Linux disk it also replaces the boot menu (`android_kernel` and `menu_kernel`). On an Android-only disk the Android kernel is in `pmOS_kernel` and there is no menu. It does not format userdata, does not change the partition table, and does not change boot priority. |
 
 On Kodama sku16 use **Android only**. The Android-and-Linux path
 expects a postmarketOS partition layout and does not apply to a Debian
@@ -104,8 +104,9 @@ is not formatted. Leave the installer open until it tells you to unplug
 the stick. It does not reboot on its own.
 
 After it finishes, unplug the USB stick and power on. Ctrl+D opens the
-boot menu when a menu was installed. The menu stays available because
-its boot priority is left as it was.
+boot menu when a menu was installed, or boots Android directly on an
+Android-only disk. The menu stays available because its boot priority
+is left as it was.
 
 An update reads the images already written on the USB stick. It does
 not open a second zip from the internal data partition. To install a

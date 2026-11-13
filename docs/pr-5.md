@@ -206,6 +206,8 @@
 
 事件：
 
+2026-11-13 名单里的补丁和配置片段都在。`docs/build.md` 写成 6.18.28 上的十步顺序，并写明菜单 FIT 仍用 10 月 31 日的内核。`docs/install.md` 写明仅 Android 的盘更新的是 super 和 `pmOS_kernel`，双系统的盘还会更新菜单。仅 Android 那条路径还没有在这台机器上跑过。
+
 ## d9cbef0 Send only scaled layers to the GPU in drm_hwcomposer
 
 内容：`device.mk` 设置 `vendor.hwc.drm.scale_with_gpu=true`。drm_hwcomposer 认为列出 YUV 格式的平面就能缩放。MT8183 的 OVL 列了 YUYV 和 UYVY，但不能缩放。壁纸以 1.1 倍裁切显示时，测试提交返回 `ERANGE`，整帧落到 GPU。这个属性让需要缩放或亚像素裁切的图层走 GPU，其余仍试平面。他在 sku0 上把失败的测试提交从大约 170/650 降到 0。42 像素宽的状态栏仍然进 GPU，因为 mediatek-drm 把 MT8183 的 `min_width` 留在 64，那一笔在 `bcc64e1`。
