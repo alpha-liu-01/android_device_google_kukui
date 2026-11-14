@@ -33,6 +33,11 @@
 #   external_drm_hwcomposer_dsi_crtc.patch
 #     DSI prefers the CRTC with more planes. The property defaults on,
 #     which is the RK3399 big VOP. Krane has one DSI CRTC.
+#   external_drm_hwcomposer_mdp3_rotation.patch
+#     90/270 degree layers are rotated by MediaTek MDP3 one frame ahead
+#     and put on a plane. Needs mtk-mdp3.ko. Without that node, or with
+#     vendor.hwc.drm.mdp3_rotation=0, those layers go to the GPU.
+#     --reverse leaves it.
 #   frameworks_base_hwui_gl_prerotation.patch
 #     HWUI's GL pipeline follows the window transform hint the way the
 #     Vulkan one does: buffers in panel orientation, drawn through a
@@ -274,6 +279,9 @@ apply_or_skip "${LINEAGE_ROOT}/external/skia" \
 apply_or_skip "${LINEAGE_ROOT}/external/drm_hwcomposer" \
     "${REPO_ROOT}/patches/external_drm_hwcomposer_dsi_crtc.patch" \
     "DSI CRTC selection"
+apply_or_skip "${LINEAGE_ROOT}/external/drm_hwcomposer" \
+    "${REPO_ROOT}/patches/external_drm_hwcomposer_mdp3_rotation.patch" \
+    "MDP3 rotation"
 apply_or_skip "${LINEAGE_ROOT}/external/mesa" \
     "${REPO_ROOT}/patches/external_mesa_panvk_host_cached.patch" \
     "panvk HOST_CACHED"

@@ -262,6 +262,8 @@
 
 事件：
 
+2026-11-13 `20261113f` 已经在有 `video4`、没有这份合成器补丁时画面正常。补丁在当前 `external/drm_hwcomposer` 上原样打上，属性默认开。打不开节点或旋转失败时，90/270 度的图层仍走 GPU。`/dev/video4` 改为 `0660 media graphics`，因为合成器是 `system:graphics`；`video0` 到 `video3` 仍是 `media camera`。`fc5ee05` 里其余改动没有拿。super 展开后 8589934592 字节，sha256 `551eec93597fb597c4e91352cc6d84fbf21f35819bb53b3e6e86619559d6564c`。三份 FIT 与 `20261113f` 相同。zip 是 `work/release/lineage-23.2-kukui-20261113g.zip`，1112423484 字节，sha256 `d42dc7ce277b7f9ec5fb81bba111c14563c2aab3a3ad0980dad93460063e750e`。2026-11-13 19:12 写入 `/dev/sda`（序列号 `000000002959`）。整盘回读 sha256 `2f19ddd20b296d9f1e745de120ac67843f03bd5f29841e8fc51dae5ebf007842`，super 回读与上面一致。2026-11-13 19:29 从 U 盘开机，`ro.build.date` 为 Fri Nov 13 19:05:54 EST 2026。`video4` 仍是 `mtk-mdp3:m2m`，权限是 `media graphics`，前四个节点没变。属性为空，代码默认开。日志里有 `1920x1200 pitch 7680 rotate 270`，没有 `cannot open`、`rotation off` 或 `VPU MDP failure`。主屏和应用方向看起来正常。
+
 ## c91f3e0 Convert MM21 to NV12 with MDP3 in the V4L2 decoder
 
 内容：新增 `patches/system_cros_codecs_mdp3.patch` 和 `sepolicy/vendor/mediacodec.te`。MDP3 把解码器缓冲里的 MM21 转成线性 NV12，直接写入客户端缓冲。没有 mtk-mdp3 节点，或者 `vendor.cros_codecs.mdp3=0` 时，仍走现有的 CPU 反块。`--reverse` 时先撤这一份，再撤原来的解码补丁。

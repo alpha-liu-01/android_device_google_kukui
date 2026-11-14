@@ -1,6 +1,10 @@
 /dev/dri/*                                                                  0666   root       graphics
 /dev/dma_heap/system                                                        0666   system     system
 /dev/video*                                                                 0660   media      camera
+# mtk-mdp3:m2m. The composer is system:graphics and rotates 90/270 layers
+# with this node. The camera and codec nodes stay media:camera. vendor_dlkm
+# registers them as camsv 0-1, decode 2, encode 3, mdp3 4.
+/dev/video4                                                                 0660   media      graphics
 /dev/media*                                                                 0660   media      camera
 /dev/v4l-subdev*                                                            0660   media      camera
 /sys/class/backlight/backlight_lcd0/brightness                              0664   system     system
