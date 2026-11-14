@@ -54,9 +54,9 @@ A USB image needs four pieces:
 
 | File | Role |
 | --- | --- |
-| `kernel.kpart` | FIT the USB stick itself boots. Command line uses `androidboot.boot_devices=soc/11201000.usb/11200000.usb`. |
-| `android.kpart` | FIT written to the eMMC Android kernel slot. Command line uses `androidboot.boot_devices=soc/11230000.mmc`. |
-| `menu.kpart` | Boot menu FIT. Command line contains `console=ttynull`. |
+| `kernel.kpart` | FIT the USB stick itself boots. Command line uses `androidboot.boot_devices=soc/11201000.usb/11200000.usb`, `loglevel=7`, and no `drm_client_lib.active=none`. |
+| `android.kpart` | FIT written to the eMMC Android kernel slot. Command line uses `androidboot.boot_devices=soc/11230000.mmc`, `loglevel=7`, and no `drm_client_lib.active=none`. |
+| `menu.kpart` | Boot menu FIT. Command line contains `console=ttynull` and `loglevel=1`. It does not use the Android command line. |
 | `super.img` | Raw dynamic-partition image, exactly 8589934592 bytes. |
 
 `super.img` comes from the Lineage build. The three FIT files come from
