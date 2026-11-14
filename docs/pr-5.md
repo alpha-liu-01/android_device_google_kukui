@@ -416,6 +416,8 @@
 
 事件：
 
+2026-11-13 只复制 LP 元数据和六个逻辑分区，元数据放在最后。`lpdump` 本来就在 `/system/bin`。只装 Android 和 Android 加 Linux 走同一段复制，目标分区仍分别是 `mmcblk0p3` 和 `mmcblk0p7`。更新系统也走这一段。主机上对 `20261113n` 的 raw super 做了 dry-run：1297 MiB，不是 8192 MiB，区域不重叠，元数据在最后，复制到另一个文件后每个区域的 sha256 和 `lpdump` 的分区表都和源一致。没有写 eMMC，没有新的 U 盘镜像。
+
 ## fc5ee05 Performance: power HAL boosts, MDP3 for the composer, wallpaper on a plane, AOT after updates
 
 内容：一笔里放了多件已经在 sku0 上量过的事。
