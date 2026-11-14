@@ -53,3 +53,12 @@ dummy.ko
 af_key.ko
 nfnetlink_log.ko
 configs.ko
+iptable_nat.ko
+ip6table_nat.ko
+xt_MASQUERADE.ko
+udp_diag.ko
+xt_TCPMSS.ko
+xt_NFLOG.ko
+sch_ingress.ko
+cls_bpf.ko
+act_bpf.ko

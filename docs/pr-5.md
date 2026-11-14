@@ -326,6 +326,8 @@
 
 事件：
 
+2026-11-13 三份补丁打在 6.18.28 上：相机传感器在系统睡眠时的电源、`sbs-battery` 对 time-to-empty 的 `ENODATA`、唤醒原因 sysfs。配置打开 `PM_DEBUG`、`PM_SLEEP_DEBUG`、pstore ramoops、`LOG_BUF_SHIFT=21`、`LRU_GEN`，透明大页改为 madvise，`RTC_HCTOSYS` 保持关闭。`vendor_dlkm` 用这次内核重编，并加入 `rtc-mt6397`、`tpm_tis_core`、`tpm_tis_spi`、`cros-ec-typec`。没有用他的 `.ko`，没有打开喂狗。`vendor.dlkm.modules.ready` 之后重启 `prng_seeder`。USB 和 eMMC 的 FIT 用这颗内核，lzma crc `776b895f`，版本仍是 `6.18.28-mt81-kukui2`。菜单 FIT 与 `20261113h` 相同，10514432 字节，sha256 `653bb1a80043f3dd11f97d4059fc5f52335a50a99e8bf3ca4b8a8c0791d0a7ff`，lzma crc 仍是 `f3ea1c10`。super 展开后 8589934592 字节，sha256 `2befbe268e8280ff39dd587107b1c70ac04ee489270a6cbf5486c822646391b0`。zip 是 `work/release/lineage-23.2-kukui-20261113i.zip`，1116309444 字节，sha256 `3270c0b9484dc5bd78380f93cbee6fa36b6b749210860c8c9623d57cc9369efa`。img 11756634112 字节，sha256 `b39327df3093d7e03b32e6ab30b5bf6e1e3247c0313c70f5601ac966d9801d8b`。2026-11-13 21:00 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读 sha256 与 img 一致，super 回读与上面一致。这次开机只有背光，没有开机动画。`android.hardware.power-service.lineage-libperfmgr` 反复以 `Invalid config: /vendor/etc/powerhint.json` 退出，`system_server` 停在 `PowerManagerService` 等这个 HAL。原因和替换包记在 `fc5ee05`。开机核对记在 `20261113k`。`20261113h` 的 zip 没有改，仍是 1112446451 字节，sha256 `8925b92a063a69ceec1433ce0d29ebbed34770c8172870fdc4001361f7ae0447`。
+
 ## a9706cd Boot log on the panel, lid, deep sleep by default, lens power
 
 内容：四件事情放在一笔里。
@@ -346,6 +348,8 @@
 
 事件：
 
+2026-11-13 盖子补丁和 `dw9768` 出流期间保持供电的补丁已打上。没有保存过选择时，只有 `ro.boot.boot_devices` 是 `soc/11230000.mmc` 才把 `suspend_power_off` 设为 1，否则为 0。开机写 `pm_debug_messages=1`。没有去掉 `drm_client_lib.active=none`，没有改成 `loglevel=7` 或 fbcon，没有把开机日志打到面板上。菜单命令行仍是 `console=ttynull` 和 `loglevel=1`。放进上面的 `20261113i`。2026-11-13 21:00 已写入。那一版没有进到开机动画，替换包是 `20261113j`。开机核对记在 `20261113k`。
+
 ## bcc64e1 Status bar on a plane, kernel version, SELinux labels, two decoders
 
 内容：新增 `bringup/kernel/mtk-drm-mt8183-min-fb-size.patch`，把 MT8183 的最小 framebuffer 宽度从 64 降到能放下大约 42 像素的状态栏，否则 AddFB2 返回 -22，状态栏只能进 GPU。`media_codecs_c2.xml` 里 H.264 解码的 `concurrent-instances` 从 1 改成 2。他用 Firefox 同时播了两路视频。新增一批 SELinux 标签：灯、传感器、vendor_init，以及 genfs。`init.kukui.rc` 去掉开机动画阶段再解一次 vtcon 的动作，因为 post-fs 已经解过 vtcon0 和 vtcon1。SELinux 仍是 permissive。
@@ -357,6 +361,12 @@
 合并需要的修改：最小宽度只改到状态栏能过 AddFB2。两路解码等单路在我们自己的镜像上确认之后再改 xml。vtcon 解绑只留 post-fs 那一处。
 
 事件：
+
+2026-11-13 最小 framebuffer 补丁打进 Image。SELinux 增加灯、传感器、vendor_init 和 genfs。`concurrent-instances` 留在 1。没有改 `KBUILD_BUILD_VERSION`。vtcon 解绑仍只在 post-fs。放进 `20261113i`，修正电源配置后的 `20261113j` 仍带着它。`20261113j` 开机向导前进时整屏闪。当时状态栏是 42x1920，合成类型是 DEVICE；上一份没有这个补丁的镜像里 AddFB2 拒绝这个宽度，状态栏留在 GPU。这颗内核已撤掉 `.min_width` 和 `.min_height`，64 的默认值还在。DTB 和 ramdisk 与 `20261113j` 相同，super 也相同，sha256 `bf5896c2c6e114165d04fe335336582103bc8ef91b24a1c7a8c0c3fb7f75b940`。新内核 lzma crc `8bc47106`。zip 是 `work/release/lineage-23.2-kukui-20261113k.zip`，1116318614 字节，sha256 `d5c56c29df24f662e31d70a661a4eb73af012d1f47e2dd6eeffcfe66d379c8fb`。img sha256 `02dfc0b69c267e47c8bd5399719bc493db8dfb92b6f774538c7c922eea03909a`。菜单 FIT 仍是 `653bb1a80043f3dd11f97d4059fc5f52335a50a99e8bf3ca4b8a8c0791d0a7ff`。2026-11-13 21:52 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。
+
+2026-11-13 22:06 在 `10.0.0.120:5555` 上核对这张 `20261113k`。状态栏仍是 42×1920，合成类型是 CLIENT。电源 HAL 在跑，`/vendor/etc/powerhint.json` 是 1924 字节的普通文件，没有 tombstone。序列号 `HA16SW5Q`，硬件版本 `rev6 sku176`，系统时间是当天。U 盘 `suspend_power_off` 是 0，`mem_sleep` 停在 s2idle。ondemand 的 `up_threshold` 是 80，`io_is_busy` 是 1，background 和 system-background 在 0–3。`/proc/config.gz` 里有 `LRU_GEN`、pstore、BTF、`INET_DIAG_DESTROY`、`FS_VERITY`，`RTC_HCTOSYS` 关闭。Firefox 在前台。
+
+这张 FIT 的 sku176 DTB 是从内核树重新编译的，没有接上 `bringup/camera` 里的摄像头节点。和 `20261113h` 的 sku176 相比，除了 `/firmware` 的 `#address-cells` 和 `#size-cells`，摄像头节点也没了。传感器和 CAMSV 没有绑定，视频节点只剩 video0 解码、video1 编码、video2 `mtk-mdp3:m2m`，属组是 camera。下一份镜像要把摄像头片段接回 sku176，再从它导出 sku0。
 
 ## 7f6d160 Serial number, kernel BTF, socket destroy, SELinux labels part 2
 
@@ -370,6 +380,8 @@
 
 事件：
 
+2026-11-13 固件 `#address-cells` 补丁进三份 DTB。`kukui-ids.sh` 只在属性为空时写序列号和硬件版本。配置打开 BTF、`INET_DIAG_DESTROY`、`INET_UDP_DIAG=m`、`FS_VERITY`。vendor 加入 `coreboot_table`、`vpd-sysfs`。ramdisk 加入 `iptable_nat`、`ip6table_nat`、`xt_MASQUERADE`、`udp_diag`。SELinux 补触控笔电池、wakeup、extcon、IIO、`/dev/media*` 和 `/dev/v4l-subdev*`。没有用他的二进制。放进上面的 `20261113i`。2026-11-13 21:00 已写入。那一版没有进到开机动画，替换包是 `20261113j`。开机核对记在 `20261113k`。
+
 ## 7814fe5 Kernel: move to Linux 6.18.63; netd modules for tether stats
 
 内容：内核再换到 6.18.63，版本字符串 `6.18.63-mt81-kukui2`，`KBUILD_BUILD_VERSION=5`。他说相对 6.18.62 只多了下面三个网络选项，其余补丁能用偏移打上。netd 在同一批 iptables-restore 里带 `-j TCPMSS`，ramdisk 里没有 `xt_TCPMSS`，整批失败，`tetherctrl_counters` 不存在，NetworkStats 每次轮询都报取不到热点统计。ramdisk 增加 `xt_TCPMSS`、`xt_NFLOG`、`sch_ingress`、`cls_bpf`、`act_bpf`。quota2 仍然没有，主线内核没有这个 Android 模块。健康 HAL 重新允许读触控笔电池。文档和 Kodama 的路径改到 6.18.63。预编译模块清单从 6.18.62 改名到 6.18.63。
@@ -381,6 +393,8 @@
 合并需要的修改：版本字符串保持 `6.18.28-mt81-kukui2`。`xt_TCPMSS` 等放进我们自己的 ramdisk 清单并重编。看 netd 日志里 quota2 仍然缺失时，其余规则是否已经能建起来。
 
 事件：
+
+2026-11-13 内核版本没有升。ramdisk 增加 `xt_TCPMSS`、`xt_NFLOG`、`sch_ingress`、`cls_bpf`、`act_bpf`。健康 HAL 允许读触控笔电池。quota2 仍然没有。放进上面的 `20261113i`。2026-11-13 21:00 已写入。那一版没有进到开机动画，替换包是 `20261113j`。开机核对记在 `20261113k`。
 
 ## 5067807 Installer: copy and check only the used parts of super, show steps
 
@@ -418,6 +432,8 @@ AOT：更新系统走 OTA 那条启动，`pm.dexopt.boot-after-ota` 原来是 ve
 
 事件：
 
+2026-11-13 `TARGET_POWER_HAL` 改为 `perfmgr-lineage`，带上 `powerhint.json`。ondemand 的 `up_threshold` 为 80，`io_is_busy` 为 1，background 和 system-background 留在 0–3。`pm.dexopt.boot-after-ota=speed-profile`。`tun.ko` 进 `vendor_dlkm`。SELinux 补了 GPU、显示、音频和 mediacodec 的类型，原来的 MDP3 允许保留。壁纸缩放没有改，shader cache 仍是关闭。`/dev/video4` 的属主在更早的提交里已经是 `media graphics`，这一批没有再改。放进 `20261113i` 并在 21:00 写入。那一版没有进到开机动画。`/vendor/etc/powerhint.json` 在镜像里是指向编译机路径的符号链接，HAL 读不到，于是 `Invalid config` 退出。`system_server` 停在 `PowerManagerService` 等这个服务，开机动画没有出来。`link_device_tree` 把源文件做成符号链接，`prebuilt_etc` 原样装进了 vendor。现在先把内容复制成普通文件再安装，节点改用 `Paths`。内核和三份 FIT 与 `20261113i` 相同。super 展开后 8589934592 字节，sha256 `bf5896c2c6e114165d04fe335336582103bc8ef91b24a1c7a8c0c3fb7f75b940`。zip 是 `work/release/lineage-23.2-kukui-20261113j.zip`，1116313512 字节，sha256 `c6159f4632f8fbeb9930cfed6164ba0a5585f338e8c5ff6d045e847359046d26`。img sha256 `915d2c282b2403d7c8d75b667a8b1a585eceffd30b8fd48c5d5fe8dde88c0ab6`。2026-11-13 21:28 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。开机核对记在 `20261113k`。
+
 ## fccfd18 docs: the USB kernel command line of the tested images
 
 内容：`docs/build.md` 写下他 Build 1 到 7 的 U 盘内核命令行：`loglevel=7`、`fbcon=font:TER16x32`，没有 `drm_client_lib.active=none`。`pack-install-fits.sh` 写的是 eMMC 命令行，U 盘 FIT 沿用被打包的那份 FIT 自带的命令行，仓库里原先没有记下这一份。
@@ -441,3 +457,5 @@ AOT：更新系统走 OTA 那条启动，`pm.dexopt.boot-after-ota` 原来是 ve
 合并需要的修改：合入后看 Firefox 能进入主界面，并且没有放宽别的隐藏 API。
 
 事件：
+
+2026-11-13 `device/google/kukui/release` 整目录链到仓库，`trunk_staging` 标明 `RELEASE_CONFIG`，flag 覆盖成 `LegacyMessageQueue/MessageQueue.java`。第二次编 super 时构建读到了这个值。放进上面的 `20261113i`。2026-11-13 21:00 已写入。那一版没有进到开机动画，替换包是 `20261113j`。开机核对记在 `20261113k`。

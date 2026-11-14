@@ -49,6 +49,10 @@
 #     pre-rotation matrix, one extra buffer while planes hold the last
 #     one. Off unless debug.hwui.gl_prerotation is set; init.kukui.rc
 #     sets it. --reverse leaves it.
+#   frameworks_base_lid_wake.patch
+#     With the lid closed and lid_behavior sleep, motion events (the
+#     keyboard cover's touchpad) and keys other than power and wakeup do
+#     not wake the screen. --reverse leaves it.
 #   external_minigbm*.patch
 #     NV12 decoder stride and an HWC fallback that drops scanout when the
 #     display cannot take the format. The Rockchip AFBC dumb backend is
@@ -269,6 +273,9 @@ apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
 apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
     "${REPO_ROOT}/patches/frameworks_base_hwui_gl_prerotation.patch" \
     "HWUI GL pre-rotation"
+apply_or_skip "${LINEAGE_ROOT}/frameworks/base" \
+    "${REPO_ROOT}/patches/frameworks_base_lid_wake.patch" \
+    "no touchpad or key wake with the lid closed"
 apply_or_skip "${LINEAGE_ROOT}/device/mainline/common" \
     "${REPO_ROOT}/patches/device_mainline_common_mesa_board_mk.patch" \
     "mesa 25 board.mk"
@@ -299,12 +306,20 @@ apply_or_skip "${LINEAGE_ROOT}/external/minigbm" \
 apply_or_skip "${LINEAGE_ROOT}/external/minigbm-upstream" \
     "${REPO_ROOT}/patches/external_minigbm_upstream_nv12.patch" \
     "minigbm-upstream NV12"
-apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs.patch" \
-    "stateless V4L2 decoder"
-apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
-    "${REPO_ROOT}/patches/system_cros_codecs_mdp3.patch" \
-    "MDP3 MM21 conversion"
+# MDP3 sits on top of the base decoder patch and edits the same files, so
+# a reverse check of the base alone fails once MDP3 is applied.
+if patch -d "${LINEAGE_ROOT}/system/cros-codecs" -p1 -R --dry-run -s \
+    < "${REPO_ROOT}/patches/system_cros_codecs_mdp3.patch" >/dev/null 2>&1; then
+    echo "[SKIP]  stateless V4L2 decoder already applied"
+    echo "[SKIP]  MDP3 MM21 conversion already applied"
+else
+    apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+        "${REPO_ROOT}/patches/system_cros_codecs.patch" \
+        "stateless V4L2 decoder"
+    apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+        "${REPO_ROOT}/patches/system_cros_codecs_mdp3.patch" \
+        "MDP3 MM21 conversion"
+fi
 apply_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
     "${REPO_ROOT}/patches/external_v4l2r.patch" \
     "v4l2r capture queue"

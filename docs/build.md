@@ -25,14 +25,30 @@ tree in this order:
 11. `bringup/kernel/mtk-mdp3-mt8183-scp-abi.patch`. It matches
     `mtk-mdp3` to the ChromeOS SCP firmware. Rebuild `mtk-mdp3.ko`
     and ship that module. This patch is not in the FIT kernel image.
+12. `bringup/kernel/camera-sensor-system-sleep-pm.patch` and
+    `bringup/kernel/dw9768-power-while-streaming.patch`. Rebuild
+    `ov8856.ko`, `ov02a10.ko`, and `dw9768.ko`.
+13. `bringup/kernel/sbs-battery-time-to-empty-enodata.patch`. Rebuild
+    `sbs-battery.ko`.
+14. `bringup/kernel/wakeup-reasons-sysfs.patch`. It is in the USB and
+    eMMC kernel image. `bringup/kernel/mtk-drm-mt8183-min-fb-size.patch`
+    is not applied: a 42 px status bar on an OVL plane flashes the
+    setup wizard when the page changes. The 64x64 default stays.
+15. `bringup/kernel/mt8183-kukui-firmware-cells.patch`. Rebuild the
+    board DTBs. Depthcharge fills the `/firmware` node.
+
+`CONFIG_LRU_GEN` changes core structures, so every module in the USB
+ramdisk and in `vendor_dlkm` comes from that same build. `CONFIG_RTC_HCTOSYS`
+stays off: the MT6358 RTC reads 2086. The menu FIT stays on the
+2026-10-31 kernel.
 
 Patches 8 to 10 are what mtk-svs needs to finish its init on MT8183. It
 also needs `CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y` from
 `bringup/phase2/config.fragment`. The configuration is the postmarketOS
 mt81 config merged with `bringup/phase2/config.fragment`,
 `bringup/camera/config.fragment`, and `bringup/kernel/resukisu.fragment`.
-The menu FIT stays on the 2026-10-31 kernel. Patches 7 to 10 go into
-the USB and eMMC FITs only.
+The menu FIT stays on the 2026-10-31 kernel. Patches 7 to 10 and 14 to
+15 go into the USB and eMMC FITs only.
 
 A USB image needs four pieces:
 

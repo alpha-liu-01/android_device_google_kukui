@@ -1,0 +1,18 @@
+// Boost table for android.hardware.power-service.lineage-libperfmgr
+// (TARGET_POWER_HAL := perfmgr-lineage). Values come from scroll and
+// launch measurements on Krane, see docs/fixes.md (Build 7).
+//
+// link_device_tree installs powerhint.json as a symlink. prebuilt_etc would
+// ship that symlink, and the HAL cannot open it. Copy the bytes first.
+genrule {
+    name: "kukui_powerhint_json_gen",
+    srcs: ["powerhint.json"],
+    out: ["powerhint.copied.json"],
+    cmd: "cat $(in) > $(out)",
+}
+
+prebuilt_etc {
+    name: "powerhint.json",
+    src: ":kukui_powerhint_json_gen",
+    vendor: true,
+}

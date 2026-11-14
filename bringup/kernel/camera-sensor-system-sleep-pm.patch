@@ -1,0 +1,35 @@
+Subject: [PATCH] media: ov8856, ov02a10: add system sleep PM ops
+
+Both drivers only have runtime PM callbacks. The 6.18 PM core treats a
+device without system sleep callbacks as "no PM callbacks", turns on
+smart suspend for it, and device_resume_noirq() sets it RPM_ACTIVE
+without calling runtime_resume. The runtime suspend that follows then
+turns off clocks and regulators that were never on: "camtg_sel already
+disabled" and "unbalanced disables for vcamd/vcn18" after every
+resume. dw9768 already uses pm_runtime_force_suspend/resume and is
+not affected; do the same here.
+
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -2465,6 +2465,8 @@
+ }
+ 
+ static const struct dev_pm_ops ov8856_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
+ 	SET_RUNTIME_PM_OPS(ov8856_power_off, ov8856_power_on, NULL)
+ };
+ 
+diff --git a/drivers/media/i2c/ov02a10.c b/drivers/media/i2c/ov02a10.c
+--- a/drivers/media/i2c/ov02a10.c
++++ b/drivers/media/i2c/ov02a10.c
+@@ -570,6 +570,8 @@
+ }
+ 
+ static const struct dev_pm_ops ov02a10_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
+ 	SET_RUNTIME_PM_OPS(ov02a10_power_off, ov02a10_power_on, NULL)
+ };
+ 

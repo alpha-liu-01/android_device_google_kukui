@@ -32,3 +32,44 @@ CONFIG_NETFILTER_NETLINK_LOG=m
 # CCI devfreq. mtk-svs needs the CCI OPP table for its third bank; without
 # this driver it stays in deferred probe and no SVS voltages are applied.
 CONFIG_ARM_MEDIATEK_CCI_DEVFREQ=y
+# Suspend debugging. PM_SLEEP_DEBUG adds /sys/power/pm_wakeup_irq and
+# pm_debug_messages, which name the wakeup source that aborts a suspend.
+CONFIG_PM_DEBUG=y
+CONFIG_PM_SLEEP_DEBUG=y
+# Keep the kernel log of a crashed or hung boot. Coreboot already reserves
+# a 1 MiB ramoops region in the DT; Android mounts /sys/fs/pstore.
+CONFIG_PSTORE=y
+CONFIG_PSTORE_RAM=y
+CONFIG_PSTORE_CONSOLE=y
+CONFIG_PSTORE_PMSG=y
+# 128 KiB lost everything before about 7.7 s of an Android boot.
+CONFIG_LOG_BUF_SHIFT=21
+# Multi-generational LRU, and huge pages only where asked for, for 4 GiB
+# with zram.
+CONFIG_LRU_GEN=y
+CONFIG_LRU_GEN_ENABLED=y
+# CONFIG_TRANSPARENT_HUGEPAGE_ALWAYS is not set
+CONFIG_TRANSPARENT_HUGEPAGE_MADVISE=y
+# The MT6358 RTC reads 60 years ahead (2086 instead of 2026). Loading
+# rtc-mt6397 with HCTOSYS set the system clock to 2086. Android sets the
+# time from the network anyway; the RTC is only needed for wake alarms.
+# CONFIG_RTC_HCTOSYS is not set
+# Kernel BTF. The cputimeinstate BPF object reads task_struct->pid with a
+# CO-RE relocation; without /sys/kernel/btf/vmlinux libbpf drops it.
+# Needs pahole on the build host. The Image gains a .BTF section.
+CONFIG_DEBUG_INFO_DWARF5=y
+CONFIG_DEBUG_INFO_BTF=y
+CONFIG_DEBUG_INFO_BTF_MODULES=y
+# Android destroys sockets of a network that went away (SOCK_DESTROY).
+CONFIG_INET_DIAG_DESTROY=y
+# =m because IPV6 is a module; udp_diag.ko is in the ramdisk.
+CONFIG_INET_UDP_DIAG=m
+# fs-verity for APK verity. userdata only uses it once formatted for it.
+CONFIG_FS_VERITY=y
+# netd: wakeup packet logging (-j NFLOG) and the tc BPF programs it hangs
+# on the clsact qdisc (sch_ingress, cls_bpf, act_bpf). Ramdisk modules.
+CONFIG_NETFILTER_XT_TARGET_NFLOG=m
+CONFIG_NETFILTER_XT_TARGET_TCPMSS=m
+CONFIG_NET_SCH_INGRESS=m
+CONFIG_NET_CLS_BPF=m
+CONFIG_NET_ACT_BPF=m

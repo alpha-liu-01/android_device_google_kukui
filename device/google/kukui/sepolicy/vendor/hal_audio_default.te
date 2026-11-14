@@ -1,0 +1,5 @@
+# 6.18 has no ashmem, so shared memory is memfd (sys.use_memfd=true).
+# The audio HAL's message queues are mapped by audioserver.
+type hal_audio_default_tmpfs, file_type;
+tmpfs_domain(hal_audio_default)
+allow audioserver hal_audio_default_tmpfs:file { getattr read write map };

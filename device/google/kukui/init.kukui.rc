@@ -9,6 +9,18 @@ on early-boot
 
 on boot
     chown system system /sys/class/backlight/backlight_lcd0/brightness
+    # ondemand ramps up only at 95% load and does not count I/O wait.
+    # Touch and launch boosts are in the power HAL (power/powerhint.json).
+    write /sys/devices/system/cpu/cpufreq/policy0/ondemand/up_threshold 80
+    write /sys/devices/system/cpu/cpufreq/policy4/ondemand/up_threshold 80
+    write /sys/devices/system/cpu/cpufreq/policy0/ondemand/io_is_busy 1
+    write /sys/devices/system/cpu/cpufreq/policy4/ondemand/io_is_busy 1
+    # Background work on the four Cortex-A53 cores (0-3).
+    write /dev/cpuset/background/cpus 0-3
+    write /dev/cpuset/system-background/cpus 0-3
+    # Name the wakeup source when a suspend is aborted. Needs
+    # CONFIG_PM_SLEEP_DEBUG.
+    write /sys/power/pm_debug_messages 1
 
 on early-init
     write /sys/module/firmware_class/parameters/path /vendor/firmware
@@ -44,6 +56,13 @@ on init
     # /vendor/lib/modules/modules.load. The firmware path has to be set
     # before ath10k probes. The post-fs insmod block never ran.
     write /sys/module/firmware_class/parameters/path /vendor/firmware
+
+# prng_seeder starts in early-init and gives up when /dev/hw_random has no
+# source. The source is the Cr50 TPM, loaded from vendor_dlkm afterwards.
+# kukui-ids reads the VPD serial number from the same modules.
+on property:vendor.dlkm.modules.ready=true
+    restart prng_seeder
+    start kukui-ids
 
 on fs
     # keymint is up before early_hal starts keystore2. userdata is not
@@ -96,6 +115,14 @@ service kukui-wifi-reprobe /system/bin/sh /vendor/bin/kukui-wifi-reprobe.sh
 # Existing data partitions already stored lid_behavior=0. The overlay
 # default applies only when settings are created.
 service kukui-lid /system/bin/sh /vendor/bin/kukui-lid.sh
+    disabled
+    user root
+    group root system
+    oneshot
+
+# Serial number from the VPD and the board revision from coreboot.
+# Needs vpd-sysfs, so it waits for the modules.
+service kukui-ids /system/bin/sh /vendor/bin/kukui-ids.sh
     disabled
     user root
     group root system

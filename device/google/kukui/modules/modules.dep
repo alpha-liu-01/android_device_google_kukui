@@ -24,6 +24,13 @@ cros_ec_sensors.ko: cros-ec-sensors-core.ko
 cros_ec_light_prox.ko: cros-ec-sensors-core.ko
 mtk_wdt.ko:
 mc.ko:
+snd-soc-mtk-common.ko:
+snd-soc-mt8183-afe.ko: snd-soc-mtk-common.ko
+snd-soc-mt6358.ko:
+snd-soc-max98357a.ko:
+snd-soc-ts3a227e.ko:
+snd-soc-bt-sco.ko:
+mt8183-mt6358-ts3a227-max98357.ko: snd-soc-mt8183-afe.ko snd-soc-ts3a227e.ko
 snd-seq-device.ko:
 snd-rawmidi.ko: snd-seq-device.ko
 snd-ump.ko: snd-rawmidi.ko snd-seq-device.ko
@@ -54,11 +61,11 @@ mtk-vcodec-common.ko: mtk-vpu.ko mtk_scp.ko mtk_scp_ipi.ko
 mtk-vcodec-dbgfs.ko: mtk-vcodec-common.ko
 mtk-vcodec-dec.ko: mtk-vcodec-common.ko v4l2-mem2mem.ko videodev.ko videobuf2-v4l2.ko videobuf2-common.ko v4l2-vp9.ko v4l2-h264.ko mc.ko mtk-vcodec-dbgfs.ko videobuf2-dma-contig.ko
 mtk-vcodec-enc.ko: mtk-vcodec-common.ko v4l2-mem2mem.ko videobuf2-common.ko videodev.ko videobuf2-dma-contig.ko videobuf2-v4l2.ko mtk-vcodec-dbgfs.ko
-snd-soc-mtk-common.ko:
-snd-soc-mt8183-afe.ko: snd-soc-mtk-common.ko
-snd-soc-mt6358.ko:
-snd-soc-max98357a.ko:
-snd-soc-ts3a227e.ko:
-snd-soc-bt-sco.ko:
-mt8183-mt6358-ts3a227-max98357.ko: snd-soc-mt8183-afe.ko snd-soc-ts3a227e.ko
 mtk-mdp3.ko: mtk_scp.ko v4l2-mem2mem.ko videobuf2-dma-contig.ko videodev.ko mtk_scp_ipi.ko videobuf2-common.ko videobuf2-v4l2.ko
+rtc-mt6397.ko:
+tpm_tis_core.ko:
+tpm_tis_spi.ko: tpm_tis_core.ko
+cros-ec-typec.ko:
+coreboot_table.ko:
+vpd-sysfs.ko: coreboot_table.ko
+tun.ko:

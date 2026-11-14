@@ -1,0 +1,29 @@
+Subject: [PATCH] arm64: dts: mediatek: mt8183-kukui: give /firmware address cells
+
+Depthcharge adds /firmware/coreboot (and /firmware/chromeos) at boot and
+creates /firmware with only an empty "ranges". Since 6.18 the OF core
+matches the default bus only when the parent has its own #address-cells
+(of_bus_default_match), so of_get_address() returns NULL for the
+coreboot node, the platform device has no resource, and coreboot_table
+fails with -EINVAL. Without it there is no /sys/firmware/vpd (serial
+number, region) and no memconsole.
+
+Declare the node here with the cells depthcharge already uses for the
+reg property (2/2, the root values). Depthcharge fills in the existing
+node.
+
+--- a/arch/arm64/boot/dts/mediatek/mt8183-kukui.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8183-kukui.dtsi
+@@ -21,6 +21,12 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	firmware {
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++	};
++
+ 	backlight_lcd0: backlight_lcd0 {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm0 0 500000>;

@@ -1,0 +1,4 @@
+# libperfmgr writes the GPU min_freq and max_freq (power/powerhint.json).
+# Lineage's libperfmgr policy covers only the cpufreq nodes.
+allow hal_power_default vendor_sysfs_gpu_devfreq:dir r_dir_perms;
+allow hal_power_default vendor_sysfs_gpu_devfreq:file rw_file_perms;

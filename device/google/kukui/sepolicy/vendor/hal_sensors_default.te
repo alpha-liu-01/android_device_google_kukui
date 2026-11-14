@@ -1,0 +1,2 @@
+# The sensor HAL maps the event queue system_server creates as a memfd.
+allow hal_sensors_default system_server_tmpfs:file { read write map };

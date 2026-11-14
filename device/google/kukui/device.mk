@@ -26,6 +26,11 @@ TARGET_HOSTAPD_AND_WPA_SUPPLICANT_FORM := legacy
 # Set before options.mk. default-aidl otherwise pulls the cuttlefish policy.
 TARGET_AUDIO_HAL := default-aidl
 TARGET_AUDIO_POLICY := kukui
+# Lineage libperfmgr power HAL instead of the AOSP example, which ignores
+# touch and launch hints. power/powerhint.json has the boost table.
+# The module copies the file contents. A direct prebuilt keeps the
+# link_device_tree symlink, and the HAL then cannot open it.
+TARGET_POWER_HAL := perfmgr-lineage
 # Kukui edits to hardware/interfaces live in this repo's patches/.
 # Without them, lunch still builds, but the speaker opens card 0.
 ifeq ($(wildcard $(LOCAL_PATH)/../../../hardware/interfaces/audio/aidl/default/include/core-impl/KukuiMixer.h),)
@@ -96,6 +101,7 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/installer/kukui-install.rc:$(TARGET_COPY_OUT_VENDOR)/etc/init/kukui-install.rc \
     $(LOCAL_PATH)/kukui-usb-suspend.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-usb-suspend.sh \
     $(LOCAL_PATH)/kukui-lid.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-lid.sh \
+    $(LOCAL_PATH)/kukui-ids.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-ids.sh \
     $(LOCAL_PATH)/kukui-wifi-reprobe.sh:$(TARGET_COPY_OUT_VENDOR)/bin/kukui-wifi-reprobe.sh \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_RAMDISK)/ueventd.kukui.rc \
     $(LOCAL_PATH)/ueventd.kukui.rc:$(TARGET_COPY_OUT_VENDOR)/etc/ueventd.kukui.rc \
@@ -178,6 +184,13 @@ PRODUCT_COPY_FILES += \
     $(LOCAL_PATH)/modules/snd-soc-ts3a227e.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-ts3a227e.ko \
     $(LOCAL_PATH)/modules/snd-soc-bt-sco.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/snd-soc-bt-sco.ko \
     $(LOCAL_PATH)/modules/mt8183-mt6358-ts3a227-max98357.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/mt8183-mt6358-ts3a227-max98357.ko \
+    $(LOCAL_PATH)/modules/rtc-mt6397.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/rtc-mt6397.ko \
+    $(LOCAL_PATH)/modules/tpm_tis_core.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_core.ko \
+    $(LOCAL_PATH)/modules/tpm_tis_spi.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tpm_tis_spi.ko \
+    $(LOCAL_PATH)/modules/cros-ec-typec.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/cros-ec-typec.ko \
+    $(LOCAL_PATH)/modules/coreboot_table.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/coreboot_table.ko \
+    $(LOCAL_PATH)/modules/vpd-sysfs.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/vpd-sysfs.ko \
+    $(LOCAL_PATH)/modules/tun.ko:$(TARGET_COPY_OUT_VENDOR_DLKM)/lib/modules/tun.ko \
     $(LOCAL_PATH)/etc/audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/usb_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/usb_audio_policy_configuration.xml \
     frameworks/av/services/audiopolicy/config/r_submix_audio_policy_configuration.xml:$(TARGET_COPY_OUT_VENDOR)/etc/r_submix_audio_policy_configuration.xml \
@@ -202,6 +215,11 @@ PRODUCT_SYSTEM_PROPERTIES += \
     mmd.zram.enabled=true \
     mmd.zram.comp_algorithm=zstd \
     mmd.zram.size=50%
+
+# "Update system" boots like an OTA. verify leaves apps in /data interpreted
+# until the idle-and-charging job. speed-profile compiles them on that boot.
+PRODUCT_SYSTEM_PROPERTIES += \
+    pm.dexopt.boot-after-ota=speed-profile
 
 PRODUCT_PRODUCT_PROPERTIES += \
     ro.adb.secure=0 \
