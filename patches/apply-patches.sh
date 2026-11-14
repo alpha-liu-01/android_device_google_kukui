@@ -27,6 +27,11 @@
 #   system_cros_codecs.patch, external_v4l2r.patch, external_v4l2_codec2.patch
 #     stateless H.264 on mtk-vcodec. MM21 is copied to linear NV12.
 #     --reverse removes them so a Gru build keeps its own decoder path.
+#   system_cros_codecs_mdp3.patch
+#     MDP3 converts MM21 to NV12 instead of the CPU, straight from the
+#     decoder buffers into the client buffer. The CPU copy stays when
+#     there is no mtk-mdp3 node, vendor.cros_codecs.mdp3=0, or a job fails.
+#     Goes on top of system_cros_codecs.patch; --reverse removes it first.
 #   external_mesa_panvk_host_cached.patch
 #     a second Vulkan memory type with HOST_CACHED. Type 0 stays the old
 #     coherent mapping. --reverse leaves it.
@@ -220,6 +225,9 @@ install_manifest() {
 if [[ $REVERSE -eq 1 ]]; then
     reverse_audio
     reverse_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+        "${REPO_ROOT}/patches/system_cros_codecs_mdp3.patch" \
+        "MDP3 MM21 conversion"
+    reverse_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
         "${REPO_ROOT}/patches/system_cros_codecs.patch" \
         "stateless V4L2 decoder"
     reverse_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
@@ -294,6 +302,9 @@ apply_or_skip "${LINEAGE_ROOT}/external/minigbm-upstream" \
 apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
     "${REPO_ROOT}/patches/system_cros_codecs.patch" \
     "stateless V4L2 decoder"
+apply_or_skip "${LINEAGE_ROOT}/system/cros-codecs" \
+    "${REPO_ROOT}/patches/system_cros_codecs_mdp3.patch" \
+    "MDP3 MM21 conversion"
 apply_or_skip "${LINEAGE_ROOT}/external/rust/crates/v4l2r" \
     "${REPO_ROOT}/patches/external_v4l2r.patch" \
     "v4l2r capture queue"

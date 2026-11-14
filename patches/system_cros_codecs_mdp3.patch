@@ -1,0 +1,549 @@
+diff --git a/ffi/src/lib.rs b/ffi/src/lib.rs
+index a4a2aca..d613601 100644
+--- a/ffi/src/lib.rs
++++ b/ffi/src/lib.rs
+@@ -27,6 +27,7 @@ use cros_codecs::decoder::DynDecodedHandle;
+ use cros_codecs::decoder::ReadyFrame;
+ use cros_codecs::decoder::StreamInfo;
+ use cros_codecs::image_processing::convert_video_frame;
++use cros_codecs::mdp3::Mdp3Converter;
+ use cros_codecs::video_frame::generic_dma_video_frame::GenericDmaVideoFrame;
+ use cros_codecs::video_frame::v4l2_mmap_video_frame::V4l2MmapVideoFrame;
+ use cros_codecs::DecodedFormat;
+@@ -142,6 +143,8 @@ pub struct CrosCodecsDecoder {
+     // Set around flush. Pictures already in the decoder belong to the abandoned works and are
+     // dropped here, without the MM21 copy.
+     discard: bool,
++    // MM21 to NV12 in MDP3. None when there is no MDP3 or it failed once; the CPU copies then.
++    mdp3: Option<Mdp3Converter>,
+ }
+ 
+ fn set_rect(event: &mut CcEvent, rect: Rect) {
+@@ -180,6 +183,7 @@ impl CrosCodecsDecoder {
+             emitted: Vec::new(),
+             pending: None,
+             discard: false,
++            mdp3: Mdp3Converter::open(),
+         })
+     }
+ 
+@@ -272,9 +276,20 @@ impl CrosCodecsDecoder {
+                 return true;
+             }
+         };
+-        if let Err(e) = convert_video_frame(hw.as_ref(), &mut client) {
+-            log::error!("Failed to convert decoded frame to NV12: {e}");
+-            return false;
++        let by_mdp3 = match self.mdp3.as_mut().map(|m| m.convert(hw.as_ref(), &client)) {
++            Some(Ok(())) => true,
++            Some(Err(e)) => {
++                log::warn!("MDP3 conversion failed, detiling on the CPU from now on: {e}");
++                self.mdp3 = None;
++                false
++            }
++            None => false,
++        };
++        if !by_mdp3 {
++            if let Err(e) = convert_video_frame(hw.as_ref(), &mut client) {
++                log::error!("Failed to convert decoded frame to NV12: {e}");
++                return false;
++            }
+         }
+         event.type_ = CC_EVENT_FRAME;
+         // V4L2 backends store `timestamp << 1` and use the LSB to tell apart the frames
+diff --git a/src/device/v4l2/stateless/queue.rs b/src/device/v4l2/stateless/queue.rs
+index 44d35b1..a9a506f 100644
+--- a/src/device/v4l2/stateless/queue.rs
++++ b/src/device/v4l2/stateless/queue.rs
+@@ -371,13 +371,21 @@ impl<V: VideoFrame> V4l2CaptureQueue<V> {
+                 // TODO: check if decoded format is supported.
+                 self.format = handle.get_format()?;
+                 // TODO: handle 10 bit format negotiation.
+-                // Cached MMAP. The uncached coherent mapping made the MM21 detile take
+-                // ~35 ms per 1080p frame, which cannot feed 30 fps, let alone 60.
+-                // DQBUF invalidates these lines before the copy reads them.
++                // When MDP3 detiles, the CPU never reads these buffers, and a cached
++                // mapping only costs a cache clean of every picture on each QBUF.
++                // Without MDP3 the CPU detiles: use cached MMAP then, because the
++                // uncached coherent mapping made the MM21 detile take ~35 ms per 1080p
++                // frame, which cannot feed 30 fps, let alone 60. DQBUF invalidates these
++                // lines before the copy reads them.
++                let flags = if crate::mdp3::Mdp3Converter::available() {
++                    0
++                } else {
++                    v4l2r::ioctl::V4L2_MEMORY_FLAG_NON_COHERENT
++                };
+                 let handle = handle.request_buffers_generic_flags::<V4l2VideoFrame<V>>(
+                     <V::NativeHandle as PlaneHandle>::Memory::MEMORY_TYPE,
+                     requested_num_buffers,
+-                    v4l2r::ioctl::V4L2_MEMORY_FLAG_NON_COHERENT,
++                    flags,
+                 )?;
+ 
+                 check_requested_buffer_count(requested_num_buffers, handle.num_free_buffers())?;
+diff --git a/src/lib.rs b/src/lib.rs
+index 299bb0a..08a3aae 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -38,6 +38,8 @@ pub mod device;
+ pub mod encoder;
+ #[cfg(feature = "backend")]
+ pub mod image_processing;
++#[cfg(feature = "v4l2")]
++pub mod mdp3;
+ #[cfg(feature = "backend")]
+ pub mod video_frame;
+ #[cfg(feature = "vulkan")]
+diff --git a/src/mdp3.rs b/src/mdp3.rs
+new file mode 100644
+index 0000000..86c24ac
+--- /dev/null
++++ b/src/mdp3.rs
+@@ -0,0 +1,409 @@
++// Copyright 2026 The LineageOS Project
++// Use of this source code is governed by a BSD-style license that can be
++// found in the LICENSE file.
++
++//! MM21 to NV12 conversion with the MediaTek MDP3 V4L2 mem2mem device.
++//!
++//! The MT8183 stateless decoder writes MM21 (16x32 tiles). Codec2 clients take
++//! linear NV12. MDP3 converts between the two in hardware, from the decoder's
++//! buffers straight into the client buffer. `image_processing::mm21_to_nv12`
++//! on the CPU is only the fallback.
++
++use std::ffi::CString;
++use std::fs;
++use std::fs::File;
++use std::fs::OpenOptions;
++use std::os::fd::AsRawFd;
++use std::os::fd::FromRawFd;
++use std::os::fd::OwnedFd;
++use std::os::raw::c_char;
++use std::os::raw::c_int;
++use std::os::unix::fs::OpenOptionsExt;
++use std::time::Duration;
++use std::time::Instant;
++
++use nix::libc;
++use v4l2r::bindings;
++
++use crate::video_frame::generic_dma_video_frame::GenericDmaVideoFrame;
++use crate::video_frame::v4l2_mmap_video_frame::V4l2MmapVideoFrame;
++use crate::video_frame::VideoFrame;
++use crate::Fourcc;
++
++const MDP3_NAME: &str = "mtk-mdp3:m2m";
++const PROPERTY: &str = "vendor.cros_codecs.mdp3";
++const BUF_TYPE_CAPTURE_MPLANE: u32 = 9;
++const BUF_TYPE_OUTPUT_MPLANE: u32 = 10;
++const MEMORY_DMABUF: u32 = 4;
++const FIELD_NONE: u32 = 1;
++const JOB_TIMEOUT_MS: c_int = 500;
++const STATS_EVERY: u64 = 600;
++
++const fn fourcc(code: &[u8; 4]) -> u32 {
++    u32::from_le_bytes(*code)
++}
++const PIX_FMT_MM21: u32 = fourcc(b"MM21");
++const PIX_FMT_NV12: u32 = fourcc(b"NV12");
++
++mod ioctl {
++    use v4l2r::bindings::*;
++    nix::ioctl_read!(querycap, b'V', 0, v4l2_capability);
++    nix::ioctl_readwrite!(s_fmt, b'V', 5, v4l2_format);
++    nix::ioctl_readwrite!(reqbufs, b'V', 8, v4l2_requestbuffers);
++    nix::ioctl_readwrite!(qbuf, b'V', 15, v4l2_buffer);
++    nix::ioctl_readwrite!(expbuf, b'V', 16, v4l2_exportbuffer);
++    nix::ioctl_readwrite!(dqbuf, b'V', 17, v4l2_buffer);
++    nix::ioctl_write_ptr!(streamon, b'V', 18, i32);
++}
++
++extern "C" {
++    fn __system_property_get(name: *const c_char, value: *mut c_char) -> c_int;
++}
++
++/// On unless the property is set to 0 or false.
++fn enabled_by_property() -> bool {
++    let Ok(name) = CString::new(PROPERTY) else {
++        return true;
++    };
++    let mut value = [0 as c_char; 92];
++    // SAFETY: name is NUL-terminated and value has PROP_VALUE_MAX bytes.
++    let len = unsafe { __system_property_get(name.as_ptr(), value.as_mut_ptr()) };
++    if len <= 0 {
++        return true;
++    }
++    let value: Vec<u8> = value[..len as usize].iter().map(|&c| c as u8).collect();
++    !(value == b"0" || value == b"false")
++}
++
++fn find_node() -> Option<String> {
++    for entry in fs::read_dir("/sys/class/video4linux").ok()?.flatten() {
++        let name = entry.file_name();
++        let name = name.to_string_lossy();
++        if !name.starts_with("video") {
++            continue;
++        }
++        let path = entry.path().join("name");
++        if fs::read_to_string(path).map(|n| n.trim() == MDP3_NAME).unwrap_or(false) {
++            return Some(format!("/dev/{name}"));
++        }
++    }
++    None
++}
++
++fn wait(fd: c_int, events: libc::c_short) -> Result<(), String> {
++    let mut pfd = libc::pollfd { fd, events, revents: 0 };
++    loop {
++        // SAFETY: pfd is a valid pollfd for the duration of the call.
++        let ret = unsafe { libc::poll(&mut pfd, 1, JOB_TIMEOUT_MS) };
++        if ret > 0 && (pfd.revents & events) != 0 {
++            return Ok(());
++        }
++        if ret == 0 {
++            return Err(format!("no result within {JOB_TIMEOUT_MS} ms"));
++        }
++        if ret < 0 && nix::errno::Errno::last() == nix::errno::Errno::EINTR {
++            continue;
++        }
++        return Err(format!("poll: {}", nix::errno::Errno::last()));
++    }
++}
++
++#[derive(Clone, Copy, PartialEq, Eq, Debug)]
++struct Config {
++    width: u32,
++    height: u32,
++    src_pitch: [u32; 2],
++    dst_pitch: u32,
++}
++
++/// One MDP3 context. Each decoder owns one, so contexts are never shared.
++pub struct Mdp3Converter {
++    path: String,
++    file: File,
++    config: Option<Config>,
++    runs: u64,
++    busy: Duration,
++}
++
++impl Mdp3Converter {
++    /// Whether decoders on this device will convert with MDP3, so their
++    /// MM21 buffers are not read by the CPU.
++    pub fn available() -> bool {
++        enabled_by_property() && find_node().is_some()
++    }
++
++    /// Opens the MDP3 device, or returns None when there is none or the
++    /// property turns it off.
++    pub fn open() -> Option<Self> {
++        if !enabled_by_property() {
++            log::info!("MDP3 MM21 conversion is off ({PROPERTY})");
++            return None;
++        }
++        let path = find_node()?;
++        let file = Self::open_node(&path).ok()?;
++        // SAFETY: zeroed is a valid v4l2_capability.
++        let mut cap: bindings::v4l2_capability = unsafe { std::mem::zeroed() };
++        // SAFETY: file is an open V4L2 node and cap is a valid out pointer.
++        unsafe { ioctl::querycap(file.as_raw_fd(), &mut cap) }.ok()?;
++        if cap.device_caps & bindings::V4L2_CAP_VIDEO_M2M_MPLANE == 0 {
++            return None;
++        }
++        log::info!("MDP3 converts MM21 to NV12 ({path})");
++        Some(Self { path, file, config: None, runs: 0, busy: Duration::ZERO })
++    }
++
++    fn open_node(path: &str) -> Result<File, String> {
++        OpenOptions::new()
++            .read(true)
++            .write(true)
++            .custom_flags(libc::O_NONBLOCK | libc::O_CLOEXEC)
++            .open(path)
++            .map_err(|e| format!("open {path}: {e}"))
++    }
++
++    fn set_format(&self, type_: u32, cfg: &Config, pixelformat: u32, pitches: &[u32]) -> Result<(), String> {
++        // SAFETY: zeroed is a valid v4l2_format.
++        let mut f: bindings::v4l2_format = unsafe { std::mem::zeroed() };
++        f.type_ = type_;
++        // SAFETY: pix_mp is the union member for the MPLANE buffer types.
++        let pix = unsafe { &mut f.fmt.pix_mp };
++        pix.width = cfg.width;
++        pix.height = cfg.height;
++        pix.pixelformat = pixelformat;
++        pix.field = FIELD_NONE;
++        pix.num_planes = pitches.len() as u8;
++        for (i, &pitch) in pitches.iter().enumerate() {
++            pix.plane_fmt[i].bytesperline = pitch;
++        }
++        // SAFETY: f is a valid v4l2_format.
++        unsafe { ioctl::s_fmt(self.file.as_raw_fd(), &mut f) }
++            .map_err(|e| format!("S_FMT {:?}: {e}", pixelformat.to_le_bytes()))?;
++        // SAFETY: as above.
++        let pix = unsafe { &f.fmt.pix_mp };
++        let pitches_ok = pitches
++            .iter()
++            .enumerate()
++            .all(|(i, &pitch)| pix.plane_fmt[i].bytesperline == pitch);
++        // The struct is packed; copy the fields out before formatting them.
++        let (width, height, got_format, num_planes) =
++            (pix.width, pix.height, pix.pixelformat, pix.num_planes);
++        let pitch0 = pix.plane_fmt[0].bytesperline;
++        if width != cfg.width
++            || height != cfg.height
++            || got_format != pixelformat
++            || num_planes as usize != pitches.len()
++            || !pitches_ok
++        {
++            return Err(format!(
++                "S_FMT {}x{} pitch {:?} became {}x{} pitch {}",
++                cfg.width, cfg.height, pitches, width, height, pitch0
++            ));
++        }
++        Ok(())
++    }
++
++    fn request(&self, type_: u32) -> Result<(), String> {
++        // SAFETY: zeroed is a valid v4l2_requestbuffers.
++        let mut rb: bindings::v4l2_requestbuffers = unsafe { std::mem::zeroed() };
++        rb.count = 1;
++        rb.type_ = type_;
++        rb.memory = MEMORY_DMABUF;
++        // SAFETY: rb is a valid v4l2_requestbuffers.
++        unsafe { ioctl::reqbufs(self.file.as_raw_fd(), &mut rb) }
++            .map_err(|e| format!("REQBUFS: {e}"))?;
++        if rb.count < 1 {
++            return Err("REQBUFS gave no buffer".to_owned());
++        }
++        Ok(())
++    }
++
++    fn configure(&mut self, cfg: Config) -> Result<(), String> {
++        // A new open() is a new context, so nothing of the old one is left.
++        if self.config.take().is_some() {
++            self.file = Self::open_node(&self.path)?;
++        }
++        self.set_format(BUF_TYPE_OUTPUT_MPLANE, &cfg, PIX_FMT_MM21, &cfg.src_pitch)?;
++        self.set_format(BUF_TYPE_CAPTURE_MPLANE, &cfg, PIX_FMT_NV12, &[cfg.dst_pitch])?;
++        self.request(BUF_TYPE_OUTPUT_MPLANE)?;
++        self.request(BUF_TYPE_CAPTURE_MPLANE)?;
++        for type_ in [BUF_TYPE_OUTPUT_MPLANE as i32, BUF_TYPE_CAPTURE_MPLANE as i32] {
++            // SAFETY: type_ is a valid buffer type.
++            unsafe { ioctl::streamon(self.file.as_raw_fd(), &type_) }
++                .map_err(|e| format!("STREAMON: {e}"))?;
++        }
++        log::info!(
++            "MDP3: {}x{} MM21 pitch {:?} to NV12 pitch {}",
++            cfg.width,
++            cfg.height,
++            cfg.src_pitch,
++            cfg.dst_pitch
++        );
++        self.config = Some(cfg);
++        Ok(())
++    }
++
++    fn dequeue(&self, type_: u32, num_planes: u32) -> Result<u32, String> {
++        let events = if type_ == BUF_TYPE_CAPTURE_MPLANE { libc::POLLIN } else { libc::POLLOUT };
++        loop {
++            // SAFETY: zeroed is a valid v4l2_plane array and v4l2_buffer.
++            let mut planes: [bindings::v4l2_plane; 2] = unsafe { std::mem::zeroed() };
++            let mut buf: bindings::v4l2_buffer = unsafe { std::mem::zeroed() };
++            buf.type_ = type_;
++            buf.memory = MEMORY_DMABUF;
++            buf.m.planes = planes.as_mut_ptr();
++            buf.length = num_planes;
++            // SAFETY: buf points at planes, which outlives the call.
++            match unsafe { ioctl::dqbuf(self.file.as_raw_fd(), &mut buf) } {
++                Ok(_) => return Ok(buf.flags),
++                Err(nix::errno::Errno::EAGAIN) => wait(self.file.as_raw_fd(), events)?,
++                Err(e) => return Err(format!("DQBUF: {e}")),
++            }
++        }
++    }
++
++    /// Converts the MM21 decoder frame `src` into the NV12 client frame `dst`.
++    /// Returns an error, and leaves `dst` alone, when the frames do not fit
++    /// what MDP3 does here; the caller then copies on the CPU.
++    pub fn convert<T>(
++        &mut self,
++        src: &V4l2MmapVideoFrame,
++        dst: &GenericDmaVideoFrame<T>,
++    ) -> Result<(), String>
++    where
++        T: Clone + Send + Sync + Sized + std::fmt::Debug + 'static,
++    {
++        if src.fourcc() != Fourcc::from(b"MM21") || dst.fourcc() != Fourcc::from(b"NV12") {
++            return Err(format!("{:?} to {:?} is not MM21 to NV12", src.fourcc(), dst.fourcc()));
++        }
++        let (device, buffer, format) = src.v4l2_export().ok_or("decoder frame not dequeued")?;
++        let src_planes = buffer.as_v4l2_planes();
++        if src_planes.len() != 2 || format.plane_fmt.len() != 2 {
++            return Err(format!("MM21 frame has {} buffers, not 2", src_planes.len()));
++        }
++
++        // The client buffer is one dma-buf: Y at 0, UV right after the coded
++        // height, both with the same pitch. That is V4L2's single-plane NV12.
++        let layout = dst.layout();
++        let handles = dst.dma_handles();
++        if handles.len() != 1 || layout.planes.len() != 2 {
++            return Err("client NV12 buffer is not one dma-buf with two planes".to_owned());
++        }
++        let pitch = layout.planes[0].stride as u32;
++        let uv_offset = layout.planes[1].offset as u64;
++        if layout.planes[0].offset != 0
++            || layout.planes[1].stride as u32 != pitch
++            || uv_offset != pitch as u64 * format.height as u64
++            || pitch < format.width
++        {
++            return Err(format!(
++                "client layout Y {}/{} UV {}/{} does not follow {}x{}",
++                layout.planes[0].offset,
++                pitch,
++                uv_offset,
++                layout.planes[1].stride,
++                format.width,
++                format.height
++            ));
++        }
++
++        let cfg = Config {
++            width: format.width,
++            height: format.height,
++            src_pitch: [format.plane_fmt[0].bytesperline, format.plane_fmt[1].bytesperline],
++            dst_pitch: pitch,
++        };
++        if self.config != Some(cfg) {
++            if let Err(e) = self.configure(cfg) {
++                self.config = None;
++                return Err(e);
++            }
++        }
++
++        let start = Instant::now();
++        // Export the decoder's two planes. A fresh export per frame keeps the
++        // fds valid across decoder reallocations; MDP3 maps them per job.
++        let v4l2_buf = buffer.as_v4l2_buffer();
++        let mut exported = Vec::with_capacity(2);
++        for plane in 0..2 {
++            // SAFETY: zeroed is a valid v4l2_exportbuffer.
++            let mut exp: bindings::v4l2_exportbuffer = unsafe { std::mem::zeroed() };
++            exp.type_ = v4l2_buf.type_;
++            exp.index = v4l2_buf.index;
++            exp.plane = plane;
++            exp.flags = (libc::O_CLOEXEC | libc::O_RDONLY) as u32;
++            // SAFETY: exp is valid and device is the decoder's open node.
++            unsafe { ioctl::expbuf(device.as_raw_fd(), &mut exp) }
++                .map_err(|e| format!("EXPBUF plane {plane}: {e}"))?;
++            // SAFETY: EXPBUF returned a new fd that we now own.
++            exported.push(unsafe { OwnedFd::from_raw_fd(exp.fd) });
++        }
++
++        // SAFETY: lseek on a dma-buf returns its size and does not change it.
++        let dst_fd = handles[0].as_raw_fd();
++        let dst_size = unsafe { libc::lseek(dst_fd, 0, libc::SEEK_END) };
++        let needed = pitch as i64 * format.height as i64 * 3 / 2;
++        if dst_size < needed {
++            return Err(format!("client buffer is {dst_size} bytes, {needed} needed"));
++        }
++
++        // Source: the decoder's planes.
++        // SAFETY: zeroed is a valid v4l2_plane array and v4l2_buffer.
++        let mut planes: [bindings::v4l2_plane; 2] = unsafe { std::mem::zeroed() };
++        for (i, plane) in planes.iter_mut().enumerate() {
++            plane.m.fd = exported[i].as_raw_fd();
++            plane.length = src_planes[i].length;
++            plane.bytesused = src_planes[i].length;
++        }
++        let mut buf: bindings::v4l2_buffer = unsafe { std::mem::zeroed() };
++        buf.type_ = BUF_TYPE_OUTPUT_MPLANE;
++        buf.memory = MEMORY_DMABUF;
++        buf.field = FIELD_NONE;
++        buf.m.planes = planes.as_mut_ptr();
++        buf.length = 2;
++        // SAFETY: buf points at planes, which outlives the call.
++        unsafe { ioctl::qbuf(self.file.as_raw_fd(), &mut buf) }
++            .map_err(|e| format!("QBUF source: {e}"))?;
++
++        // Destination: the client buffer.
++        // SAFETY: as above.
++        let mut plane: bindings::v4l2_plane = unsafe { std::mem::zeroed() };
++        plane.m.fd = dst_fd;
++        plane.length = dst_size as u32;
++        let mut buf: bindings::v4l2_buffer = unsafe { std::mem::zeroed() };
++        buf.type_ = BUF_TYPE_CAPTURE_MPLANE;
++        buf.memory = MEMORY_DMABUF;
++        buf.m.planes = &mut plane;
++        buf.length = 1;
++        // SAFETY: buf points at plane, which outlives the call.
++        if let Err(e) = unsafe { ioctl::qbuf(self.file.as_raw_fd(), &mut buf) } {
++            // The source is queued; start over with a new context next time.
++            self.config = None;
++            return Err(format!("QBUF destination: {e}"));
++        }
++
++        let result = self
++            .dequeue(BUF_TYPE_CAPTURE_MPLANE, 1)
++            .and_then(|flags| self.dequeue(BUF_TYPE_OUTPUT_MPLANE, 2).map(|_| flags));
++        let flags = match result {
++            Ok(flags) => flags,
++            Err(e) => {
++                self.config = None;
++                return Err(e);
++            }
++        };
++        if flags & bindings::V4L2_BUF_FLAG_ERROR != 0 {
++            return Err("MDP3 job failed".to_owned());
++        }
++
++        self.busy += start.elapsed();
++        self.runs += 1;
++        if self.runs % STATS_EVERY == 0 {
++            log::info!(
++                "MDP3: {} frames converted, avg {:.2} ms",
++                self.runs,
++                self.busy.as_secs_f64() * 1e3 / self.runs as f64
++            );
++        }
++        Ok(())
++    }
++}
+diff --git a/src/video_frame/generic_dma_video_frame.rs b/src/video_frame/generic_dma_video_frame.rs
+index 71e3b0d..a54a81b 100644
+--- a/src/video_frame/generic_dma_video_frame.rs
++++ b/src/video_frame/generic_dma_video_frame.rs
+@@ -374,6 +374,16 @@ impl<T: Clone + Send + Sync + Sized + Debug + 'static> GenericDmaVideoFrame<T> {
+         Ok(ret)
+     }
+ 
++    /// The dma-buf files backing the frame.
++    pub fn dma_handles(&self) -> &[File] {
++        &self.dma_handles
++    }
++
++    /// Plane offsets and strides within `dma_handles()`.
++    pub fn layout(&self) -> &FrameLayout {
++        &self.layout
++    }
++
+     fn get_single_plane_size(&self, index: usize) -> usize {
+         if index >= self.num_planes() {
+             panic!("Invalid plane index {index}!");
+diff --git a/src/video_frame/v4l2_mmap_video_frame.rs b/src/video_frame/v4l2_mmap_video_frame.rs
+index fb0aba2..86684e1 100644
+--- a/src/video_frame/v4l2_mmap_video_frame.rs
++++ b/src/video_frame/v4l2_mmap_video_frame.rs
+@@ -84,6 +84,12 @@ impl V4l2MmapVideoFrame {
+         }
+     }
+ 
++    /// The decoder device, buffer and format of a dequeued frame, so its planes can be
++    /// exported (VIDIOC_EXPBUF) to another V4L2 device.
++    pub fn v4l2_export(&self) -> Option<(Arc<Device>, V4l2Buffer, Format)> {
++        Some((self.device.clone()?, self.buffer.clone()?, self.queue_format.clone()?))
++    }
++
+     fn map_helper(&self) -> Result<V4l2MmapMapping, String> {
+         let device = self.device.as_ref().ok_or("No V4L2 device!".to_string())?;
+         // SAFETY: The unsafe block is just because we're accessing a union, which is guaranteed

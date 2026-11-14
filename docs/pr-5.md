@@ -276,6 +276,8 @@
 
 事件：
 
+2026-11-13 补丁叠在已经打上的 `system_cros_codecs.patch` 上，原来的三份解码补丁没有重新生成。属性为空时默认开，设成 `0` 或转换失败时仍走 CPU 反块。解码服务是 `media` 用户，能打开已经改成 `media graphics` 的 `video4`。`libcros_codecs_ffi.so` 里有 `MDP3 converts MM21 to NV12`。super 展开后 8589934592 字节，sha256 `2af18a36e5598ea90fc69d120bc864f784f6e5de5ec577859ef36a287255069a`。三份 FIT 与 `20261113g` 相同。zip 是 `work/release/lineage-23.2-kukui-20261113h.zip`，1112446451 字节，sha256 `8925b92a063a69ceec1433ce0d29ebbed34770c8172870fdc4001361f7ae0447`。2026-11-13 19:49 写入 `/dev/sda`（序列号 `000000002959`）。整盘回读 sha256 `53b42db816f8ecf6ab5113f1438717076f78eb65e67646c386228c8e3f3a71cd`，super 回读与上面一致。2026-11-13 20:18 从 U 盘开机，`ro.build.date` 为 Fri Nov 13 19:40:08 EST 2026。720p H.264 走 `/dev/video2`，对齐后的尺寸是 1280x768。日志有 `MDP3 converts MM21 to NV12 (/dev/video4)`，1200 帧平均 4.42 ms，没有关掉转换，也没有失败后退回 CPU。`video4` 仍是 `mtk-mdp3:m2m`，权限是 `media graphics`，前四个节点没变。没有 tombstone。内核警告仍是 EC 睡眠超时和摄像头时钟、稳压器，不是 mdp3。VP8 和 VP9 仍走软件解码。
+
 ## be4af95 Rebuild the kernel modules with the MDP3 patch
 
 内容：按带 MDP3 补丁的内核重新放了一套 `.ko` 和模块清单。没有源码改动。
