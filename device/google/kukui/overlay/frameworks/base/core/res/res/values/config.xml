@@ -56,4 +56,11 @@
         <item>235</item>
         <item>255</item>
     </integer-array>
+
+    <!-- The wallpaper is shown zoomed in by this factor and zooms out with
+         the shade and recents. The display planes cannot scale, so at 1.10
+         the wallpaper was always GPU-composited, and with it every layer
+         between it and whatever moved on top. At 1.0 it is 1:1 and can sit
+         on a plane. The zoom animation goes away. -->
+    <item name="config_wallpaperMaxScale" format="float" type="dimen">1.0</item>
 </resources>

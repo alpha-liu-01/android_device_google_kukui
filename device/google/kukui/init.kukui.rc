@@ -39,11 +39,9 @@ on early-init
     # patch applied, apps render in panel orientation so planes can scan
     # them out. The compositor stays on GLES.
     setprop debug.hwui.gl_prerotation true
-    # The tenth boot got past HWC hotplug (ctl.start bootanim) and then
-    # SIGABRT about 160ms later, on the RenderEngine thread. That thread
-    # is priming the shader cache. Skip it so the first frames are the
-    # ones bootanim actually needs.
-    setprop service.sf.prime_shader_cache false
+    # Shader-cache priming is left at the SurfaceFlinger default. An early
+    # boot aborted on the RenderEngine thread while it primed, so this was
+    # forced off. That was before the current Mesa and this 6.18.28 image.
     # Desktop window shadows are drawn by the GPU. On Mali-G72 that pass
     # takes about 24 ms, so a 60 Hz panel presents every other vsync and
     # the whole screen, including menus, runs at about 30 fps. The panel

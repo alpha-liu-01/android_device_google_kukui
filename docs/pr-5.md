@@ -366,7 +366,15 @@
 
 2026-11-13 22:06 在 `10.0.0.120:5555` 上核对这张 `20261113k`。状态栏仍是 42×1920，合成类型是 CLIENT。电源 HAL 在跑，`/vendor/etc/powerhint.json` 是 1924 字节的普通文件，没有 tombstone。序列号 `HA16SW5Q`，硬件版本 `rev6 sku176`，系统时间是当天。U 盘 `suspend_power_off` 是 0，`mem_sleep` 停在 s2idle。ondemand 的 `up_threshold` 是 80，`io_is_busy` 是 1，background 和 system-background 在 0–3。`/proc/config.gz` 里有 `LRU_GEN`、pstore、BTF、`INET_DIAG_DESTROY`、`FS_VERITY`，`RTC_HCTOSYS` 关闭。Firefox 在前台。
 
-这张 FIT 的 sku176 DTB 是从内核树重新编译的，没有接上 `bringup/camera` 里的摄像头节点。和 `20261113h` 的 sku176 相比，除了 `/firmware` 的 `#address-cells` 和 `#size-cells`，摄像头节点也没了。传感器和 CAMSV 没有绑定，视频节点只剩 video0 解码、video1 编码、video2 `mtk-mdp3:m2m`，属组是 camera。下一份镜像要把摄像头片段接回 sku176，再从它导出 sku0。
+这张 FIT 的 sku176 DTB 是从内核树重新编译的，没有接上 `bringup/camera` 里的摄像头节点。和 `20261113h` 的 sku176 相比，除了 `/firmware` 的 `#address-cells` 和 `#size-cells`，摄像头节点也没了。传感器和 CAMSV 没有绑定，视频节点只剩 video0 解码、video1 编码、video2 `mtk-mdp3:m2m`，属组是 camera。
+
+摄像头片段已接回 `20261113k` 的 sku176，再导出 sku0。Kodama 的 DTB、内核、ramdisk、super 和菜单 FIT 都没换。内核 lzma crc 仍是 `8bc47106`。sku176 crc `d92fe442`，sku0 crc `5d3e47c2`，Kodama crc 仍是 `0e71f555`。USB ramdisk crc `2e38f1e4`，eMMC ramdisk crc `1276030d`。菜单 FIT 仍是 `653bb1a80043f3dd11f97d4059fc5f52335a50a99e8bf3ca4b8a8c0791d0a7ff`，lzma crc `f3ea1c10`。super 仍是 `bf5896c2c6e114165d04fe335336582103bc8ef91b24a1c7a8c0c3fb7f75b940`。zip 是 `work/release/lineage-23.2-kukui-20261113l.zip`，1116316682 字节，sha256 `12b8fe6046695143d0c2abb4d5de886affb047441f0155f6f2f9104f9fd020d8`。img sha256 `d1de068c7cc990902cec4b4aab7fc51b03b138524407553bdccfa1b746b108a9`。2026-11-13 22:29 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。
+
+2026-11-13 22:38 在 `10.0.0.120:5555` 上核对，用户确认相机正常。video0 和 video1 是 CAMSV，属组 camera；video2 是 `mtk-vcodec-dec`，video3 是 `mtk-vcodec-enc`，属组都是 camera；video4 是 `mtk-mdp3:m2m`，属组 graphics。后摄 `ov8856 2-0010`、对焦 `dw9768 2-000c`、前摄 `ov02a10 4-003d` 都绑上了。内核仍是 `6.18.28-mt81-kukui2`，编译时间 Fri Nov 13 21:46:27 EST 2026。
+
+单路硬解已经在更早的镜像上确认过。H.264 解码的 `concurrent-instances` 和 `ro.vendor.v4l2_codec2.decode_concurrent_instances` 改成 2，编码仍是 1。和壁纸缩放放在同一张 `20261113m` 里，shader cache 仍关着，安装器没有放进去。内核、三份 FIT 与 `20261113l` 相同。super 展开后 8589934592 字节，sha256 `54e94a774494bdff6b765646ec79c3b7fdbd4b6774f6e5119b2fd04f5826fe67`。zip 是 `work/release/lineage-23.2-kukui-20261113m.zip`，1116315528 字节，sha256 `3bea3e24d345f7da0ad19fa65a6e8a03dd87c75b0aeb4689f84abd2a33522810`。img sha256 `26955868831c566c7c1f087c46d987802ff0c3f07ad82195bf30d4590516cada`。2026-11-13 22:58 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。
+
+2026-11-13 23:20 在 `10.0.0.120:5555` 上核对。`decode_concurrent_instances` 是 2，解码器 xml 的上限是 2，编码仍是 1。MX Player 和 Just Player 都开了 `c2.v4l2.avc.decoder`，codec2 服务里同时有两路 H.264（stream 2 和之后的 stream 3）。互相暂停是音频焦点：两边都申请 `AUDIOFOCUS_GAIN`，大约两秒淡出后输的一方收到 loss 并自己停掉。不是解码器拒绝第二路。
 
 ## 7f6d160 Serial number, kernel BTF, socket destroy, SELinux labels part 2
 
@@ -432,7 +440,11 @@ AOT：更新系统走 OTA 那条启动，`pm.dexopt.boot-after-ota` 原来是 ve
 
 事件：
 
-2026-11-13 `TARGET_POWER_HAL` 改为 `perfmgr-lineage`，带上 `powerhint.json`。ondemand 的 `up_threshold` 为 80，`io_is_busy` 为 1，background 和 system-background 留在 0–3。`pm.dexopt.boot-after-ota=speed-profile`。`tun.ko` 进 `vendor_dlkm`。SELinux 补了 GPU、显示、音频和 mediacodec 的类型，原来的 MDP3 允许保留。壁纸缩放没有改，shader cache 仍是关闭。`/dev/video4` 的属主在更早的提交里已经是 `media graphics`，这一批没有再改。放进 `20261113i` 并在 21:00 写入。那一版没有进到开机动画。`/vendor/etc/powerhint.json` 在镜像里是指向编译机路径的符号链接，HAL 读不到，于是 `Invalid config` 退出。`system_server` 停在 `PowerManagerService` 等这个服务，开机动画没有出来。`link_device_tree` 把源文件做成符号链接，`prebuilt_etc` 原样装进了 vendor。现在先把内容复制成普通文件再安装，节点改用 `Paths`。内核和三份 FIT 与 `20261113i` 相同。super 展开后 8589934592 字节，sha256 `bf5896c2c6e114165d04fe335336582103bc8ef91b24a1c7a8c0c3fb7f75b940`。zip 是 `work/release/lineage-23.2-kukui-20261113j.zip`，1116313512 字节，sha256 `c6159f4632f8fbeb9930cfed6164ba0a5585f338e8c5ff6d045e847359046d26`。img sha256 `915d2c282b2403d7c8d75b667a8b1a585eceffd30b8fd48c5d5fe8dde88c0ab6`。2026-11-13 21:28 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。开机核对记在 `20261113k`。
+2026-11-13 `TARGET_POWER_HAL` 改为 `perfmgr-lineage`，带上 `powerhint.json`。ondemand 的 `up_threshold` 为 80，`io_is_busy` 为 1，background 和 system-background 留在 0–3。`pm.dexopt.boot-after-ota=speed-profile`。`tun.ko` 进 `vendor_dlkm`。SELinux 补了 GPU、显示、音频和 mediacodec 的类型，原来的 MDP3 允许保留。壁纸缩放没有改，shader cache 仍是关闭。`/dev/video4` 的属主在更早的提交里已经是 `media graphics`，这一批没有再改。放进 `20261113i` 并在 21:00 写入。那一版没有进到开机动画。`/vendor/etc/powerhint.json` 在镜像里是指向编译机路径的符号链接，HAL 读不到，于是 `Invalid config` 退出。`system_server` 停在 `PowerManagerService` 等这个服务，开机动画没有出来。`link_device_tree` 把源文件做成符号链接，`prebuilt_etc` 原样装进了 vendor。现在先把内容复制成普通文件再安装，节点改用 `Paths`。内核和三份 FIT 与 `20261113i` 相同。super 展开后 8589934592 字节，sha256 `bf5896c2c6e114165d04fe335336582103bc8ef91b24a1c7a8c0c3fb7f75b940`。zip 是 `work/release/lineage-23.2-kukui-20261113j.zip`，1116313512 字节，sha256 `c6159f4632f8fbeb9930cfed6164ba0a5585f338e8c5ff6d045e847359046d26`。img sha256 `915d2c282b2403d7c8d75b667a8b1a585eceffd30b8fd48c5d5fe8dde88c0ab6`。2026-11-13 21:28 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。开机核对记在 `20261113k`。`/dev/video4` 在 `20261113l` 上是 `mtk-mdp3:m2m`，属组 graphics。
+
+壁纸 `config_wallpaperMaxScale` 改成 1.0。shader cache 仍是关闭。和两路 H.264 解码放在同一张 `20261113m` 里。2026-11-13 22:58 已写入。两路硬解的核对记在 `bcc64e1`。
+
+`service.sf.prime_shader_cache=false` 已去掉，启动时按 SurfaceFlinger 的默认去预热 shader cache。安装器没有放进这张镜像。内核、三份 FIT 与 `20261113m` 相同。super 展开后 8589934592 字节，sha256 `1635ad8d7faeb37f15b49faff9147750bc748160d28accabbec817b7d1d95b63`。zip 是 `work/release/lineage-23.2-kukui-20261113n.zip`，1116315333 字节，sha256 `fe36c5526feca0046373d6cf1724d50b8bed4f00690106257bbfe8ec37bfa113`。img sha256 `9242eb64aacebcfd84e8d4f96f936a8f4ba142543807a8f3a415350918891b54`。2026-11-13 23:38 写入 `/dev/sda`（序列号 `000000002959`）。清缓存后整盘回读与 img 一致，super 回读与上面一致。
 
 ## fccfd18 docs: the USB kernel command line of the tested images
 
